@@ -51,6 +51,13 @@ After changes, verify at each zoom preset:
 4. Local Group — satellite galaxies, Andromeda, Triangulum visible
 5. Great Attractor — cosmic filaments, voids, galaxy clusters visible
 
+## Deployment
+- **Deploy script**: `./deploy.sh` — copies `cosmic-distances.html` to bill and skippy
+- **Auto-deploy**: `pre-push` git hook runs `deploy.sh` when pushing to `main`
+- **bill**: `cosmos.eusd.org` — `/opt/caddy/sites-content/distance-to-a-star/index.html`
+- **skippy**: `cosmos.711bf.org` — `/var/www/cosmos/index.html`
+- **No `Infinity` in visibility ranges** — use `400 * MLY` as upper bound (matches MAX_LOG). Infinity corrupts `navigateToObject` via `Math.sqrt(lo * Infinity) = Infinity`.
+
 ## Key Functions
 - `navigateToObject(name)` — Zoom+pan to frame an object
 - `drawSpiralArms(...)` — Logarithmic spiral galaxy renderer

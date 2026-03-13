@@ -335,7 +335,7 @@ var catRanges = {
   exotic: [50, 250000],
   galaxy: [200, 250000],
   local: [8000, 15e6],
-  cosmic: [2e6, Infinity]
+  cosmic: [2e6, 400 * MLY]
 };
 
 // ─── Presets ──────────────────────────────────────────────────────────
@@ -688,7 +688,7 @@ var objects = [
     facts: [["Distance", "~61 Mly"], ["Constellation", "Eridanus"], ["Feature", "Textbook example of barred spiral structure"]],
     desc: "Considered the prototypical barred spiral galaxy. Its prominent central bar channels gas inward, fueling star formation in a ring around the core." },
   { name: "IC 1101", x: -300 * MLY, y: 180 * MLY, dist: 1040 * MLY, radius: 14, color: "#ddccaa", glow: "#ddccaa44",
-    type: "Supergiant elliptical galaxy (cD)", category: "cosmic", visRange: [80 * MLY, Infinity],
+    type: "Supergiant elliptical galaxy (cD)", category: "cosmic", visRange: [80 * MLY, 400 * MLY],
     facts: [["Distance", "~1.04 Gly"], ["Diameter", "~4 Mly (largest known galaxy)"], ["Stars", "~100 trillion"], ["Cluster", "Abell 2029"]],
     desc: "One of the largest known galaxies in the observable universe. If placed where the Milky Way is, its halo would engulf both Magellanic Clouds and reach halfway to Andromeda." }
 ];
@@ -982,6 +982,11 @@ function getVisibleObjects() {
   var sh = H / devicePixelRatio;
   var m = 80;
   return objects.filter(function(o) {
+    // Always show the selected/navigated-to object
+    if (state.selected === o) {
+      var sp2 = worldToScreen(o.x, o.y);
+      return sp2.x > -m && sp2.x < sw + m && sp2.y > -m && sp2.y < sh + m;
+    }
     var range = o.visRange || catRanges[o.category];
     if (!range) return false;
     if (vr < range[0] || vr > range[1]) return false;
@@ -2946,6 +2951,9 @@ var lastFrameTime = 0;
 function animationLoop(ts) {
   requestAnimationFrame(animationLoop);
 
+  // Guard against corrupted zoom state
+  if (!isFinite(state.zoom)) state.zoom = Math.max(0, Math.min(1000, state.zoom || 0));
+
   // Warp decay
   if (!tourEngine.active && state.warpIntensity > 0.01) {
     state.warpIntensity *= 0.92;
@@ -3779,7 +3787,8 @@ function navigateToObject(objName) {
 
   var range = obj.visRange || catRanges[obj.category];
   if (!range) return;
-  var targetVR = Math.sqrt(range[0] * range[1]);
+  var rangeLo = range[0], rangeHi = Math.min(range[1], 400 * MLY);
+  var targetVR = Math.sqrt(rangeLo * rangeHi);
   if (obj.dist === 0 && obj.category === 'solar') targetVR = 0.00004;
 
   // If geometric mean is zero or nonsensical, compute from object distance
@@ -3809,7 +3818,7 @@ function navigateToObject(objName) {
   if (tourEngine.active) tourEngine.stop();
 
   // Animate zoom + pan simultaneously to center on the object
-  var targetSlider = Math.round(viewRadiusToSlider(targetVR));
+  var targetSlider = Math.max(0, Math.min(1000, Math.round(viewRadiusToSlider(targetVR))));
   var startZoom = state.zoom;
   var startPanX = state.panX, startPanY = state.panY;
   var targetPanX = obj.x, targetPanY = obj.y;
