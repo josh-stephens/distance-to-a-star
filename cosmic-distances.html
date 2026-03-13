@@ -27,6 +27,7 @@
   }
   .preset-btn:hover { background: #1e1e38; color: #c8c8e0; }
   .preset-btn.active { background: #1a2a4a; border-color: #3a5a8a; color: #7aaaee; }
+  .key-hint { opacity: 0.35; margin-left: 3px; font-size: 10px; }
   .glossary-btn {
     padding: 5px 14px; border: 1px solid #2a3a4a; background: #162a2a;
     color: #88aabb; border-radius: 4px; font-size: 11px; cursor: pointer;
@@ -86,6 +87,15 @@
   .tour-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2a44; transition: background 0.3s; cursor: pointer; }
   .tour-dot.active { background: #7aaaee; }
   .tour-dot.visited { background: #4a5a7a; }
+  .tour-timer-track {
+    margin-top: 10px; height: 2px; background: rgba(42, 42, 68, 0.6);
+    border-radius: 1px; overflow: hidden;
+  }
+  .tour-timer-fill {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #3a5a8a, #7aaaee);
+    border-radius: 1px; transition: none;
+  }
+  .tour-timer-fill.paused { opacity: 0.4; }
 
   .info-panel {
     position: absolute; top: 12px; right: 12px; width: min(460px, 35vw);
@@ -230,12 +240,13 @@
 
 <div class="top-bar">
   <h1>Cosmic Distance Explorer</h1>
-  <button class="preset-btn" data-preset="solar">Solar System</button>
-  <button class="preset-btn" data-preset="stellar">Nearest Stars</button>
-  <button class="preset-btn" data-preset="galaxy">Milky Way</button>
-  <button class="preset-btn" data-preset="local">Local Group</button>
-  <button class="preset-btn" data-preset="cosmic">Great Attractor</button>
-  <button class="glossary-btn" id="glossary-toggle-btn">Glossary <span style="opacity:0.45;margin-left:2px">/</span></button>
+  <button class="preset-btn" data-preset="solar">Solar System <span class="key-hint">1</span></button>
+  <button class="preset-btn" data-preset="stellar">Nearest Stars <span class="key-hint">2</span></button>
+  <button class="preset-btn" data-preset="constellations">Constellations <span class="key-hint">3</span></button>
+  <button class="preset-btn" data-preset="galaxy">Milky Way <span class="key-hint">4</span></button>
+  <button class="preset-btn" data-preset="local">Local Group <span class="key-hint">5</span></button>
+  <button class="preset-btn" data-preset="cosmic">Great Attractor <span class="key-hint">6</span></button>
+  <button class="glossary-btn" id="glossary-toggle-btn">Glossary <span class="key-hint">/</span></button>
   <div class="tour-menu-wrap">
     <button class="tour-btn" id="tour-btn">Tours &#x25be;</button>
     <div class="tour-dropdown" id="tour-dropdown"></div>
@@ -271,6 +282,9 @@
         <button class="narr-ctrl-btn" id="narr-next">Next &rarr;</button>
       </div>
       <div class="tour-progress" id="tour-progress"></div>
+      <div class="tour-timer-track">
+        <div class="tour-timer-fill" id="tour-timer-fill"></div>
+      </div>
     </div>
   </div>
 
@@ -323,7 +337,7 @@ function sliderToViewRadius(s) {
 
 // ─── Effects settings ──────────────────────────────────────────────────
 
-var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true };
+var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true };
 
 // ─── Category visibility ranges ────────────────────────────────────────
 
@@ -331,7 +345,7 @@ var catRanges = {
   solar: [0, 0.3],
   stellar: [0.3, 60],
   nebula: [50, 150000],
-  cluster: [500, 200000],
+  cluster: [200, 200000],
   exotic: [50, 250000],
   galaxy: [200, 250000],
   local: [8000, 15e6],
@@ -341,14 +355,15 @@ var catRanges = {
 // ─── Presets ──────────────────────────────────────────────────────────
 
 var presets = {
-  solar:      { vr: 0.00004 },
-  oort:       { vr: 3 },
-  stellar:    { vr: 18 },
-  galaxy:     { vr: 90000 },
-  satellites: { vr: 300000 },
-  local:      { vr: 3.5 * MLY },
-  virgo:      { vr: 80 * MLY },
-  cosmic:     { vr: 350 * MLY }
+  solar:          { vr: 0.00004 },
+  oort:           { vr: 3 },
+  stellar:        { vr: 18 },
+  constellations: { vr: 600 },
+  galaxy:         { vr: 90000 },
+  satellites:     { vr: 300000 },
+  local:          { vr: 3.5 * MLY },
+  virgo:          { vr: 80 * MLY },
+  cosmic:         { vr: 350 * MLY }
 };
 for (var k in presets) presets[k].slider = Math.round(viewRadiusToSlider(presets[k].vr));
 
@@ -435,6 +450,16 @@ var objects = [
     facts: [["Distance from Sun", "39.5 AU (5.5 light-hr)"], ["Orbital period", "248 years"], ["Heart feature", "Tombaugh Regio"]],
     desc: "Once the 9th planet, now classified as a dwarf planet. New Horizons revealed its heart-shaped nitrogen ice plain in 2015." },
 
+  // Spacecraft
+  { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
+    type: "Spacecraft", category: "solar", visRange: [0, 4],
+    facts: [["Distance from Sun", "~165 AU (22.8 light-hr)"], ["Launched", "September 5, 1977"], ["Speed", "~17 km/s (3.6 AU/yr)"], ["Status", "Interstellar space since 2012"]],
+    desc: "The most distant human-made object. Launched in 1977, Voyager 1 crossed the heliopause in 2012 and now travels through interstellar space. It carries a golden record with sounds and images of Earth. At its current speed, it would reach Proxima Centauri in ~73,000 years." },
+  { name: "Voyager 2", x: 100 * AU_IN_LY, y: -110 * AU_IN_LY, dist: 140 * AU_IN_LY, radius: 1.5, color: "#55ddff", glow: "#55ddff44",
+    type: "Spacecraft", category: "solar", visRange: [0, 4],
+    facts: [["Distance from Sun", "~140 AU (19.5 light-hr)"], ["Launched", "August 20, 1977"], ["Speed", "~15 km/s (3.3 AU/yr)"], ["Status", "Interstellar space since 2018"]],
+    desc: "The only spacecraft to visit all four giant planets. Voyager 2 crossed the heliopause in 2018. Despite being launched 16 days before Voyager 1, its Jupiter gravity assist sent it on a slower trajectory to also visit Uranus and Neptune." },
+
   // Stellar
   { name: "Proxima Centauri", x: -3.5, y: -2.3, dist: 4.24, radius: 2, color: "#ff6644", glow: "#ff664433",
     type: "Red dwarf (M5.5Ve)", category: "stellar",
@@ -448,6 +473,20 @@ var objects = [
     type: "Star (K1V)", category: "stellar",
     facts: [["Distance", "4.37 light-years"]],
     desc: "The smaller companion to Alpha Centauri A. An orange dwarf." },
+  // Exoplanets
+  { name: "Proxima Centauri b", x: -3.4, y: -2.4, dist: 4.24, radius: 1.5, color: "#66aacc", glow: "#66aacc44",
+    type: "Exoplanet (rocky, habitable zone)", category: "stellar", visRange: [0.5, 20],
+    facts: [["Distance", "4.24 light-years"], ["Mass", "~1.17 Earth masses"], ["Orbital period", "11.2 days"], ["Star", "Proxima Centauri (red dwarf)"]],
+    desc: "The nearest known exoplanet. An Earth-mass world orbiting in the habitable zone of Proxima Centauri, just 4.24 light-years away. Whether it retains an atmosphere under its star's intense flares remains one of astrobiology's biggest open questions." },
+  { name: "TRAPPIST-1 System", x: -30, y: -25, dist: 39.46, radius: 2, color: "#cc8866", glow: "#cc886644",
+    type: "7-planet system (3 in habitable zone)", category: "stellar", visRange: [8, 200],
+    facts: [["Distance", "39.46 light-years"], ["Planets", "7 rocky (b through h)"], ["Habitable zone", "e, f, g"], ["Star", "Ultra-cool red dwarf"]],
+    desc: "Seven Earth-sized rocky planets orbiting a dim red dwarf, three in the habitable zone. The most promising system for finding habitable worlds beyond our own. JWST is actively studying their atmospheres." },
+  { name: "Kepler-452b", x: 1200, y: -1300, dist: 1800, radius: 2, color: "#77bb99", glow: "#77bb9944",
+    type: "Exoplanet (super-Earth)", category: "stellar", visRange: [80, 8000],
+    facts: [["Distance", "1,800 light-years"], ["Radius", "~1.6 Earth radii"], ["Orbital period", "385 days"], ["Star", "Sun-like (G2V)"]],
+    desc: "Dubbed 'Earth 2.0' -- the first near-Earth-sized planet found in the habitable zone of a Sun-like star. Its year lasts 385 days and its star is nearly identical to our Sun, making it the most Earth-like world discovered by Kepler." },
+
   { name: "Barnard's Star", x: 3.0, y: 4.5, dist: 5.96, radius: 1.5, color: "#dd5533", glow: "#dd553322",
     type: "Red dwarf (M4Ve)", category: "stellar",
     facts: [["Distance", "5.96 light-years"], ["Age", "~10 billion years"]],
@@ -492,25 +531,131 @@ var objects = [
     type: "Supergiant (F7Ib)", category: "stellar", visRange: [80, 2000],
     facts: [["Distance", "433 light-years"], ["Type", "Cepheid variable (triple system)"], ["Role", "Current North Star"]],
     desc: "Earth's North Star. A Cepheid variable -- a standard candle for measuring cosmic distances." },
-  { name: "Antares", x: -300, y: 450, dist: 550, radius: 4, color: "#ff4422", glow: "#ff442244",
-    type: "Red supergiant (M1Iab)", category: "stellar", visRange: [80, 2500],
+  // ── Orion ──
+  { name: "Antares", x: -300, y: 420, dist: 550, radius: 4, color: "#ff4422", glow: "#ff442244",
+    type: "Red supergiant (M1Iab)", category: "stellar", visRange: [80, 2500], constellation: "scorpius",
     facts: [["Distance", "550 light-years"], ["Diameter", "680x Sun"], ["Constellation", "Scorpius (the heart)"]],
     desc: "Heart of the Scorpion. So large that if placed at the Sun, Mars would orbit inside it." },
-  { name: "Betelgeuse", x: 350, y: -600, dist: 700, radius: 5, color: "#ff6633", glow: "#ff663355",
-    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [100, 3000],
+  { name: "Betelgeuse", x: 20, y: -380, dist: 700, radius: 5, color: "#ff6633", glow: "#ff663355",
+    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 3000], constellation: "orion",
     facts: [["Distance", "700 light-years"], ["Diameter", "700-1000x Sun"], ["Fate", "Supernova within 100,000 yr"]],
     desc: "A red supergiant so immense it would engulf Jupiter. Will explode as a supernova." },
-  { name: "Rigel", x: -400, y: -760, dist: 863, radius: 4.5, color: "#99bbff", glow: "#99bbff55",
-    type: "Blue supergiant (B8Ia)", category: "stellar", visRange: [100, 4000],
+  { name: "Bellatrix", x: 230, y: -400, dist: 250, radius: 3, color: "#99aaff", glow: "#99aaff44",
+    type: "Blue giant (B2III)", category: "stellar", visRange: [50, 2000], constellation: "orion",
+    facts: [["Distance", "250 light-years"], ["Luminosity", "9,200 L\u2609"], ["Name meaning", "'Female warrior' in Latin"]],
+    desc: "Orion's right shoulder. At 250 ly, Bellatrix is much closer than the other Orion stars -- the constellation is an illusion of perspective." },
+  { name: "Alnitak", x: 60, y: -540, dist: 1200, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
+    type: "Triple star system (O9.7Ib)", category: "stellar", visRange: [50, 4000], constellation: "orion",
+    facts: [["Distance", "~1,200 light-years"], ["System", "Triple star system"], ["Nearby", "Illuminates Flame and Horsehead Nebulae"]],
+    desc: "The leftmost belt star. Its UV radiation illuminates the nearby Flame Nebula and sculpts the iconic Horsehead Nebula." },
+  { name: "Alnilam", x: 120, y: -555, dist: 2000, radius: 3, color: "#bbccff", glow: "#bbccff55",
+    type: "Blue supergiant (B0Ia)", category: "stellar", visRange: [50, 6000], constellation: "orion",
+    facts: [["Distance", "~2,000 light-years"], ["Luminosity", "275,000 L\u2609"], ["Belt position", "Center belt star (brightest)"]],
+    desc: "The center jewel of Orion's Belt and the most distant of the three. At 2,000 ly, it is nearly twice as far as its belt companions -- proof that constellations are illusions of projection." },
+  { name: "Mintaka", x: 180, y: -570, dist: 1200, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
+    type: "Multiple star system (O9.5II)", category: "stellar", visRange: [50, 4000], constellation: "orion",
+    facts: [["Distance", "~1,200 light-years"], ["System", "Eclipsing binary + 2 companions"], ["Belt position", "Westernmost (right) belt star"]],
+    desc: "The rightmost star of Orion's Belt. Actually a complex system of at least four stars, nearly on the celestial equator." },
+  { name: "Saiph", x: 40, y: -720, dist: 650, radius: 3, color: "#88aaff", glow: "#88aaff44",
+    type: "Blue supergiant (B0.5Ia)", category: "stellar", visRange: [50, 3000], constellation: "orion",
+    facts: [["Distance", "~650 light-years"], ["Luminosity", "56,000 L\u2609"], ["Name meaning", "'Sword of the Giant' in Arabic"]],
+    desc: "Orion's left foot. Despite similar luminosity to Rigel, it appears dimmer because more of its light is in the ultraviolet." },
+  { name: "Rigel", x: 210, y: -700, dist: 863, radius: 4.5, color: "#99bbff", glow: "#99bbff55",
+    type: "Blue supergiant (B8Ia)", category: "stellar", visRange: [50, 4000], constellation: "orion",
     facts: [["Distance", "863 light-years"], ["Luminosity", "120,000 L\u2609"], ["Role", "Illuminates Witch Head Nebula"]],
     desc: "A blue supergiant blazing at 120,000x the Sun's luminosity. The 7th brightest star." },
-  { name: "Deneb", x: 1500, y: 2100, dist: 2615, radius: 4, color: "#bbccff", glow: "#bbccff44",
+
+  // ── Scorpius (tail curves down from Antares) ──
+  { name: "Dschubba", x: -220, y: 280, dist: 490, radius: 2.5, color: "#aabbff", glow: "#aabbff33",
+    type: "Subgiant (B0.3IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
+    facts: [["Distance", "~490 light-years"], ["Name", "\u03b4 Scorpii"], ["Feature", "Be star with episodic brightening"]],
+    desc: "The forehead of the Scorpion. A Be star that occasionally ejects disks of gas, causing dramatic brightness changes." },
+  { name: "Sargas", x: -380, y: 540, dist: 300, radius: 2.5, color: "#ffddaa", glow: "#ffddaa33",
+    type: "Giant (F1II)", category: "stellar", visRange: [50, 2000], constellation: "scorpius",
+    facts: [["Distance", "~300 light-years"], ["Name", "\u03b8 Scorpii"], ["Luminosity", "~1,800 L\u2609"]],
+    desc: "A bright giant in the Scorpion's tail. At 300 ly, Sargas is much closer than the heart star Antares at 550 ly." },
+  { name: "Shaula", x: -440, y: 640, dist: 570, radius: 3, color: "#99bbff", glow: "#99bbff44",
+    type: "Triple star system (B2IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
+    facts: [["Distance", "~570 light-years"], ["Name", "\u03bb Scorpii (the stinger)"], ["System", "Triple star"]],
+    desc: "The stinger at the tip of the Scorpion's tail. The second brightest star in Scorpius after Antares." },
+
+  // ── Big Dipper / Ursa Major ──
+  { name: "Dubhe", x: 320, y: 380, dist: 124, radius: 2.5, color: "#ffcc66", glow: "#ffcc6633",
+    type: "Giant (K0III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "124 light-years"], ["Name", "\u03b1 Ursae Majoris"], ["Note", "NOT part of the Ursa Major Moving Group"]],
+    desc: "The front lip of the Big Dipper's bowl. Unlike 5 of the other Dipper stars, Dubhe is not part of the Ursa Major Moving Group -- the pattern is slowly dissolving." },
+  { name: "Merak", x: 340, y: 300, dist: 79, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+    type: "Star (A1V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "79 light-years"], ["Name", "\u03b2 Ursae Majoris"], ["Use", "Pointer star toward Polaris"]],
+    desc: "The bottom of the Dipper's bowl, and a pointer star: the line from Merak through Dubhe leads to Polaris." },
+  { name: "Phecda", x: 400, y: 270, dist: 84, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+    type: "Star (A0V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "84 light-years"], ["Name", "\u03b3 Ursae Majoris"], ["Group", "Ursa Major Moving Group"]],
+    desc: "The inner bottom corner of the Big Dipper's bowl. Part of the Ursa Major Moving Group, a loose cluster of stars sharing a common motion through space." },
+  { name: "Megrez", x: 410, y: 340, dist: 58, radius: 1.8, color: "#ddeeff", glow: "#ddeeff22",
+    type: "Star (A3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "58 light-years"], ["Name", "\u03b4 Ursae Majoris"], ["Note", "Faintest Dipper star"]],
+    desc: "The faintest star in the Big Dipper, where the bowl meets the handle. Also the closest Dipper star at just 58 ly." },
+  { name: "Alioth", x: 470, y: 310, dist: 81, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
+    type: "Star (A1III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "81 light-years"], ["Name", "\u03b5 Ursae Majoris"], ["Rank", "Brightest star in Ursa Major"]],
+    desc: "The brightest star in Ursa Major and the first star of the Dipper's handle." },
+  { name: "Mizar", x: 530, y: 270, dist: 78, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
+    type: "Sextuple star system (A2V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "78 light-years"], ["Companion", "Alcor (visual double)"], ["System", "Actually 6 stars"]],
+    desc: "The famous double star at the bend of the Dipper's handle. Paired with Alcor as an ancient eye test. Mizar itself is actually a sextuple system -- six stars masquerading as one." },
+  { name: "Alkaid", x: 590, y: 220, dist: 104, radius: 2.5, color: "#bbccff", glow: "#bbccff33",
+    type: "Star (B3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    facts: [["Distance", "104 light-years"], ["Name", "\u03b7 Ursae Majoris"], ["Note", "NOT part of the Moving Group"]],
+    desc: "The tip of the Dipper's handle. Like Dubhe at the bowl's front, Alkaid is NOT part of the Ursa Major Moving Group -- in millions of years, the Dipper will lose its shape." },
+
+  // ── Crux / Southern Cross ──
+  { name: "Acrux", x: -420, y: -310, dist: 321, radius: 3, color: "#aabbff", glow: "#aabbff44",
+    type: "Triple star system (B0.5IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    facts: [["Distance", "321 light-years"], ["Name", "\u03b1 Crucis"], ["System", "Triple star"], ["Use", "Points toward south celestial pole"]],
+    desc: "The brightest star in the Southern Cross and the southernmost first-magnitude star. A triple system used for centuries to find south." },
+  { name: "Mimosa", x: -490, y: -220, dist: 280, radius: 3, color: "#99bbff", glow: "#99bbff44",
+    type: "Giant (B1III)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    facts: [["Distance", "280 light-years"], ["Name", "\u03b2 Crucis"], ["Feature", "Pulsating variable (Beta Cephei type)"]],
+    desc: "The left arm of the Southern Cross. A pulsating variable that subtly changes brightness every few hours." },
+  { name: "Gacrux", x: -420, y: -130, dist: 88, radius: 2.5, color: "#ff9966", glow: "#ff996644",
+    type: "Red giant (M3.5III)", category: "stellar", visRange: [30, 1500], constellation: "crux",
+    facts: [["Distance", "88 light-years"], ["Name", "\u03b3 Crucis"], ["Color", "Distinctly red/orange"]],
+    desc: "The top of the Southern Cross -- and by far the closest of its stars at just 88 ly. Its warm orange color contrasts with the blue-white of the other three, a visual clue to its very different distance." },
+  { name: "Delta Crucis", x: -350, y: -220, dist: 345, radius: 2, color: "#aabbff", glow: "#aabbff33",
+    type: "Subgiant (B2IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    facts: [["Distance", "345 light-years"], ["Name", "\u03b4 Crucis"], ["Feature", "Pulsating variable"]],
+    desc: "The right arm of the Southern Cross. The faintest of the four main stars." },
+
+  // ── Cassiopeia (W-shape) ──
+  { name: "Caph", x: 400, y: -110, dist: 54, radius: 2, color: "#ffeedd", glow: "#ffeedd33",
+    type: "Giant (F2III)", category: "stellar", visRange: [20, 1000], constellation: "cassiopeia",
+    facts: [["Distance", "54 light-years"], ["Name", "\u03b2 Cassiopeiae"], ["Feature", "Delta Scuti variable"]],
+    desc: "The leftmost peak of Cassiopeia's W and the closest of its stars at just 54 ly. A rapidly oscillating star used to study stellar interiors." },
+  { name: "Schedar", x: 440, y: -220, dist: 228, radius: 2.5, color: "#ffaa66", glow: "#ffaa6633",
+    type: "Giant (K0IIIa)", category: "stellar", visRange: [40, 1500], constellation: "cassiopeia",
+    facts: [["Distance", "228 light-years"], ["Name", "\u03b1 Cassiopeiae"], ["Color", "Distinctly orange"]],
+    desc: "The brightest star in Cassiopeia and the left valley of the W. Its warm orange glow marks it among its bluer neighbors." },
+  { name: "Gamma Cassiopeiae", x: 510, y: -100, dist: 550, radius: 3, color: "#aaccff", glow: "#aaccff44",
+    type: "Be star (B0.5IVe)", category: "stellar", visRange: [50, 2500], constellation: "cassiopeia",
+    facts: [["Distance", "~550 light-years"], ["Feature", "Eruptive variable, spins near breakup speed"], ["X-ray", "Anomalously strong X-ray source"]],
+    desc: "The center peak of Cassiopeia's W. A Be star spinning so fast it flings off disks of gas, causing unpredictable brightness changes. A mysteriously strong X-ray source." },
+  { name: "Ruchbah", x: 570, y: -240, dist: 99, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+    type: "Eclipsing binary (A5III-IV)", category: "stellar", visRange: [30, 1000], constellation: "cassiopeia",
+    facts: [["Distance", "99 light-years"], ["Name", "\u03b4 Cassiopeiae"], ["Feature", "Algol-type eclipsing binary"]],
+    desc: "The right valley of Cassiopeia's W. An eclipsing binary where the companion star periodically passes in front, dimming its light." },
+  { name: "Segin", x: 630, y: -130, dist: 410, radius: 2, color: "#bbccff", glow: "#bbccff33",
+    type: "Subgiant (B3III)", category: "stellar", visRange: [50, 2000], constellation: "cassiopeia",
+    facts: [["Distance", "410 light-years"], ["Name", "\u03b5 Cassiopeiae"], ["Cluster", "Near open cluster NGC 146"]],
+    desc: "The rightmost peak of Cassiopeia's W. The depth story is vivid here: Caph (54 ly) and Ruchbah (99 ly) are nearby, while Segin (410 ly) and Gamma Cas (550 ly) are 5-10x farther." },
+
+  { name: "Deneb", x: 700, y: 80, dist: 2615, radius: 4, color: "#bbccff", glow: "#bbccff44",
     type: "Supergiant (A2Ia)", category: "stellar", visRange: [300, 8000],
     facts: [["Distance", "2,615 light-years"], ["Luminosity", "200,000 L\u2609"], ["Light departed", "~400 BC"]],
     desc: "200,000x the Sun's luminosity. Its light left when Socrates walked Athens." },
 
   // Nebulae
-  { name: "Helix Nebula", x: 300, y: -600, dist: 655, radius: 5, color: "#44ddcc", glow: "#44ddcc33",
+  { name: "Helix Nebula", x: -200, y: -630, dist: 655, radius: 5, color: "#44ddcc", glow: "#44ddcc33",
     type: "Planetary nebula", category: "nebula", visRange: [100, 30000],
     facts: [["Distance", "655 light-years"], ["Diameter", "~5.7 ly"], ["Nickname", "Eye of God"]],
     desc: "A dying star's outer layers expelled into space, forming the 'Eye of God.'" },
@@ -527,55 +672,69 @@ var objects = [
     facts: [["Distance", "6,500 light-years"], ["Diameter", "~11 ly"], ["Origin", "Supernova of 1054 AD"]],
     desc: "Remains of a star that exploded in 1054 AD, recorded by Chinese astronomers." },
   { name: "Eagle Nebula", x: -4000, y: 5600, dist: 7000, radius: 6, color: "#cc88ff", glow: "#cc88ff33",
-    type: "Emission nebula", category: "nebula", visRange: [500, 80000],
+    type: "Emission nebula", category: "nebula", visRange: [200, 80000],
     facts: [["Distance", "7,000 light-years"], ["Feature", "Pillars of Creation (5 ly tall)"], ["Status", "May already be destroyed"]],
     desc: "Home of the Pillars of Creation -- towering columns of gas where new stars form." },
   { name: "Carina Nebula", x: -5000, y: -7000, dist: 8500, radius: 7, color: "#ff7788", glow: "#ff778844",
-    type: "Emission nebula", category: "nebula", visRange: [500, 80000],
+    type: "Emission nebula", category: "nebula", visRange: [200, 80000],
     facts: [["Distance", "8,500 light-years"], ["Diameter", "~300 ly"], ["Contains", "Eta Carinae (unstable hypergiant)"]],
     desc: "One of the largest nebulae, hosting the unstable hypergiant Eta Carinae." },
 
   // Exotic
   { name: "Vela Pulsar", x: -500, y: 800, dist: 936, radius: 2, color: "#44ffaa", glow: "#44ffaa44",
-    type: "Neutron star / Pulsar", category: "exotic", visRange: [100, 30000],
+    type: "Neutron star / Pulsar", category: "exotic", visRange: [50, 30000],
     facts: [["Distance", "936 light-years"], ["Spin rate", "11.2 Hz"], ["Age", "~11,000 years"]],
     desc: "Born from a supernova 11,000 years ago. Spins 11 times per second." },
   { name: "Crab Pulsar", x: -2020, y: 6220, dist: 6500, radius: 2, color: "#ffaa22", glow: "#ffaa2244",
-    type: "Neutron star (30 Hz)", category: "exotic", visRange: [500, 80000],
+    type: "Neutron star (30 Hz)", category: "exotic", visRange: [100, 80000],
     facts: [["Distance", "6,500 light-years"], ["Spin rate", "30 Hz"], ["Role", "Powers Crab Nebula's glow"]],
     desc: "Spinning 30 times per second, this tiny star powers the entire Crab Nebula." },
   { name: "Cygnus X-1", x: 4000, y: 4500, dist: 6070, radius: 3, color: "#aa44ff", glow: "#aa44ff55",
-    type: "Stellar black hole (21 M\u2609)", category: "exotic", visRange: [500, 80000],
+    type: "Stellar black hole (21 M\u2609)", category: "exotic", visRange: [100, 80000],
     facts: [["Distance", "6,070 light-years"], ["Mass", "21 M\u2609"], ["Discovery", "1964 (X-ray), first accepted BH"]],
     desc: "The first widely accepted black hole. Hawking bet against it and conceded in 1990." },
   { name: "SGR 1806-20", x: -24000, y: 2000, dist: 50000, radius: 3, color: "#ff44aa", glow: "#ff44aa55",
-    type: "Magnetar", category: "exotic", visRange: [5000, 200000],
+    type: "Magnetar", category: "exotic", visRange: [500, 200000],
     facts: [["Distance", "50,000 light-years"], ["2004 flare", "Altered Earth's ionosphere"], ["Magnetic field", "~10^15 x Earth's"]],
     desc: "The most powerful magnetic object known. Its 2004 flare affected Earth from 50,000 ly away." },
 
+  // Historic supernovae
+  { name: "Tycho's SN Remnant", x: 6000, y: -5400, dist: 8000, radius: 4, color: "#ff6644", glow: "#ff664455",
+    type: "Supernova remnant (Type Ia)", category: "exotic", visRange: [200, 80000],
+    facts: [["Distance", "~8,000 light-years"], ["Observed", "November 1572 by Tycho Brahe"], ["Type", "Type Ia (thermonuclear)"], ["Significance", "Shattered the 'unchanging heavens' doctrine"]],
+    desc: "In 1572, Tycho Brahe observed a 'new star' brighter than Venus that shook the foundations of astronomy. This Type Ia supernova proved the heavens could change, undermining centuries of Aristotelian cosmology." },
+  { name: "Kepler's SN Remnant", x: -15000, y: 13000, dist: 20000, radius: 4, color: "#ee5533", glow: "#ee553355",
+    type: "Supernova remnant (Type Ia)", category: "exotic", visRange: [500, 120000],
+    facts: [["Distance", "~20,000 light-years"], ["Observed", "October 1604 by Johannes Kepler"], ["Type", "Type Ia (thermonuclear)"], ["Note", "Last visible supernova in the Milky Way"]],
+    desc: "The last supernova observed with the naked eye in our galaxy. Kepler studied it for over a year, publishing 'De Stella Nova' in 1606. No Milky Way supernova has been seen since." },
+  { name: "SN 1987A", x: 72000, y: -143000, dist: 160000, radius: 5, color: "#ff8855", glow: "#ff885566",
+    type: "Supernova remnant (Type II)", category: "exotic", visRange: [20000, 8 * MLY],
+    facts: [["Distance", "~168,000 ly (in LMC)"], ["Observed", "February 23, 1987"], ["Neutrinos", "First supernova neutrinos detected"], ["Progenitor", "Blue supergiant Sanduleak -69 202"]],
+    desc: "The closest supernova since the invention of the telescope. Neutrino detectors in Japan and the US caught 25 neutrinos hours before the light arrived, confirming core-collapse theory and opening the era of neutrino astronomy." },
+
   // Clusters
   { name: "47 Tucanae", x: 5000, y: -12000, dist: 13000, radius: 4, color: "#ffcc88", glow: "#ffcc8833",
-    type: "Globular cluster", category: "cluster", visRange: [2000, 150000],
+    type: "Globular cluster", category: "cluster", visRange: [500, 150000],
     facts: [["Distance", "13,000 light-years"], ["Stars", "~1 million"], ["Rank", "2nd brightest globular"]],
     desc: "One of the most massive globular clusters, visible to the naked eye from the Southern Hemisphere." },
   { name: "Omega Centauri", x: -8000, y: -13000, dist: 15800, radius: 5, color: "#ffdd99", glow: "#ffdd9944",
-    type: "Globular cluster (~10M stars)", category: "cluster", visRange: [2000, 150000],
+    type: "Globular cluster (~10M stars)", category: "cluster", visRange: [500, 150000],
     facts: [["Distance", "15,800 light-years"], ["Stars", "~10 million"], ["Origin", "May be a stripped dwarf galaxy core"]],
     desc: "The largest MW globular cluster. May be the remnant core of a consumed dwarf galaxy." },
   { name: "M13", x: 10000, y: 19000, dist: 22200, radius: 4, color: "#eedd88", glow: "#eedd8833",
-    type: "Globular cluster (Hercules)", category: "cluster", visRange: [3000, 150000],
+    type: "Globular cluster (Hercules)", category: "cluster", visRange: [800, 150000],
     facts: [["Distance", "22,200 light-years"], ["Stars", "~300,000"], ["1974 Arecibo message", "Target of first interstellar radio message"]],
     desc: "The Great Globular Cluster in Hercules. Target of the 1974 Arecibo message." },
   { name: "M22", x: -14000, y: 5000, dist: 10600, radius: 3.5, color: "#eedd88", glow: "#eedd8833",
-    type: "Globular cluster (Sagittarius)", category: "cluster", visRange: [2000, 150000],
+    type: "Globular cluster (Sagittarius)", category: "cluster", visRange: [500, 150000],
     facts: [["Distance", "10,600 light-years"], ["Stars", "~83,000"], ["Age", "~12 billion years"]],
     desc: "One of the nearest globular clusters and among the first discovered. Contains two stellar-mass black holes." },
   { name: "M3", x: 18000, y: -28000, dist: 33900, radius: 3.5, color: "#eedd99", glow: "#eedd9933",
-    type: "Globular cluster (Canes Venatici)", category: "cluster", visRange: [3000, 150000],
+    type: "Globular cluster (Canes Venatici)", category: "cluster", visRange: [800, 150000],
     facts: [["Distance", "33,900 light-years"], ["Stars", "~500,000"], ["Variable stars", "274 known (most of any GC)"]],
     desc: "One of the largest and brightest globular clusters. Contains the most variable stars of any known globular, making it invaluable for studying stellar evolution." },
   { name: "Palomar 5", x: -30000, y: 55000, dist: 75700, radius: 3, color: "#ccbb88", glow: "#ccbb8822",
-    type: "Globular cluster (disrupting)", category: "cluster", visRange: [5000, 200000],
+    type: "Globular cluster (disrupting)", category: "cluster", visRange: [1500, 200000],
     facts: [["Distance", "75,700 light-years"], ["Stars", "~10,000 (and shrinking)"], ["Tidal tails", "Span ~30,000 ly"]],
     desc: "A globular cluster being ripped apart by the Milky Way's tidal forces. Its spectacular tidal tails stretch 30,000 light-years, providing a real-time view of how galaxies consume their satellites." },
 
@@ -731,6 +890,10 @@ var glossaryData = [
   { name: "Neptune", cat: "Solar System", color: "#4466cc", short: "The windiest world", long: "The farthest planet from the Sun, Neptune hosts the fastest winds in the solar system at up to 2,100 km/h. Its largest moon Triton orbits backward, suggesting it was captured from the Kuiper Belt. Neptune was the first planet found by mathematical prediction rather than direct observation, discovered in 1846." },
   { name: "Pluto", cat: "Solar System", color: "#ccbbaa", short: "The demoted world", long: "Once the ninth planet, Pluto was reclassified as a dwarf planet in 2006 when the International Astronomical Union redefined what constitutes a planet. Orbiting in the Kuiper Belt at an average of 39.5 AU, it was visited by NASA's New Horizons spacecraft in 2015, revealing a world of nitrogen ice plains, mountains of water ice, and a thin atmosphere." },
 
+  // Spacecraft
+  { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
+  { name: "Voyager 2", cat: "Solar System", color: "#55ddff", short: "Grand Tour of the giants", long: "Launched August 20, 1977 -- 16 days before Voyager 1 -- Voyager 2 is the only spacecraft to visit all four giant planets: Jupiter, Saturn, Uranus, and Neptune. Its Neptune flyby in 1989 revealed active geysers on Triton. It crossed the heliopause into interstellar space in November 2018 at roughly 140 AU from the Sun. Unlike Voyager 1, its plasma science instrument still works, providing unique data about the interstellar medium." },
+
   // Additional Stars
   { name: "Proxima Centauri", cat: "Stars", color: "#ff6644", short: "Nearest star to the Sun", long: "A small red dwarf just 4.24 light-years away -- the closest star to our solar system. Despite its proximity, it is far too faint to see with the naked eye. Proxima b, an Earth-sized planet in its habitable zone, orbits every 11 days. At Voyager 1's speed, reaching Proxima Centauri would take roughly 73,000 years." },
   { name: "\u03b1 Centauri A", cat: "Stars", color: "#ffee66", short: "Sun's nearest twin", long: "The brighter component of the Alpha Centauri binary system at 4.37 light-years, Alpha Centauri A is nearly identical to our Sun in mass, luminosity, and spectral type (G2V). It forms the closest star system to Earth along with its companions Alpha Centauri B and Proxima Centauri." },
@@ -774,9 +937,51 @@ var glossaryData = [
 
   // Additional Extreme Phenomena
   { name: "Crab Pulsar", cat: "Extreme Phenomena", color: "#ffaa22", short: "Heart of the Crab Nebula", long: "A neutron star at the center of the Crab Nebula, spinning 30 times per second. Born from the supernova of 1054 AD recorded by Chinese astronomers, this tiny remnant just 20 km across powers the entire nebula's glow with its rotational energy, emitting radiation from radio waves to gamma rays." },
+  { name: "Tycho's Supernova", cat: "Extreme Phenomena", color: "#ff6644", short: "The star that changed astronomy (1572)", long: "In November 1572, Tycho Brahe observed a brilliant 'new star' in Cassiopeia that outshone Venus and remained visible for 16 months. His meticulous observations proved it was far beyond the Moon, shattering the Aristotelian belief that the heavens were perfect and unchanging. The remnant, 8,000 light-years away, was a Type Ia supernova -- a white dwarf that detonated after accreting too much matter from a companion star." },
+  { name: "Kepler's Supernova", cat: "Extreme Phenomena", color: "#ee5533", short: "Last naked-eye supernova in the Milky Way (1604)", long: "Johannes Kepler studied this 'new star' in Ophiuchus for over a year, publishing 'De Stella Nova' in 1606. At 20,000 light-years away, it was the last supernova visible to the naked eye in our galaxy. Over 400 years later, astronomers are still waiting for the next one. Its remnant is now a rapidly expanding shell of hot gas studied across all wavelengths." },
+  { name: "SN 1987A", cat: "Extreme Phenomena", color: "#ff8855", short: "First supernova neutrinos (1987)", long: "On February 23, 1987, a blue supergiant exploded in the Large Magellanic Cloud 168,000 light-years away -- the closest supernova since Kepler's in 1604. Hours before the light arrived, neutrino detectors in Japan (Kamiokande II) and the US (IMB) caught 25 neutrinos, confirming core-collapse theory and opening the era of neutrino astronomy. The expanding ring of debris continues to brighten as the shockwave catches up with material ejected thousands of years earlier." },
+
+  // Exoplanets
+  { name: "Proxima Centauri b", cat: "Stars", color: "#66aacc", short: "Nearest known exoplanet", long: "An Earth-mass world in the habitable zone of our nearest stellar neighbor, just 4.24 light-years away. Discovered in 2016, Proxima b orbits every 11.2 days. Its host star is a violent flare star, raising questions about whether any atmosphere could survive. If it has liquid water, it would be the closest possible abode for extraterrestrial life." },
+  { name: "TRAPPIST-1 System", cat: "Stars", color: "#cc8866", short: "Seven Earth-sized worlds", long: "A remarkable system of seven rocky planets orbiting an ultra-cool red dwarf 39 light-years away. Three of the planets (e, f, and g) orbit in the habitable zone. All seven are close enough to each other that standing on one, you could see the others as clearly as we see the Moon. JWST is actively probing their atmospheres for signs of water and biosignatures." },
+  { name: "Kepler-452b", cat: "Stars", color: "#77bb99", short: "Earth's bigger, older cousin", long: "Dubbed 'Earth 2.0' when discovered in 2015, Kepler-452b orbits a Sun-like star every 385 days at 1,800 light-years. About 60% larger than Earth, it sits in its star's habitable zone. Its host star is 1.5 billion years older than our Sun, offering a possible glimpse at Earth's future. Whether it is rocky or gaseous remains unknown." },
 
   // Additional Concepts
-  { name: "Spiral Arms", cat: "Concepts", color: "#5588bb", short: "The galaxy's grand design", long: "The Milky Way's spiral arms are not solid structures but density waves -- regions where stars, gas, and dust pile up temporarily, like a cosmic traffic jam. Our Sun sits in the Orion Arm (also called the Orion Spur), a minor arm between the major Perseus and Sagittarius arms. Star formation concentrates in the arms because the density waves compress gas clouds, triggering collapse." }
+  { name: "Spiral Arms", cat: "Concepts", color: "#5588bb", short: "The galaxy's grand design", long: "The Milky Way's spiral arms are not solid structures but density waves -- regions where stars, gas, and dust pile up temporarily, like a cosmic traffic jam. Our Sun sits in the Orion Arm (also called the Orion Spur), a minor arm between the major Perseus and Sagittarius arms. Star formation concentrates in the arms because the density waves compress gas clouds, triggering collapse." },
+  { name: "Dark Matter Halos", cat: "Concepts", color: "#8877aa", short: "Invisible scaffolding of galaxies", long: "Every galaxy is embedded in an enormous halo of dark matter extending far beyond its visible stars. The Milky Way's dark matter halo is estimated to reach 300,000 light-years or more -- several times the visible disk. Dark matter makes up about 85% of all matter in the universe. We cannot see it, but its gravity holds galaxies together: without it, stars at the edges of galaxies would fly off into intergalactic space." },
+  { name: "Observable Universe", cat: "Concepts", color: "#9977bb", short: "The cosmic horizon at 46.5 billion light-years", long: "The observable universe extends 46.5 billion light-years in every direction -- not because the universe is 46.5 billion years old (it is 13.8 billion), but because space itself has been expanding. Light from the most distant visible objects has been traveling for 13.8 billion years, but the expansion of space has stretched that distance to 46.5 billion light-years. Beyond this horizon, light has not had time to reach us. There may be infinitely more universe beyond what we can observe." },
+  { name: "Supernovae", cat: "Concepts", color: "#ff7744", short: "Stellar explosions that forge the elements", long: "A supernova is the explosive death of a star, briefly outshining its entire host galaxy. Type II supernovae occur when massive stars (8+ solar masses) exhaust their fuel and their cores collapse. Type Ia supernovae happen when white dwarfs exceed the Chandrasekhar limit by accreting matter from a companion. Both types seed the cosmos with heavy elements -- every atom of iron, gold, and uranium on Earth was forged in a supernova. Historic supernovae observed by Tycho (1572), Kepler (1604), and in the LMC (1987A) have shaped our understanding of stellar death." },
+  { name: "Exoplanets", cat: "Concepts", color: "#66aacc", short: "Worlds beyond our solar system", long: "As of 2025, over 5,700 exoplanets have been confirmed orbiting other stars. The Kepler mission alone found thousands, revealing that planets are the rule rather than the exception -- on average, every star in the Milky Way has at least one planet. The nearest known exoplanet, Proxima Centauri b, orbits our closest stellar neighbor just 4.24 light-years away. JWST is now characterizing exoplanet atmospheres, searching for biosignatures like water vapor, methane, and oxygen." },
+  { name: "Constellations", cat: "Concepts", color: "#7888bb", short: "Flat patterns from a 3D universe", long: "Constellations are patterns of stars that appear close together on the sky but are typically at vastly different distances. Orion is a perfect example: Bellatrix (250 ly), Betelgeuse (700 ly), Rigel (863 ly), and the belt stars (1,200-2,000 ly) span nearly 10x in depth. The familiar shapes are accidents of our viewpoint -- from another star system, these constellations would be unrecognizable. Ancient cultures independently drew different patterns from the same stars." },
+
+  // Orion constellation stars
+  { name: "Bellatrix", cat: "Stars", color: "#99aaff", short: "Orion's closer shoulder", long: "The left shoulder of Orion at just 250 light-years -- much closer than the other bright Orion stars. Bellatrix demonstrates that constellation patterns are illusions of perspective: stars that appear side by side can be at wildly different distances. Its name means 'female warrior' in Latin." },
+  { name: "Mintaka", cat: "Stars", color: "#aabbff", short: "Belt star nearly on the equator", long: "The westernmost (rightmost) star of Orion's Belt at 1,200 light-years. Mintaka sits almost exactly on the celestial equator, making it useful for navigation. It is actually a complex system of at least four stars orbiting each other." },
+  { name: "Alnilam", cat: "Stars", color: "#bbccff", short: "Belt's center -- twice as far", long: "The center and brightest star of Orion's Belt, blazing at 275,000 times the Sun's luminosity from 2,000 light-years away. It is nearly twice as distant as its belt companions Mintaka and Alnitak, proving that the three 'aligned' stars are not physically associated -- they just happen to line up from Earth's viewpoint." },
+  { name: "Alnitak", cat: "Stars", color: "#aabbff", short: "Sculptor of the Horsehead", long: "The easternmost (leftmost) belt star at 1,200 light-years. Its intense ultraviolet radiation illuminates the Flame Nebula and sculpts the iconic Horsehead Nebula, one of the most photographed objects in the sky. Alnitak is a triple star system." },
+  { name: "Saiph", cat: "Stars", color: "#88aaff", short: "Orion's ultraviolet foot", long: "Orion's right foot (lower left as seen from the Northern Hemisphere) at 650 light-years. Despite having similar luminosity to Rigel, Saiph appears dimmer because more of its energy is emitted in the ultraviolet, invisible to our eyes. Its name derives from the Arabic for 'sword of the giant.'" },
+
+  // Scorpius stars
+  { name: "Dschubba", cat: "Stars", color: "#aabbff", short: "The Scorpion's forehead", long: "Delta Scorpii, the forehead of Scorpius at 490 light-years. A Be star that dramatically brightened in 2000 when its eccentric companion passed close by, ejecting a disk of gas. It has remained brighter than its historical magnitude ever since -- a rare event witnessed in real time." },
+  { name: "Sargas", cat: "Stars", color: "#ffddaa", short: "Closer than the heart", long: "Theta Scorpii, a bright giant in the Scorpion's curved tail at 300 light-years -- significantly closer than the heart star Antares at 550 ly. The depth variation along the Scorpion's body shows how constellation shapes are accidents of perspective." },
+  { name: "Shaula", cat: "Stars", color: "#99bbff", short: "The Scorpion's stinger", long: "Lambda Scorpii, the tip of the Scorpion's tail and the second brightest star in Scorpius after Antares. At 570 light-years, this triple star system marks one of the most recognizable asterisms in the southern sky." },
+
+  // Big Dipper stars
+  { name: "Dubhe", cat: "Stars", color: "#ffcc66", short: "The Dipper's dissolving edge", long: "Alpha Ursae Majoris, the front lip of the Big Dipper's bowl at 124 light-years. Crucially, Dubhe is NOT part of the Ursa Major Moving Group that includes 5 of the 7 Dipper stars. Over millions of years, Dubhe and Alkaid will drift away and the Big Dipper will lose its familiar shape." },
+  { name: "Merak", cat: "Stars", color: "#ddeeff", short: "Pointer to Polaris", long: "Beta Ursae Majoris at 79 light-years. Draw a line from Merak through Dubhe and extend it about 5x the distance between them -- you will arrive at Polaris. This pointer trick has guided navigators for millennia." },
+  { name: "Mizar", cat: "Stars", color: "#ddeeff", short: "Six stars pretending to be one", long: "Zeta Ursae Majoris at 78 light-years -- the most famous double star in the sky. Visible next to faint Alcor, Mizar was used as an ancient eye test. Modern spectroscopy revealed that Mizar is actually a sextuple system: six stars gravitationally bound, appearing as a single point of light." },
+  { name: "Alkaid", cat: "Stars", color: "#bbccff", short: "The handle's orphan", long: "Eta Ursae Majoris, the tip of the Big Dipper's handle at 104 light-years. Like Dubhe, Alkaid is NOT part of the Ursa Major Moving Group. These two 'outsider' stars at opposite ends of the Dipper are slowly diverging from the five middle stars, meaning the Dipper is temporary -- it will be unrecognizable in about 50,000 years." },
+
+  // Southern Cross stars
+  { name: "Acrux", cat: "Stars", color: "#aabbff", short: "Pointer to the south pole", long: "Alpha Crucis, the brightest star in the Southern Cross at 321 light-years. A triple star system that serves as a celestial compass: extending the long axis of the Cross about 4.5x from Acrux points to the south celestial pole. Featured on the flags of Australia, New Zealand, Brazil, and Papua New Guinea." },
+  { name: "Gacrux", cat: "Stars", color: "#ff9966", short: "The nearby red outsider", long: "Gamma Crucis, the top of the Southern Cross and its closest star at just 88 light-years -- less than a third the distance of the other three main stars. Its warm orange color against the blue-white of its companions is a visual clue to its very different nature and distance." },
+  { name: "Mimosa", cat: "Stars", color: "#99bbff", short: "The pulsating cross arm", long: "Beta Crucis at 280 light-years, the left arm of the Southern Cross. A Beta Cephei variable that subtly pulsates in brightness over a few hours. The second brightest star in the Cross." },
+
+  // Cassiopeia stars
+  { name: "Gamma Cassiopeiae", cat: "Stars", color: "#aaccff", short: "Spinning near self-destruction", long: "The center peak of Cassiopeia's W at 550 light-years. A Be star rotating so fast it is nearly tearing itself apart, ejecting disks of gas that cause dramatic brightness fluctuations. It is also an anomalously strong X-ray source whose mechanism remains debated." },
+  { name: "Schedar", cat: "Stars", color: "#ffaa66", short: "The orange queen", long: "Alpha Cassiopeiae at 228 light-years, the brightest star in Cassiopeia. Its warm orange color contrasts with the blue-white of its neighbors, similar to how Gacrux stands out in the Southern Cross -- different color often means different distance." },
+  { name: "Caph", cat: "Stars", color: "#ffeedd", short: "Cassiopeia's closest star", long: "Beta Cassiopeiae at just 54 light-years -- by far the closest star in Cassiopeia's W. A Delta Scuti variable that pulsates rapidly. It sits at the left peak of the W, while the center peak (Gamma Cas at 550 ly) is ten times farther away." },
+  { name: "Segin", cat: "Stars", color: "#bbccff", short: "The far end of the W", long: "Epsilon Cassiopeiae at 410 light-years, the rightmost peak of Cassiopeia's W-shape. Lying near the open cluster NGC 146, Segin shares the far side of Cassiopeia with Gamma Cas (550 ly), while the nearer stars Caph (54 ly) and Ruchbah (99 ly) create a striking depth contrast across the constellation." }
 ];
 
 // ─── Tour definitions ─────────────────────────────────────────────────
@@ -786,15 +991,15 @@ var tourDefs = {
     name: "The Pale Blue Dot Tour",
     desc: "Earth to the Great Attractor and back",
     steps: [
-      { vr: 0.00004, title: "This Is Home", body: "Earth orbits the Sun at 1 AU -- about 8 light-minutes away. A beam of sunlight you see right now left the Sun before you started reading this sentence. This tiny gap is where we begin.", scale: "View: ~2.5 AU across", dwell: 6000 },
-      { vr: 3, title: "The Sun's Domain", body: "Zoom out 75,000x. The Oort Cloud marks the outermost reach of the Sun's gravity -- a shell of icy bodies extending ~1.6 light-years out. Beyond this boundary, we belong to the galaxy. Voyager 1, launched in 1977, won't reach the Oort Cloud for another 300 years.", scale: "View: ~6 light-years across  |  75,000x wider", dwell: 7000 },
-      { vr: 18, title: "The Nearest Stars", body: "Zoom out 6x more. Proxima Centauri, the closest star, is 4.24 light-years away -- at Voyager 1's speed, a 73,000-year journey. Sirius, the brightest star in our sky, is 8.6 ly out. Notice: most of our neighbors are dim red dwarfs, invisible to the naked eye.", scale: "View: ~36 light-years across  |  6x wider", dwell: 7500 },
-      { vr: 90000, title: "The Milky Way", body: "Zoom out 5,000x. Our stellar neighborhood is an invisible speck in the Orion Arm. The galactic center lies 26,000 light-years away, harboring Sagittarius A* -- a black hole 4 million times the Sun's mass. The full disk spans 105,000 light-years.", scale: "View: ~180,000 light-years across  |  5,000x wider", dwell: 7500 },
-      { vr: 300000, title: "Satellite Galaxies", body: "Zoom out 3x. The Milky Way isn't alone -- it's surrounded by smaller galaxies caught in its gravity. The Large Magellanic Cloud (160,000 ly) and Small Magellanic Cloud (200,000 ly) are visible to the naked eye from the Southern Hemisphere.", scale: "View: ~600,000 light-years across  |  3x wider", dwell: 7500 },
-      { vr: 3.5 * MLY, title: "The Local Group", body: "Zoom out 12x. The Milky Way is one of ~80 galaxies in the Local Group. Andromeda, 2.5 million light-years away and containing a trillion stars, is falling toward us at 110 km/s. The two galaxies will collide in about 4.5 billion years, merging into 'Milkomeda.'", scale: "View: ~7 million light-years across  |  12x wider", dwell: 8000 },
-      { vr: 80 * MLY, title: "The Virgo Cluster", body: "Zoom out 23x. Our Local Group is a small outlier of the Virgo Cluster -- a swarm of 1,300+ galaxies, 54 million light-years away. At its heart sits M87, a giant elliptical galaxy whose supermassive black hole was the first ever directly imaged (2019).", scale: "View: ~160 million light-years across  |  23x wider", dwell: 7500 },
-      { vr: 350 * MLY, title: "The Great Attractor", body: "Zoom out 4x more. Our Local Group, the Virgo Cluster, and thousands of other galaxies are all being pulled toward the Great Attractor at 600 km/s. This gravitational anomaly, equivalent to 10 quadrillion suns, is hidden behind the plane of our own galaxy. We're all inside the Laniakea Supercluster -- 'immense heaven' in Hawaiian.", scale: "View: ~700 million light-years across  |  4x wider", dwell: 8000 },
-      { vr: 18, title: "Coming Home", body: "Now we reverse the journey -- collapsing 250 million light-years back down to the scale of our stellar neighborhood. Every star you see here is close enough that light from it left within a human lifetime. And yet the nearest one is still impossibly far by any human measure of distance.", scale: "Returning to ~36 light-years across", dwell: 7000 },
+      { vr: 0.00004, title: "This Is Home", body: "Earth orbits the Sun at 1 AU -- about 8 light-minutes away. A beam of sunlight you see right now left the Sun before you started reading this sentence. This tiny gap is where we begin.", scale: "~2.5 AU across", dwell: 6000 },
+      { vr: 3, title: "The Sun's Domain", body: "Zoom out 75,000x. The Oort Cloud marks the outermost reach of the Sun's gravity -- a shell of icy bodies extending ~1.6 light-years out. Beyond this boundary, we belong to the galaxy. Voyager 1, launched in 1977, won't reach the Oort Cloud for another 300 years.", scale: "~6 ly across  |  75,000x wider", dwell: 7000 },
+      { vr: 18, target: "Sirius", title: "The Nearest Stars", body: "Proxima Centauri, the closest star, is 4.24 light-years away -- at Voyager 1's speed, a 73,000-year journey. Sirius, the brightest star in our sky, is 8.6 ly out. Notice: most of our neighbors are dim red dwarfs, invisible to the naked eye.", scale: "~36 ly across  |  6x wider", dwell: 7500 },
+      { vr: 90000, title: "The Milky Way", body: "Zoom out 5,000x. Our stellar neighborhood is an invisible speck in the Orion Arm. The galactic center lies 26,000 light-years away, harboring Sagittarius A* -- a black hole 4 million times the Sun's mass. The full disk spans 105,000 light-years.", scale: "~180,000 ly across  |  5,000x wider", dwell: 7500 },
+      { vr: 300000, target: "Large Magellanic Cloud", title: "Satellite Galaxies", body: "The Milky Way isn't alone -- it's surrounded by smaller galaxies caught in its gravity. The Large Magellanic Cloud (160,000 ly) and Small Magellanic Cloud (200,000 ly) are visible to the naked eye from the Southern Hemisphere.", scale: "~600,000 ly across  |  3x wider", dwell: 7500 },
+      { vr: 3.5 * MLY, target: "Andromeda (M31)", title: "The Local Group", body: "Zoom out 12x. The Milky Way is one of ~80 galaxies in the Local Group. Andromeda, 2.5 million light-years away and containing a trillion stars, is falling toward us at 110 km/s. The two galaxies will collide in about 4.5 billion years, merging into 'Milkomeda.'", scale: "~7 Mly across  |  12x wider", dwell: 8000 },
+      { vr: 80 * MLY, target: "M87", title: "The Virgo Cluster", body: "Zoom out 23x. Our Local Group is a small outlier of the Virgo Cluster -- a swarm of 1,300+ galaxies, 54 million light-years away. At its heart sits M87, a giant elliptical galaxy whose supermassive black hole was the first ever directly imaged (2019).", scale: "~160 Mly across  |  23x wider", dwell: 7500 },
+      { vr: 350 * MLY, target: "Great Attractor", title: "The Great Attractor", body: "Zoom out 4x more. Our Local Group, the Virgo Cluster, and thousands of other galaxies are all being pulled toward the Great Attractor at 600 km/s. This gravitational anomaly, equivalent to 10 quadrillion suns, is hidden behind the plane of our own galaxy. We're all inside the Laniakea Supercluster -- 'immense heaven' in Hawaiian.", scale: "~700 Mly across  |  4x wider", dwell: 8000 },
+      { vr: 18, title: "Coming Home", body: "Now we reverse the journey -- collapsing 250 million light-years back down to the scale of our stellar neighborhood. Every star you see here is close enough that light from it left within a human lifetime. And yet the nearest one is still impossibly far by any human measure of distance.", scale: "Returning to ~36 ly across", dwell: 7000 },
       { vr: 0.00004, title: "Pale Blue Dot", body: "Back to Earth and Sun, separated by 8 light-minutes. From here to the Great Attractor spans 10 orders of magnitude -- a factor of 17 billion. All of human history, every border ever drawn, every journey ever taken, happened in this one tiny pixel of the cosmos.", scale: "Full range: 17,000,000,000 to 1", dwell: 7000 }
     ]
   },
@@ -802,15 +1007,15 @@ var tourDefs = {
     name: "Star Lovers Tour",
     desc: "10 stellar wonders near and far",
     steps: [
-      { vr: 18, title: "Sirius \u2014 The Dog Star", body: "At 8.6 light-years, Sirius blazes at magnitude -1.46 \u2014 the brightest star in our sky. It's actually a binary: brilliant Sirius A and its tiny white dwarf companion Sirius B, which packs the Sun's mass into an Earth-sized sphere. Ancient Egyptians based their calendar on its rising.", scale: "View: ~36 ly", dwell: 7000 },
-      { vr: 18, title: "Procyon \u2014 The Little Dog Star", body: "Just 11.5 light-years away, Procyon is the 8th brightest star. Like Sirius, it has a white dwarf companion. Its name means 'before the dog' \u2014 it rises before Sirius in the night sky.", scale: "View: ~36 ly", dwell: 6500 },
-      { vr: 45, title: "Vega \u2014 Future North Star", body: "In 12,000 years, Earth's axial precession will make Vega our North Star. This blue-white beauty at 25 light-years was the first star (besides the Sun) to be photographed and have its spectrum recorded.", scale: "View: ~90 ly", dwell: 7000 },
-      { vr: 60, title: "Arcturus \u2014 Light of the World's Fair", body: "An orange giant 25 times the Sun's diameter, Arcturus is the brightest star in the northern celestial hemisphere. Its light, collected by a telescope, was used to trigger the opening of the 1933 Chicago World's Fair.", scale: "View: ~120 ly", dwell: 7000 },
-      { vr: 120, title: "Aldebaran \u2014 Eye of the Bull", body: "The red giant eye of Taurus, 44 times the Sun's diameter. Aldebaran appears embedded in the Hyades star cluster but is actually only half as far \u2014 a beautiful cosmic coincidence.", scale: "View: ~240 ly", dwell: 6500 },
-      { vr: 800, title: "Polaris \u2014 The Guiding Light", body: "Earth's current North Star is a triple system containing a Cepheid variable \u2014 a star that pulsates with clockwork precision. Cepheids are 'standard candles' used to measure cosmic distances, making Polaris a cornerstone of the distance ladder.", scale: "View: ~1,600 ly", dwell: 7500 },
-      { vr: 1200, title: "Betelgeuse \u2014 The Dying Giant", body: "A red supergiant so immense that if it replaced our Sun, its surface would reach past Mars \u2014 possibly Jupiter. Betelgeuse will explode as a supernova, perhaps tomorrow, perhaps in 100,000 years. When it does, it will be visible in daylight.", scale: "View: ~2,400 ly", dwell: 7500 },
-      { vr: 1500, title: "Rigel \u2014 Orion's Blue Foot", body: "A blue supergiant blazing at 120,000 times the Sun's luminosity. Rigel illuminates the nearby Witch Head Nebula with its intense ultraviolet radiation. It's the 7th brightest star despite being 863 light-years away.", scale: "View: ~3,000 ly", dwell: 7000 },
-      { vr: 4500, title: "Deneb \u2014 Ancient Light", body: "One of the most luminous stars known: 200,000 times the Sun. The light you see from Deneb left around 400 BC, when Socrates walked the streets of Athens. It anchors the Summer Triangle and marks the tail of Cygnus.", scale: "View: ~9,000 ly", dwell: 7500 },
+      { vr: 5, target: "Sirius", title: "Sirius \u2014 The Dog Star", body: "At 8.6 light-years, Sirius blazes at magnitude -1.46 \u2014 the brightest star in our sky. It's actually a binary: brilliant Sirius A and its tiny white dwarf companion Sirius B, which packs the Sun's mass into an Earth-sized sphere. Ancient Egyptians based their calendar on its rising.", scale: "8.6 ly from Earth", dwell: 7000 },
+      { vr: 6, target: "Procyon", title: "Procyon \u2014 The Little Dog Star", body: "Just 11.5 light-years away, Procyon is the 8th brightest star. Like Sirius, it has a white dwarf companion. Its name means 'before the dog' \u2014 it rises before Sirius in the night sky.", scale: "11.5 ly from Earth", dwell: 6500 },
+      { vr: 14, target: "Vega", title: "Vega \u2014 Future North Star", body: "In 12,000 years, Earth's axial precession will make Vega our North Star. This blue-white beauty at 25 light-years was the first star (besides the Sun) to be photographed and have its spectrum recorded.", scale: "25 ly from Earth", dwell: 7000 },
+      { vr: 18, target: "Arcturus", title: "Arcturus \u2014 Light of the World's Fair", body: "An orange giant 25 times the Sun's diameter, Arcturus is the brightest star in the northern celestial hemisphere. Its light, collected by a telescope, was used to trigger the opening of the 1933 Chicago World's Fair.", scale: "37 ly from Earth", dwell: 7000 },
+      { vr: 35, target: "Aldebaran", title: "Aldebaran \u2014 Eye of the Bull", body: "The red giant eye of Taurus, 44 times the Sun's diameter. Aldebaran appears embedded in the Hyades star cluster but is actually only half as far \u2014 a beautiful cosmic coincidence.", scale: "65 ly from Earth", dwell: 6500 },
+      { vr: 220, target: "Polaris", title: "Polaris \u2014 The Guiding Light", body: "Earth's current North Star is a triple system containing a Cepheid variable \u2014 a star that pulsates with clockwork precision. Cepheids are 'standard candles' used to measure cosmic distances, making Polaris a cornerstone of the distance ladder.", scale: "433 ly from Earth", dwell: 7500 },
+      { vr: 350, target: "Betelgeuse", title: "Betelgeuse \u2014 The Dying Giant", body: "A red supergiant so immense that if it replaced our Sun, its surface would reach past Mars \u2014 possibly Jupiter. Betelgeuse will explode as a supernova, perhaps tomorrow, perhaps in 100,000 years. When it does, it will be visible in daylight.", scale: "700 ly from Earth", dwell: 7500 },
+      { vr: 450, target: "Rigel", title: "Rigel \u2014 Orion's Blue Foot", body: "A blue supergiant blazing at 120,000 times the Sun's luminosity. Rigel illuminates the nearby Witch Head Nebula with its intense ultraviolet radiation. It's the 7th brightest star despite being 863 light-years away.", scale: "863 ly from Earth", dwell: 7000 },
+      { vr: 1300, target: "Deneb", title: "Deneb \u2014 Ancient Light", body: "One of the most luminous stars known: 200,000 times the Sun. The light you see from Deneb left around 400 BC, when Socrates walked the streets of Athens. It anchors the Summer Triangle and marks the tail of Cygnus.", scale: "2,615 ly from Earth", dwell: 7500 },
       { vr: 18, title: "Return to the Neighborhood", body: "Back among our closest stellar neighbors. Every star in this view is close enough that light reaches us within a human lifetime. Yet even the nearest \u2014 Proxima Centauri at 4.24 light-years \u2014 would take 73,000 years to reach at Voyager speed.", scale: "Returning to ~36 ly", dwell: 7000 }
     ]
   },
@@ -818,14 +1023,14 @@ var tourDefs = {
     name: "Extreme Phenomena Tour",
     desc: "Black holes, pulsars, and cosmic mysteries",
     steps: [
-      { vr: 1500, title: "Vela Pulsar \u2014 Spinning Corpse", body: "Born from a supernova 11,000 years ago, this neutron star is just 20 km across but denser than an atomic nucleus. It spins 11 times per second, sweeping beams of radiation across the cosmos like a lighthouse.", scale: "View: ~3,000 ly", dwell: 7000 },
-      { vr: 10000, title: "Crab Pulsar \u2014 The Guest Star's Heart", body: "Chinese astronomers recorded a 'guest star' in 1054 AD, so bright it was visible in daylight. Inside the resulting nebula spins a neutron star at 30 rotations per second, powering the entire Crab Nebula's glow.", scale: "View: ~20,000 ly", dwell: 7500 },
-      { vr: 10000, title: "Cygnus X-1 \u2014 First Black Hole", body: "The first object widely accepted as a black hole, discovered via X-ray emissions in 1964. It contains 21 solar masses and feeds on a blue supergiant companion. Stephen Hawking famously bet against it being a black hole \u2014 and conceded in 1990.", scale: "View: ~20,000 ly", dwell: 7500 },
-      { vr: 80000, title: "SGR 1806-20 \u2014 The Magnetar", body: "The most powerful magnetic object known. In 2004, it released a gamma-ray flare so intense it briefly altered Earth's ionosphere \u2014 from 50,000 light-years away. Its magnetic field is a quadrillion times Earth's.", scale: "View: ~160,000 ly", dwell: 7500 },
-      { vr: 80000, title: "Sagittarius A* \u2014 Our Black Hole", body: "The supermassive black hole at the Milky Way's center: 4 million solar masses in a region smaller than Mercury's orbit. Stars orbiting it travel at 3% light speed. First directly imaged by the Event Horizon Telescope in 2022.", scale: "View: ~160,000 ly", dwell: 8000 },
-      { vr: 80000000, title: "M87* \u2014 The First Image", body: "In 2019, humanity captured the first-ever image of a black hole: M87*, a 6.5-billion-solar-mass monster at the heart of the Virgo Cluster. Its relativistic jet extends 5,000 light-years, powered by matter spiraling in.", scale: "View: ~160 Mly", dwell: 7500 },
-      { vr: 350000000, title: "The Great Attractor \u2014 Cosmic Mystery", body: "Something massive is pulling hundreds of thousands of galaxies toward it at 600 km/s. Hidden behind our galaxy's dusty disk, the Great Attractor's true nature remains uncertain \u2014 a vast concentration of mass equivalent to 10 quadrillion Suns.", scale: "View: ~700 Mly", dwell: 8000 },
-      { vr: 350000000, title: "The Edge of Sight", body: "Beyond the Great Attractor, the observable universe extends 46.5 billion light-years in every direction. At that boundary lies the cosmic microwave background \u2014 the afterglow of the Big Bang, light that has traveled for 13.8 billion years to reach us.", scale: "View: ~700 Mly", dwell: 8000 }
+      { vr: 500, target: "Vela Pulsar", title: "Vela Pulsar \u2014 Spinning Corpse", body: "Born from a supernova 11,000 years ago, this neutron star is just 20 km across but denser than an atomic nucleus. It spins 11 times per second, sweeping beams of radiation across the cosmos like a lighthouse.", scale: "936 ly from Earth", dwell: 7000 },
+      { vr: 3200, target: "Crab Pulsar", title: "Crab Pulsar \u2014 The Guest Star's Heart", body: "Chinese astronomers recorded a 'guest star' in 1054 AD, so bright it was visible in daylight. Inside the resulting nebula spins a neutron star at 30 rotations per second, powering the entire Crab Nebula's glow.", scale: "6,500 ly from Earth", dwell: 7500 },
+      { vr: 3000, target: "Cygnus X-1", title: "Cygnus X-1 \u2014 First Black Hole", body: "The first object widely accepted as a black hole, discovered via X-ray emissions in 1964. It contains 21 solar masses and feeds on a blue supergiant companion. Stephen Hawking famously bet against it being a black hole \u2014 and conceded in 1990.", scale: "6,070 ly from Earth", dwell: 7500 },
+      { vr: 25000, target: "SGR 1806-20", title: "SGR 1806-20 \u2014 The Magnetar", body: "The most powerful magnetic object known. In 2004, it released a gamma-ray flare so intense it briefly altered Earth's ionosphere \u2014 from 50,000 light-years away. Its magnetic field is a quadrillion times Earth's.", scale: "50,000 ly from Earth", dwell: 7500 },
+      { vr: 13000, target: "Sagittarius A*", title: "Sagittarius A* \u2014 Our Black Hole", body: "The supermassive black hole at the Milky Way's center: 4 million solar masses in a region smaller than Mercury's orbit. Stars orbiting it travel at 3% light speed. First directly imaged by the Event Horizon Telescope in 2022.", scale: "26,000 ly from Earth", dwell: 8000 },
+      { vr: 30 * MLY, target: "M87", title: "M87* \u2014 The First Image", body: "In 2019, humanity captured the first-ever image of a black hole: M87*, a 6.5-billion-solar-mass monster at the heart of the Virgo Cluster. Its relativistic jet extends 5,000 light-years, powered by matter spiraling in.", scale: "53.8 Mly from Earth", dwell: 7500 },
+      { vr: 150 * MLY, target: "Great Attractor", title: "The Great Attractor \u2014 Cosmic Mystery", body: "Something massive is pulling hundreds of thousands of galaxies toward it at 600 km/s. Hidden behind our galaxy's dusty disk, the Great Attractor's true nature remains uncertain \u2014 a vast concentration of mass equivalent to 10 quadrillion Suns.", scale: "250 Mly from Earth", dwell: 8000 },
+      { vr: 350 * MLY, title: "The Edge of Sight", body: "Beyond the Great Attractor, the observable universe extends 46.5 billion light-years in every direction. At that boundary lies the cosmic microwave background \u2014 the afterglow of the Big Bang, light that has traveled for 13.8 billion years to reach us.", scale: "The observable universe", dwell: 8000 }
     ]
   }
 };
@@ -844,6 +1049,7 @@ var state = {
 };
 
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
+var pendingLabels = [];
 
 // ─── Particle systems ──────────────────────────────────────────────────
 
@@ -1132,6 +1338,42 @@ function drawVignette() {
 
 // ─── Draw: regions ────────────────────────────────────────────────────
 
+function drawOrbits() {
+  if (!effects.orbits) return;
+  var vr = getViewRadius();
+  if (vr > 0.003) return;          // only at solar system scale
+  var scale = getScale();
+  var sp0 = worldToScreen(0, 0);   // Sun position
+
+  var orbitNames = ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
+  var orbitData = [];
+  objects.forEach(function(o) {
+    if (orbitNames.indexOf(o.name) === -1) return;
+    var r = Math.sqrt(o.x * o.x + o.y * o.y);
+    orbitData.push({ name: o.name, r: r, color: o.color });
+  });
+
+  // Fade in below vr 0.003, full below 0.001
+  var alpha = vr > 0.001 ? 1.0 - (vr - 0.001) / 0.002 : 1.0;
+  alpha = Math.max(0, Math.min(1, alpha)) * 0.35;
+
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.lineWidth = 0.8;
+  orbitData.forEach(function(o) {
+    var rPx = o.r * scale;
+    if (rPx < 3 || rPx > W * 4) return;
+    ctx.strokeStyle = o.color;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(sp0.x, sp0.y, rPx, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function drawRegions() {
   var vr = getViewRadius();
   var scale = getScale();
@@ -1405,6 +1647,165 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     var vr = getViewRadius();
     // At default solar view (0.00004), scale = 1. At max zoom, scale up to 30.
     detailScale = Math.max(1, Math.min(30, 0.00004 / Math.max(vr, 0.000000005)));
+  }
+
+  // ──── SPACECRAFT ────
+
+  if (name === 'Voyager 1' || name === 'Voyager 2') {
+    var vsc = Math.max(detailScale * 0.8, 1);
+    var isV1 = name === 'Voyager 1';
+    var vColor = isV1 ? '#55ff88' : '#55ddff';
+    // Dish body (small triangle)
+    ctx.save();
+    ctx.translate(cx, cy);
+    var vAngle = isV1 ? -0.6 : 0.8;
+    ctx.rotate(vAngle);
+    var ds = 3 * vsc;
+    // Antenna dish
+    ctx.strokeStyle = vColor;
+    ctx.lineWidth = 1.2 * vsc;
+    ctx.beginPath();
+    ctx.arc(0, -ds * 0.5, ds * 1.2, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+    // Boom
+    ctx.beginPath();
+    ctx.moveTo(0, -ds * 0.3);
+    ctx.lineTo(0, ds * 1.5);
+    ctx.stroke();
+    // RTG arms
+    ctx.lineWidth = 0.8 * vsc;
+    ctx.beginPath();
+    ctx.moveTo(-ds * 1.2, ds * 0.8);
+    ctx.lineTo(ds * 1.2, ds * 0.8);
+    ctx.stroke();
+    // RTG tips
+    ctx.fillStyle = vColor;
+    ctx.fillRect(-ds * 1.5, ds * 0.6, ds * 0.6, ds * 0.4);
+    ctx.fillRect(ds * 0.9, ds * 0.6, ds * 0.6, ds * 0.4);
+    ctx.restore();
+    // Trajectory trail
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    ctx.strokeStyle = vColor;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    var sunSp = worldToScreen(0, 0);
+    ctx.beginPath();
+    ctx.moveTo(sunSp.x, sunSp.y);
+    ctx.lineTo(cx, cy);
+    // Extend trail beyond current position
+    var tdx = cx - sunSp.x, tdy = cy - sunSp.y;
+    var tLen = Math.sqrt(tdx * tdx + tdy * tdy);
+    if (tLen > 1) {
+      ctx.lineTo(cx + tdx / tLen * 30, cy + tdy / tLen * 30);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // ──── SUPERNOVA REMNANTS ────
+
+  if (name === "Tycho's SN Remnant" || name === "Kepler's SN Remnant" || name === 'SN 1987A') {
+    var snr = Math.max(r, 3);
+    var snColor = color;
+    // Expanding shell effect
+    var shellPhase = (tSec * 0.3) % (Math.PI * 2);
+    var shellR = snr * (1.5 + Math.sin(shellPhase) * 0.2);
+    // Outer shock wave ring
+    ctx.save();
+    ctx.strokeStyle = snColor;
+    ctx.globalAlpha = 0.3 + Math.sin(shellPhase) * 0.1;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, shellR * 1.8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Inner bright shell
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, shellR, 0, Math.PI * 2);
+    ctx.stroke();
+    // Hot filaments radiating out
+    ctx.globalAlpha = 0.2;
+    ctx.lineWidth = 0.8;
+    for (var fi = 0; fi < 8; fi++) {
+      var fAngle = fi * Math.PI / 4 + shellPhase * 0.1;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(fAngle) * snr * 0.5, cy + Math.sin(fAngle) * snr * 0.5);
+      ctx.lineTo(cx + Math.cos(fAngle) * shellR * 1.6, cy + Math.sin(fAngle) * shellR * 1.6);
+      ctx.stroke();
+    }
+    // Central remnant glow
+    var snGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, snr);
+    snGrad.addColorStop(0, snColor);
+    snGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = snGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, snr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    state.dirty = true;
+    return;
+  }
+
+  // ──── EXOPLANETS ────
+
+  if (name === 'Proxima Centauri b' || name === 'Kepler-452b') {
+    var epr = Math.max(r, 2.5);
+    // Planet body
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, epr, 0, Math.PI * 2);
+    ctx.fill();
+    // Habitable zone glow ring
+    ctx.save();
+    ctx.strokeStyle = '#44aaff';
+    ctx.globalAlpha = 0.2 + Math.sin(tSec * 1.5) * 0.08;
+    ctx.lineWidth = epr * 0.6;
+    ctx.beginPath();
+    ctx.arc(cx, cy, epr * 1.8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    state.dirty = true;
+    return;
+  }
+
+  if (name === 'TRAPPIST-1 System') {
+    // Draw 7 small dots in a line representing the compact system
+    var tpr = Math.max(r, 2);
+    // Central star (dim red dwarf)
+    ctx.fillStyle = '#cc6644';
+    ctx.beginPath();
+    ctx.arc(cx, cy, tpr * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    // 7 planets orbiting close
+    var planetColors = ['#888899', '#7788aa', '#8899aa', '#66aacc', '#77bbaa', '#88ccaa', '#6699aa'];
+    for (var tp = 0; tp < 7; tp++) {
+      var tAngle = tSec * (0.3 + tp * 0.08) + tp * Math.PI / 3.5;
+      var tDist = tpr * (1.4 + tp * 0.45);
+      var tpx = cx + Math.cos(tAngle) * tDist;
+      var tpy = cy + Math.sin(tAngle) * tDist;
+      ctx.fillStyle = planetColors[tp];
+      ctx.beginPath();
+      ctx.arc(tpx, tpy, Math.max(1, tpr * 0.25), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Habitable zone band
+    ctx.save();
+    ctx.strokeStyle = '#44aaff';
+    ctx.globalAlpha = 0.12;
+    ctx.lineWidth = tpr * 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, tpr * (1.4 + 3 * 0.45 + 1.1), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    state.dirty = true;
+    return;
   }
 
   // ──── PLANETS ────
@@ -2464,20 +2865,86 @@ function drawObject(obj, sp, ts) {
     ctx.stroke();
   }
 
+  // Labels are drawn in a separate pass (drawLabels) for collision avoidance.
+  // Store label info for deferred rendering.
   var labelOffset = Math.max(r, dr);
-  ctx.font = sel ? 'bold 12px -apple-system, system-ui, sans-serif' : '11px -apple-system, system-ui, sans-serif';
-  ctx.fillStyle = sel ? '#e8e8f0' : '#a8a8c0';
-  ctx.textAlign = 'center';
-  ctx.fillText(obj.name, sp.x, sp.y + labelOffset + 16);
-
-  if (obj.dist > 0) {
-    ctx.font = '9px SF Mono, Menlo, monospace';
-    ctx.fillStyle = '#5a5a78';
-    ctx.fillText(formatDistance(obj.dist), sp.x, sp.y + labelOffset + 28);
-  }
+  pendingLabels.push({
+    name: obj.name,
+    dist: obj.dist,
+    x: sp.x,
+    y: sp.y + labelOffset + 16,
+    sel: sel,
+    priority: (sel ? 10000 : 0) + obj.radius + (obj.dist === 0 ? 100 : 0)
+  });
 
   // Draw type-specific visual detail on top of the base glow
   drawObjectDetail(obj, sp.x, sp.y, r, ts);
+}
+
+function drawLabels() {
+  // Sort by priority descending — highest priority labels get placed first
+  pendingLabels.sort(function(a, b) { return b.priority - a.priority; });
+
+  var placed = []; // array of { x, y, w, h } bounding boxes
+
+  for (var i = 0; i < pendingLabels.length; i++) {
+    var lb = pendingLabels[i];
+    var fontSize = lb.sel ? 12 : 11;
+    var font = lb.sel ? 'bold 12px -apple-system, system-ui, sans-serif' : '11px -apple-system, system-ui, sans-serif';
+    ctx.font = font;
+    var nameW = ctx.measureText(lb.name).width;
+    var labelH = 14;
+    var distH = lb.dist > 0 ? 14 : 0;
+
+    // Try positions: below (default), above, right, left
+    var candidates = [
+      { x: lb.x, y: lb.y },                            // below
+      { x: lb.x, y: lb.y - 32 - labelH },              // above
+      { x: lb.x + nameW * 0.5 + 16, y: lb.y - 8 },    // right
+      { x: lb.x - nameW * 0.5 - 16, y: lb.y - 8 }     // left
+    ];
+
+    var bestPos = null;
+    var bestOverlap = Infinity;
+
+    for (var c = 0; c < candidates.length; c++) {
+      var cx = candidates[c].x;
+      var cy = candidates[c].y;
+      var box = { x: cx - nameW / 2 - 2, y: cy - labelH, w: nameW + 4, h: labelH + distH + 2 };
+      var overlap = 0;
+      for (var j = 0; j < placed.length; j++) {
+        var p = placed[j];
+        var ox = Math.max(0, Math.min(box.x + box.w, p.x + p.w) - Math.max(box.x, p.x));
+        var oy = Math.max(0, Math.min(box.y + box.h, p.y + p.h) - Math.max(box.y, p.y));
+        overlap += ox * oy;
+      }
+      if (overlap === 0) { bestPos = candidates[c]; bestOverlap = 0; break; }
+      if (overlap < bestOverlap) { bestOverlap = overlap; bestPos = candidates[c]; }
+    }
+
+    // Determine opacity: full if no overlap, reduced if some
+    var alpha = bestOverlap === 0 ? 1.0 : Math.max(0.2, 1.0 - bestOverlap / (nameW * labelH));
+    if (lb.sel) alpha = 1.0; // selected always full opacity
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = font;
+    ctx.fillStyle = lb.sel ? '#e8e8f0' : '#a8a8c0';
+    ctx.textAlign = 'center';
+    ctx.fillText(lb.name, bestPos.x, bestPos.y);
+
+    if (lb.dist > 0 && alpha > 0.3) {
+      ctx.font = '9px SF Mono, Menlo, monospace';
+      ctx.fillStyle = '#5a5a78';
+      ctx.fillText(formatDistance(lb.dist), bestPos.x, bestPos.y + 12);
+    }
+    ctx.restore();
+
+    // Register this label's bounding box
+    placed.push({ x: bestPos.x - nameW / 2 - 2, y: bestPos.y - labelH, w: nameW + 4, h: labelH + distH + 2 });
+  }
+
+  pendingLabels = [];
 }
 
 function drawDistanceLine(o1, o2) {
@@ -2859,6 +3326,256 @@ function drawCosmicFilaments() {
   ctx.restore();
 }
 
+// ─── Draw: constellation lines ────────────────────────────────────────
+
+var constellationDefs = {
+  orion: {
+    name: "Orion",
+    depthLabel: "250 \u2013 2,000 ly deep",
+    color: "rgba(120, 140, 200, ALPHA)",
+    labelAnchor: "Bellatrix", labelDx: 80, labelDy: -30,
+    lines: [
+      ["Betelgeuse", "Bellatrix"],
+      ["Betelgeuse", "Alnitak"],
+      ["Bellatrix", "Mintaka"],
+      ["Alnitak", "Alnilam"],
+      ["Alnilam", "Mintaka"],
+      ["Alnitak", "Saiph"],
+      ["Mintaka", "Rigel"],
+      ["Rigel", "Saiph"]
+    ]
+  },
+  scorpius: {
+    name: "Scorpius",
+    depthLabel: "300 \u2013 570 ly deep",
+    color: "rgba(200, 120, 100, ALPHA)",
+    labelAnchor: "Antares", labelDx: -90, labelDy: 0,
+    lines: [
+      ["Dschubba", "Antares"],
+      ["Antares", "Sargas"],
+      ["Sargas", "Shaula"]
+    ]
+  },
+  bigdipper: {
+    name: "Big Dipper",
+    depthLabel: "54 \u2013 124 ly deep",
+    color: "rgba(140, 160, 200, ALPHA)",
+    labelAnchor: "Phecda", labelDx: 50, labelDy: -30,
+    lines: [
+      ["Dubhe", "Merak"],
+      ["Merak", "Phecda"],
+      ["Phecda", "Megrez"],
+      ["Megrez", "Dubhe"],
+      ["Megrez", "Alioth"],
+      ["Alioth", "Mizar"],
+      ["Mizar", "Alkaid"]
+    ]
+  },
+  crux: {
+    name: "Southern\nCross",
+    depthLabel: "88 \u2013 345 ly deep",
+    color: "rgba(140, 180, 220, ALPHA)",
+    labelAnchor: "Gacrux", labelDx: 70, labelDy: -10,
+    lines: [
+      ["Gacrux", "Acrux"],
+      ["Mimosa", "Delta Crucis"]
+    ]
+  },
+  cassiopeia: {
+    name: "Cassiopeia",
+    depthLabel: "54 \u2013 550 ly deep",
+    color: "rgba(180, 150, 200, ALPHA)",
+    labelAnchor: "Gamma Cassiopeiae", labelDx: 0, labelDy: -35,
+    lines: [
+      ["Caph", "Schedar"],
+      ["Schedar", "Gamma Cassiopeiae"],
+      ["Gamma Cassiopeiae", "Ruchbah"],
+      ["Ruchbah", "Segin"]
+    ]
+  }
+};
+
+function drawConstellationLines() {
+  var vr = getViewRadius();
+  if (vr < 80 || vr > 4000) return;
+
+  // Fade in 80-150, full 150-2500, fade out 2500-4000
+  var alpha = 1;
+  if (vr < 150) alpha = (vr - 80) / 70;
+  if (vr > 2500) alpha = (4000 - vr) / 1500;
+  alpha = Math.max(0, Math.min(1, alpha));
+
+  // Build name->object lookup
+  var objByName = {};
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].constellation) objByName[objects[i].name] = objects[i];
+  }
+
+  ctx.save();
+
+  for (var cId in constellationDefs) {
+    var cDef = constellationDefs[cId];
+    var lines = cDef.lines;
+
+    // Draw lines
+    ctx.strokeStyle = cDef.color.replace('ALPHA', (0.18 * alpha).toFixed(3));
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+
+    for (var li = 0; li < lines.length; li++) {
+      var a = objByName[lines[li][0]];
+      var b = objByName[lines[li][1]];
+      if (!a || !b) continue;
+      var sa = worldToScreen(a.x, a.y);
+      var sb = worldToScreen(b.x, b.y);
+      ctx.beginPath();
+      ctx.moveTo(sa.x, sa.y);
+      ctx.lineTo(sb.x, sb.y);
+      ctx.stroke();
+    }
+
+    ctx.setLineDash([]);
+
+    // Label the constellation — anchored to a specific star + offset
+    if (alpha > 0.3) {
+      var anchor = cDef.labelAnchor ? objByName[cDef.labelAnchor] : null;
+      var lx, ly;
+      if (anchor) {
+        var anchorSp = worldToScreen(anchor.x, anchor.y);
+        lx = anchorSp.x + (cDef.labelDx || 0);
+        ly = anchorSp.y + (cDef.labelDy || 0);
+      } else {
+        // Fallback to centroid
+        lx = 0; ly = 0; var count = 0;
+        for (var ni = 0; ni < lines.length; ni++) {
+          var na = objByName[lines[ni][0]];
+          var nb = objByName[lines[ni][1]];
+          if (na) { var spa = worldToScreen(na.x, na.y); lx += spa.x; ly += spa.y; count++; }
+          if (nb) { var spb = worldToScreen(nb.x, nb.y); lx += spb.x; ly += spb.y; count++; }
+        }
+        if (count > 0) { lx /= count; ly /= count; }
+      }
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = cDef.color.replace('ALPHA', (0.35 * alpha).toFixed(3));
+      ctx.textAlign = 'center';
+      var nameLines = cDef.name.split('\n');
+      for (var nl = 0; nl < nameLines.length; nl++) {
+        ctx.fillText(nameLines[nl], lx, ly + nl * 14);
+      }
+      var labelBottom = ly + (nameLines.length - 1) * 14;
+
+      if (cDef.depthLabel) {
+        ctx.font = '9px SF Mono, Menlo, monospace';
+        ctx.fillStyle = cDef.color.replace('ALPHA', (0.2 * alpha).toFixed(3));
+        ctx.fillText(cDef.depthLabel, lx, labelBottom + 14);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+// ─── Draw: observable universe boundary ───────────────────────────────
+
+function drawObservableUniverse() {
+  var vr = getViewRadius();
+  // Only visible at extreme cosmic scale
+  if (vr < 200 * MLY) return;
+
+  var scale = getScale();
+  var OBSERVABLE_RADIUS = 46.5e9; // 46.5 billion light-years comoving distance
+  var rPx = OBSERVABLE_RADIUS * scale;
+
+  // Too small or too large to be useful
+  if (rPx < 30) return;
+
+  var sp = worldToScreen(0, 0);
+  var sw = W / devicePixelRatio;
+  var sh = H / devicePixelRatio;
+
+  // Fade in between 200 Mly and 400 Mly
+  var fade = 1;
+  if (vr < 400 * MLY) fade = (vr - 200 * MLY) / (200 * MLY);
+
+  ctx.save();
+
+  // Outer dashed boundary
+  ctx.strokeStyle = "rgba(100, 80, 140, " + (0.15 * fade) + ")";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([12, 8]);
+  ctx.beginPath();
+  ctx.arc(sp.x, sp.y, rPx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Soft inner glow at the edge
+  if (rPx > 80 && rPx < sw * 4) {
+    ctx.strokeStyle = "rgba(100, 80, 140, " + (0.06 * fade) + ")";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, rPx, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Label
+  if (rPx > 60) {
+    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = "rgba(140, 120, 180, " + (0.3 * fade) + ")";
+    ctx.textAlign = 'center';
+    ctx.fillText("Observable Universe (46.5 Gly)", sp.x, sp.y - rPx - 12);
+  }
+
+  ctx.restore();
+}
+
+// ─── Draw: dark matter halos ──────────────────────────────────────────
+
+function drawDarkMatterHalos() {
+  var vr = getViewRadius();
+  // Only visible at local group / cosmic scale where galaxies are dots
+  if (vr < 200000 || vr > 30 * MLY) return;
+
+  var scale = getScale();
+  var sw = W / devicePixelRatio;
+  var sh = H / devicePixelRatio;
+
+  // Fade in from 200,000 to 400,000; fade out from 20 Mly to 30 Mly
+  var fade = 1;
+  if (vr < 400000) fade = (vr - 200000) / 200000;
+  if (vr > 20 * MLY) fade = (30 * MLY - vr) / (10 * MLY);
+  fade = Math.max(0, Math.min(1, fade));
+
+  // Galaxies that should have visible dark matter halos
+  var haloTargets = [
+    { x: 0, y: 0, haloR: 300000, color: [255, 221, 68] },                          // Milky Way
+    { x: -1.5 * MLY, y: -2.0 * MLY, haloR: 400000, color: [187, 170, 238] },       // Andromeda
+    { x: -2.0 * MLY, y: -1.8 * MLY, haloR: 150000, color: [153, 170, 221] },       // Triangulum
+    { x: 70000, y: -145000, haloR: 80000, color: [136, 170, 221] },                 // LMC
+    { x: 110000, y: -170000, haloR: 50000, color: [119, 153, 204] }                 // SMC
+  ];
+
+  ctx.save();
+  for (var i = 0; i < haloTargets.length; i++) {
+    var ht = haloTargets[i];
+    var sp = worldToScreen(ht.x, ht.y);
+    var rPx = ht.haloR * scale;
+
+    if (rPx < 8 || rPx > sw * 3) continue;
+    if (sp.x < -rPx || sp.x > sw + rPx || sp.y < -rPx || sp.y > sh + rPx) continue;
+
+    var hGrad = ctx.createRadialGradient(sp.x, sp.y, rPx * 0.2, sp.x, sp.y, rPx);
+    var c = ht.color;
+    hGrad.addColorStop(0, "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (0.04 * fade) + ")");
+    hGrad.addColorStop(0.5, "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (0.02 * fade) + ")");
+    hGrad.addColorStop(1, "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0)");
+    ctx.fillStyle = hGrad;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, rPx, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // ─── Main draw ────────────────────────────────────────────────────────
 
 function draw(ts) {
@@ -2873,8 +3590,12 @@ function draw(ts) {
   drawAmbientParticles(ts);
   drawWarpStreaks(ts);
   drawRegions();
+  drawOrbits();
+  drawConstellationLines();
   drawGalaxies();
   drawCosmicFilaments();
+  drawObservableUniverse();
+  drawDarkMatterHalos();
   drawFlowParticles(ts);
 
   // Center marker
@@ -2896,9 +3617,12 @@ function draw(ts) {
     });
   }
 
+  pendingLabels = [];
   visible.forEach(function(o) { drawObject(o, worldToScreen(o.x, o.y), ts); });
+  drawLabels();
 
   drawSunIndicator();
+  drawLightPulse(ts);
   drawHoverIcon();
   drawVignette();
   drawReferenceDistances();
@@ -2936,7 +3660,7 @@ function draw(ts) {
 
   // Scale label
   var vr = getViewRadius();
-  var sd = vr < 0.001 ? 'Solar System' : vr < 50 ? 'Stellar Neighborhood' : vr < 250000 ? 'Milky Way' : vr < 10 * MLY ? 'Local Group' : 'Cosmic Scale';
+  var sd = vr < 0.001 ? 'Solar System' : vr < 50 ? 'Stellar Neighborhood' : vr < 3000 ? 'Constellations' : vr < 250000 ? 'Milky Way' : vr < 10 * MLY ? 'Local Group' : 'Cosmic Scale';
   ctx.font = '11px -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#3a3a55';
   ctx.textAlign = 'right';
@@ -2968,11 +3692,212 @@ function animationLoop(ts) {
   var vr = getViewRadius();
   if (effects.flowLines && vr >= 40 * MLY && vr <= 500 * MLY) state.dirty = true;
 
+  // Light pulse animation
+  if (lightPulse.active) state.dirty = true;
+
   if (state.dirty) {
     state.dirty = false;
     draw(ts);
   }
   lastFrameTime = ts;
+}
+
+// ─── "When this light left" ───────────────────────────────────────────
+
+function getHistoricalEvent(distLy) {
+  var yearsAgo = distLy; // 1 ly = light traveling 1 year
+  var launchYear = 2026 - yearsAgo;
+
+  // Historical timeline (most recent first for matching)
+  var events = [
+    [0.002, null], // less than ~17 hours, skip
+    [0.01, "this light was already en route when you woke up today"],
+    [0.1, "this light left about " + (distLy * 365.25).toFixed(0) + " days ago"],
+    [1, "this light left about " + yearsAgo.toFixed(1) + " years ago"],
+    [4.3, "the light you see now left before the COVID-19 pandemic"],
+    [10, "the light you see now left when " + Math.round(2026 - yearsAgo) + " was a new year"],
+    [30, "this light left around " + Math.round(launchYear) + ", when the internet was just emerging"],
+    [65, "this light left around " + Math.round(launchYear) + ", during the Space Race era"],
+    [150, "this light left around " + Math.round(launchYear) + ", before the American Civil War"],
+    [250, "this light left around " + Math.round(launchYear) + ", before the American Revolution"],
+    [500, "this light departed around " + Math.round(launchYear) + ", when Columbus sailed"],
+    [1000, "this light left around " + Math.round(launchYear) + " AD, during the Viking Age"],
+    [2100, "this light left when Rome was still an empire"],
+    [5000, "this light left when the Egyptian pyramids were being built"],
+    [10000, "this light left at the dawn of agriculture and civilization"],
+    [40000, "this light left when Neanderthals still walked the Earth"],
+    [200000, "this light left when Homo sapiens first appeared"],
+    [2e6, "this light left when the first members of genus Homo appeared"],
+    [6e6, "this light left when humans and chimpanzees last shared a common ancestor"],
+    [66e6, "this light left when dinosaurs still ruled the Earth"],
+    [250e6, "this light left during the Permian period, before the Great Dying"],
+    [540e6, "this light left during the Cambrian explosion of complex life"],
+    [2e9, "this light left when only single-celled life existed on Earth"],
+    [4.5e9, "this light left before the Earth itself had formed"],
+    [13.8e9, "this light has been traveling since near the beginning of the universe"]
+  ];
+
+  for (var i = 0; i < events.length; i++) {
+    if (yearsAgo <= events[i][0]) {
+      return events[i][1];
+    }
+  }
+  return "this light has been traveling for " + (yearsAgo / 1e9).toFixed(1) + " billion years";
+}
+
+// ─── Light pulse animation ───────────────────────────────────────────
+
+var lightPulse = {
+  active: false,
+  targetObj: null,
+  startTime: 0,
+  duration: 0,     // animation duration in ms
+  travelTimeLy: 0, // actual light travel time in years
+  arrived: false
+};
+
+function startLightPulse(obj) {
+  if (!obj || obj.dist <= 0) return;
+
+  // Zoom to a level where both Sun and target are visible on screen
+  var vr = getViewRadius();
+  var neededVR = obj.dist * 1.5;
+  if (vr > neededVR * 3 || vr < neededVR * 0.05) {
+    var targetSlider = Math.max(0, Math.min(1000, Math.round(viewRadiusToSlider(neededVR))));
+    var startZoom = state.zoom;
+    var startPanX = state.panX, startPanY = state.panY;
+    var zDuration = 800;
+    var zStart = performance.now();
+    function animateToFit(t) {
+      var zElapsed = t - zStart;
+      var zProgress = Math.min(1, zElapsed / zDuration);
+      var zEase = easeInOutCubic(zProgress);
+      state.zoom = startZoom + (targetSlider - startZoom) * zEase;
+      state.panX = startPanX * (1 - zEase);
+      state.panY = startPanY * (1 - zEase);
+      slider.value = Math.round(state.zoom);
+      state.dirty = true;
+      if (zProgress < 1) requestAnimationFrame(animateToFit);
+    }
+    requestAnimationFrame(animateToFit);
+  }
+
+  lightPulse.active = true;
+  lightPulse.targetObj = obj;
+  lightPulse.startTime = performance.now() + 400;
+  lightPulse.travelTimeLy = obj.dist;
+  lightPulse.arrived = false;
+  // Scale animation: min 3s, max 8s, log-scaled by distance
+  var logDist = Math.log10(Math.max(obj.dist, 0.0001));
+  lightPulse.duration = Math.max(3000, Math.min(8000, 3000 + logDist * 600));
+  state.dirty = true;
+}
+
+function drawLightPulse(ts) {
+  if (!lightPulse.active) return;
+  var elapsed = ts - lightPulse.startTime;
+  var progress = Math.min(1, elapsed / lightPulse.duration);
+  var obj = lightPulse.targetObj;
+  if (!obj) { lightPulse.active = false; return; }
+
+  var sunSp = worldToScreen(0, 0);
+  var objSp = worldToScreen(obj.x, obj.y);
+
+  // Pulse position along the path
+  var ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+  var px = sunSp.x + (objSp.x - sunSp.x) * ease;
+  var py = sunSp.y + (objSp.y - sunSp.y) * ease;
+
+  // Draw the light beam trail
+  ctx.save();
+  var trailGrad = ctx.createLinearGradient(sunSp.x, sunSp.y, px, py);
+  trailGrad.addColorStop(0, 'rgba(255, 221, 68, 0)');
+  trailGrad.addColorStop(Math.max(0, ease - 0.3), 'rgba(255, 221, 68, 0.05)');
+  trailGrad.addColorStop(1, 'rgba(255, 221, 68, 0.2)');
+  ctx.strokeStyle = trailGrad;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(sunSp.x, sunSp.y);
+  ctx.lineTo(px, py);
+  ctx.stroke();
+
+  // Draw the pulse dot
+  var pulseR = 4 + Math.sin(elapsed * 0.008) * 1.5;
+  var pg = ctx.createRadialGradient(px, py, 0, px, py, pulseR * 3);
+  pg.addColorStop(0, 'rgba(255, 238, 100, 0.9)');
+  pg.addColorStop(0.3, 'rgba(255, 221, 68, 0.4)');
+  pg.addColorStop(1, 'rgba(255, 221, 68, 0)');
+  ctx.fillStyle = pg;
+  ctx.beginPath();
+  ctx.arc(px, py, pulseR * 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffee66';
+  ctx.beginPath();
+  ctx.arc(px, py, pulseR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw elapsed time counter with opaque background
+  var travelYears = lightPulse.travelTimeLy * ease;
+  var timeStr = formatLightTravelElapsed(travelYears);
+  var sw = W / devicePixelRatio;
+  var labelText = 'Light travel time to ' + obj.name;
+  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  var timeW = ctx.measureText(timeStr).width;
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  var nameW = ctx.measureText(labelText).width;
+  var boxW = Math.max(timeW, nameW) + 24;
+  var boxH = 36;
+  var boxX = sw / 2 - boxW / 2;
+  var boxY = 52;
+  ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 221, 68, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+  ctx.stroke();
+  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffdd44';
+  ctx.fillText(timeStr, sw / 2, boxY + 15);
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = '#8888aa';
+  ctx.fillText(labelText, sw / 2, boxY + 29);
+
+  // Arrival flash
+  if (progress >= 1 && !lightPulse.arrived) {
+    lightPulse.arrived = true;
+    frameFlash.active = true;
+    frameFlash.x = obj.x;
+    frameFlash.y = obj.y;
+    frameFlash.startTime = ts;
+    frameFlash.color = '#ffee66';
+  }
+
+  // Auto-stop after arrival + 2s
+  if (progress >= 1 && elapsed > lightPulse.duration + 2000) {
+    lightPulse.active = false;
+  }
+
+  ctx.restore();
+  state.dirty = true;
+}
+
+function formatLightTravelElapsed(years) {
+  var seconds = years * 365.25 * 24 * 3600;
+  if (seconds < 60) return seconds.toFixed(1) + 's';
+  var minutes = seconds / 60;
+  if (minutes < 60) return minutes.toFixed(1) + ' min';
+  var hours = minutes / 60;
+  if (hours < 24) return hours.toFixed(1) + ' hr';
+  var days = hours / 24;
+  if (days < 365.25) return days.toFixed(0) + ' days';
+  if (years < 1000) return years.toFixed(1) + ' years';
+  if (years < 1e6) return (years / 1000).toFixed(1) + 'k years';
+  if (years < 1e9) return (years / 1e6).toFixed(1) + 'M years';
+  return (years / 1e9).toFixed(1) + 'B years';
 }
 
 // ─── Info panel ───────────────────────────────────────────────────────
@@ -3011,6 +3936,36 @@ function showInfo(obj) {
     else if (obj.dist < 1e6) c.textContent = (obj.dist / 4.24).toFixed(0) + "x farther than Proxima Centauri.";
     else c.textContent = "Light from here left " + (obj.dist / 1e6).toFixed(1) + " million years ago.";
     body.appendChild(c);
+
+    // "When this light left" historical context
+    var histEvent = getHistoricalEvent(obj.dist);
+    if (histEvent) {
+      var hDiv = document.createElement('div');
+      hDiv.style.cssText = 'margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.02);border-left:2px solid #3a4a6a;border-radius:0 4px 4px 0';
+      var hLabel = document.createElement('div');
+      hLabel.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#4a5a7a;margin-bottom:4px';
+      hLabel.textContent = 'When this light left';
+      var hText = document.createElement('div');
+      hText.style.cssText = 'font-size:12px;color:#9898b8;line-height:1.5';
+      hText.textContent = histEvent;
+      hDiv.appendChild(hLabel);
+      hDiv.appendChild(hText);
+      body.appendChild(hDiv);
+    }
+
+    // Light pulse button
+    var pulseBtn = document.createElement('button');
+    pulseBtn.style.cssText = 'margin-top:12px;padding:6px 14px;background:#16162a;border:1px solid #2a3a4a;border-radius:4px;color:#88aabb;font-size:11px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px';
+    var pulseIcon = document.createElement('span');
+    pulseIcon.style.cssText = 'display:inline-block;width:8px;height:8px;border-radius:50%;background:#ffdd44;box-shadow:0 0 6px #ffdd44';
+    pulseBtn.appendChild(pulseIcon);
+    var pulseTxt = document.createElement('span');
+    pulseTxt.textContent = 'Send light pulse from Sun';
+    pulseBtn.appendChild(pulseTxt);
+    pulseBtn.addEventListener('mouseover', function() { this.style.background = '#1e2a3a'; this.style.color = '#aaccdd'; });
+    pulseBtn.addEventListener('mouseout', function() { this.style.background = '#16162a'; this.style.color = '#88aabb'; });
+    pulseBtn.addEventListener('click', function() { startLightPulse(obj); });
+    body.appendChild(pulseBtn);
   }
 }
 
@@ -3053,8 +4008,13 @@ var tourEngine = {
   stepIndex: -1,
   dwellTimeout: null,
   zoomAnimId: null,
+  timerAnimId: null,
+  dwellStart: 0,
+  dwellDuration: 0,
+  dwellElapsed: 0,
 
   start: function(id) {
+    dismissWelcome();
     if (this.active) this.stop();
     if (!tourDefs[id]) return;
     this.active = true;
@@ -3076,6 +4036,8 @@ var tourEngine = {
     this.stepIndex = -1;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
+    if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+    document.getElementById('tour-timer-fill').style.width = '0%';
     state.warpIntensity = 0;
     var tourBtn = document.getElementById('tour-btn');
     tourBtn.textContent = 'Tours \u25be';
@@ -3088,9 +4050,28 @@ var tourEngine = {
   togglePause: function() {
     if (!this.active) return;
     this.paused = !this.paused;
+    var fillEl = document.getElementById('tour-timer-fill');
     document.getElementById('narr-pause').textContent = this.paused ? 'Resume' : 'Pause';
-    if (!this.paused && this.dwellTimeout === null) {
-      this.nextStep();
+    if (this.paused) {
+      // Freeze timer
+      this.dwellElapsed += performance.now() - this.dwellStart;
+      if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
+      if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+      fillEl.classList.add('paused');
+    } else {
+      fillEl.classList.remove('paused');
+      if (this.dwellDuration > 0) {
+        var remaining = Math.max(0, this.dwellDuration - this.dwellElapsed);
+        this.dwellStart = performance.now();
+        this.startTimerBar();
+        var self = this;
+        this.dwellTimeout = setTimeout(function() {
+          self.dwellTimeout = null;
+          self.nextStep();
+        }, remaining);
+      } else {
+        this.nextStep();
+      }
     }
   },
 
@@ -3100,24 +4081,119 @@ var tourEngine = {
     if (idx < 0 || idx >= steps.length) return;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
+    if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+    document.getElementById('tour-timer-fill').style.width = '0%';
     this.stepIndex = idx - 1;
     this.nextStep();
+  },
+
+  startTimerBar: function() {
+    var self = this;
+    var fillEl = document.getElementById('tour-timer-fill');
+    if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+    function tick() {
+      if (!self.active || self.paused) return;
+      var elapsed = self.dwellElapsed + (performance.now() - self.dwellStart);
+      var pct = Math.min(100, (elapsed / self.dwellDuration) * 100);
+      fillEl.style.width = pct + '%';
+      if (pct < 100) {
+        self.timerAnimId = requestAnimationFrame(tick);
+      }
+    }
+    this.timerAnimId = requestAnimationFrame(tick);
+  },
+
+  resolveTarget: function(name) {
+    if (!name) return null;
+    for (var i = 0; i < objects.length; i++) {
+      if (objects[i].name === name) return objects[i];
+    }
+    return null;
   },
 
   nextStep: function() {
     if (!this.active) return;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
+    if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+    document.getElementById('tour-timer-fill').style.width = '0%';
 
     this.stepIndex++;
     var steps = tourDefs[this.tourId].steps;
     if (this.stepIndex >= steps.length) { this.stop(); return; }
 
     var wp = steps[this.stepIndex];
-    var targetSlider = Math.round(viewRadiusToSlider(wp.vr));
     var narrationEl = document.getElementById('narration');
     narrationEl.classList.remove('visible');
 
+    // Resolve target object for panning
+    var tObj = this.resolveTarget(wp.target);
+    var targetPanX = tObj ? tObj.x : 0;
+    var targetPanY = tObj ? tObj.y : 0;
+    var targetSlider = Math.round(viewRadiusToSlider(wp.vr));
+
+    // Check if we should do a two-phase transit (zoom out, then in)
+    var prevStep = this.stepIndex > 0 ? steps[this.stepIndex - 1] : null;
+    var prevObj = prevStep ? this.resolveTarget(prevStep.target) : null;
+    var doTransit = tObj && prevObj && tObj.name !== prevObj.name;
+
+    var self = this;
+
+    if (doTransit) {
+      // Phase 1: zoom out to show both stars, centered between them
+      var midX = (prevObj.x + tObj.x) / 2;
+      var midY = (prevObj.y + tObj.y) / 2;
+      var separation = Math.sqrt(Math.pow(tObj.x - prevObj.x, 2) + Math.pow(tObj.y - prevObj.y, 2));
+      var transitVR = Math.max(separation * 0.8, wp.vr * 1.5, prevStep.vr * 1.5);
+      var transitSlider = Math.round(viewRadiusToSlider(transitVR));
+
+      var startZoom1, startPanX1, startPanY1, zoomDist1, dur1, startTime1;
+
+      function animateOut(t) {
+        if (!self.active) return;
+        if (!startTime1) {
+          startZoom1 = state.zoom;
+          startPanX1 = state.panX;
+          startPanY1 = state.panY;
+          zoomDist1 = Math.abs(transitSlider - startZoom1);
+          dur1 = Math.max(800, Math.min(2000, zoomDist1 * 3));
+          startTime1 = t;
+        }
+        var progress = Math.min(1, (t - startTime1) / dur1);
+        var ease = easeInOutCubic(progress);
+        state.zoom = startZoom1 + (transitSlider - startZoom1) * ease;
+        state.panX = startPanX1 + (midX - startPanX1) * ease;
+        state.panY = startPanY1 + (midY - startPanY1) * ease;
+        slider.value = Math.round(state.zoom);
+        updateRecenterBtn();
+        state.warpIntensity = Math.pow(Math.sin(progress * Math.PI), 2) * Math.min(0.6, zoomDist1 / 300);
+        state.dirty = true;
+        if (progress < 1) {
+          self.zoomAnimId = requestAnimationFrame(animateOut);
+        } else {
+          self.zoomAnimId = null;
+          // Brief pause at wide view, then phase 2
+          setTimeout(function() {
+            if (!self.active) return;
+            self.animateToTarget(wp, targetPanX, targetPanY, targetSlider);
+          }, 600);
+        }
+      }
+
+      setTimeout(function() {
+        if (!self.active) return;
+        self.zoomAnimId = requestAnimationFrame(animateOut);
+      }, 400);
+    } else {
+      // Simple single-phase animation (first step, or no target)
+      setTimeout(function() {
+        if (!self.active) return;
+        self.animateToTarget(wp, targetPanX, targetPanY, targetSlider);
+      }, self.stepIndex === 0 ? 200 : 600);
+    }
+  },
+
+  animateToTarget: function(wp, targetPanX, targetPanY, targetSlider) {
     var self = this;
     var startZoom = state.zoom;
     var startPanX = state.panX, startPanY = state.panY;
@@ -3132,8 +4208,8 @@ var tourEngine = {
       var ease = easeInOutCubic(progress);
 
       state.zoom = startZoom + (targetSlider - startZoom) * ease;
-      state.panX = startPanX * (1 - ease);
-      state.panY = startPanY * (1 - ease);
+      state.panX = startPanX + (targetPanX - startPanX) * ease;
+      state.panY = startPanY + (targetPanY - startPanY) * ease;
       slider.value = Math.round(state.zoom);
       updateRecenterBtn();
 
@@ -3145,6 +4221,10 @@ var tourEngine = {
       } else {
         self.zoomAnimId = null;
         self.showNarration(wp);
+        self.dwellDuration = wp.dwell;
+        self.dwellElapsed = 0;
+        self.dwellStart = performance.now();
+        self.startTimerBar();
         if (!self.paused) {
           self.dwellTimeout = setTimeout(function() {
             self.dwellTimeout = null;
@@ -3154,10 +4234,7 @@ var tourEngine = {
       }
     }
 
-    setTimeout(function() {
-      if (!self.active) return;
-      self.zoomAnimId = requestAnimationFrame(animateZoom);
-    }, self.stepIndex === 0 ? 200 : 600);
+    self.zoomAnimId = requestAnimationFrame(animateZoom);
   },
 
   prevStep: function() {
@@ -3165,6 +4242,8 @@ var tourEngine = {
     var target = Math.max(0, this.stepIndex - 1);
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
+    if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
+    document.getElementById('tour-timer-fill').style.width = '0%';
     this.stepIndex = target - 1;
     this.nextStep();
   },
@@ -3298,7 +4377,14 @@ function buildGlossary() {
       var glossaryObjMap = {
         "Magnetars": "SGR 1806-20", "Neutron Stars": "Vela Pulsar",
         "Milky Way": "Sun (You Are Here)", "Laniakea": "Great Attractor",
-        "Spiral Arms": "Perseus Arm"
+        "Spiral Arms": "Perseus Arm",
+        "Tycho's Supernova": "Tycho's SN Remnant",
+        "Kepler's Supernova": "Kepler's SN Remnant",
+        "Supernovae": "Tycho's SN Remnant",
+        "Exoplanets": "Proxima Centauri b",
+        "Dark Matter Halos": "Andromeda (M31)",
+        "Observable Universe": "Great Attractor",
+        "Constellations": "Betelgeuse"
       };
       var lookupName = glossaryObjMap[entry.name] || entry.name;
       var matchObj = null;
@@ -3369,6 +4455,7 @@ function openGlossaryToEntry(name) {
 }
 
 document.getElementById('glossary-toggle-btn').addEventListener('click', function() {
+  dismissWelcome();
   var panel = document.getElementById('glossary-panel');
   panel.classList.toggle('open');
   this.classList.toggle('active');
@@ -3449,7 +4536,8 @@ function buildEffectsPanel() {
     { key: 'twinkling', label: 'Star twinkling' },
     { key: 'warpStreaks', label: 'Warp streaks' },
     { key: 'flowLines', label: 'Gravity flow' },
-    { key: 'ambientParticles', label: 'Ambient particles' }
+    { key: 'ambientParticles', label: 'Ambient particles' },
+    { key: 'orbits', label: 'Orbit lines' }
   ];
 
   checks.forEach(function(c) {
@@ -3550,6 +4638,7 @@ window.addEventListener('hashchange', readHash);
 var slider = document.getElementById('zoom-slider');
 
 slider.addEventListener('input', function() {
+  dismissWelcome();
   if (tourEngine.active) tourEngine.stop();
   state.zoom = parseInt(slider.value);
   state.activePreset = null;
@@ -3559,6 +4648,7 @@ slider.addEventListener('input', function() {
 
 canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
+  dismissWelcome();
   if (tourEngine.active) tourEngine.stop();
   state.zoom = Math.max(0, Math.min(1000, state.zoom - e.deltaY * 0.5));
   slider.value = Math.round(state.zoom);
@@ -3587,6 +4677,7 @@ var dragState = { dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY
 
 canvas.addEventListener('mousedown', function(e) {
   if (e.button !== 0) return;
+  dismissWelcome();
   dragState.dragging = true;
   dragState.moved = false;
   dragState.startX = e.clientX;
@@ -3744,6 +4835,7 @@ canvas.addEventListener('dblclick', function(e) {
 
 document.querySelectorAll('.preset-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
+    dismissWelcome();
     if (tourEngine.active) tourEngine.stop();
     var p = presets[btn.dataset.preset];
     if (!p) return;
@@ -3917,7 +5009,7 @@ document.getElementById('info-close').addEventListener('click', function() {
 
 // ─── Keyboard shortcuts ─────────────────────────────────────────────
 
-var presetKeys = { '1': 'solar', '2': 'stellar', '3': 'galaxy', '4': 'local', '5': 'cosmic' };
+var presetKeys = { '1': 'solar', '2': 'stellar', '3': 'constellations', '4': 'galaxy', '5': 'local', '6': 'cosmic' };
 document.addEventListener('keydown', function(e) {
   // Escape closes glossary even from search input
   if (e.key === 'Escape' && e.target.id === 'glossary-search-input') {
@@ -3997,6 +5089,10 @@ document.addEventListener('keydown', function(e) {
   }
 
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
+  if (e.key === 'l' || e.key === 'L') {
+    if (state.selected && state.selected.dist > 0) startLightPulse(state.selected);
+    return;
+  }
 
   if (e.key === 't' || e.key === 'T') {
     if (tourEngine.active) {
@@ -4065,6 +5161,7 @@ function getTouchDist(touches) {
 
 canvas.addEventListener('touchstart', function(e) {
   e.preventDefault();
+  dismissWelcome();
   if (e.touches.length === 2) {
     touchState.startDist = getTouchDist(e.touches);
     touchState.startZoom = state.zoom;
@@ -4133,6 +5230,7 @@ buildGlossary();
 buildEffectsPanel();
 
 // Set initial welcome content
+var welcomeShowing = true;
 (function() {
   var body = document.getElementById('info-body');
   while (body.firstChild) body.removeChild(body.firstChild);
@@ -4146,6 +5244,12 @@ buildEffectsPanel();
   p3.textContent = 'Dashed outlines show the extent of large structures at every scale.';
   body.appendChild(p3);
 })();
+
+function dismissWelcome() {
+  if (!welcomeShowing) return;
+  welcomeShowing = false;
+  document.getElementById('info-panel').classList.add('hidden');
+}
 
 resize();
 state.zoom = presets.solar.slider;
