@@ -326,32 +326,34 @@ function computeVisibilityScore(obj, camDist) {
   // Constellation members in camera's field of view always visible
   if (_focusedConStars[obj.name]) return 1.0;
 
-  // Base score from apparent brightness (inverse square approximation)
   var baseMag = obj.radius || 3;
-  var apparentBrightness = baseMag / (camDist * camDist + 1);
-
-  // Category importance scales with camera distance from origin
-  var catWeight = 1.0;
   var camFromOrigin = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
 
   // Solar-system objects (except Sol) only visible near origin
   if (obj.category === 'solar' && camFromOrigin > 0.01) return 0;
 
+  // Milky Way always visible as the halo around Sol
+  if (obj.name === 'Milky Way (You Are Here)') return 1.0;
+
+  // Large-scale objects use logarithmic falloff — visible across the universe
+  if (obj.category === 'galaxy' || obj.category === 'cosmic' || obj.category === 'local' || obj.category === 'cluster') {
+    var logDist = Math.log10(camDist + 1);
+    return Math.min(1.0, baseMag / (logDist * logDist + 1) * 0.5);
+  }
+
+  // Stellar/nebula/exotic use inverse square with category weighting
+  var apparentBrightness = baseMag / (camDist * camDist + 1);
+  var catWeight = 1.0;
+
   if (camFromOrigin > 1000) {
-    // From far away, suppress stellar/nebula, boost galaxy/cosmic
     if (obj.category === 'stellar') catWeight = 0.15;
     if (obj.category === 'nebula') catWeight = 0.3;
-    if (obj.category === 'galaxy' || obj.category === 'cosmic') catWeight = 2.0;
-    // Milky Way always visible as the halo around Sol
-    if (obj.name === 'Milky Way (You Are Here)') return 1.0;
   }
 
   // Named/important stars get a floor (constellation members, major stars)
   if (obj.constellation) catWeight = Math.max(catWeight, 0.5);
 
-  // Combine
-  var score = Math.min(1.0, apparentBrightness * catWeight * 1000);
-  return score;
+  return Math.min(1.0, apparentBrightness * catWeight * 1000);
 }
 
 function cullOverlapping(visibleList) {
