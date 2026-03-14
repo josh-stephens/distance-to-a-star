@@ -4108,22 +4108,35 @@ var tourEngine = {
         self.transitTimeout = null;
         if (!self.active) return;
 
-        // Third-person camera: place camera behind the star, looking past it
+        // Over-the-shoulder camera: object in bottom-left, constellation fills view
         var vpPreset = cam3dPresets[vpKey];
         if (vpPreset && lookKey) {
           var lookPos = getLookTarget(lookKey);
           if (lookPos) {
             var vx = vpPreset.px, vy = vpPreset.py, vz = vpPreset.pz;
-            var ldx = lookPos.x - vx, ldy = lookPos.y - vy, ldz = lookPos.z - vz;
-            var llen = Math.sqrt(ldx * ldx + ldy * ldy + ldz * ldz);
-            if (llen > 0.001) {
-              ldx /= llen; ldy /= llen; ldz /= llen;
-              // Offset: place camera behind the star relative to look target
+            // Forward: from star toward constellation
+            var fwX = lookPos.x - vx, fwY = lookPos.y - vy, fwZ = lookPos.z - vz;
+            var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
+            if (fwLen > 0.001) {
+              fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
+              // Right vector (cross forward with world up [0,0,1])
+              var rxR = fwY, ryR = -fwX, rzR = 0;
+              var rLen = Math.sqrt(rxR * rxR + ryR * ryR);
+              if (rLen < 0.001) { rxR = 1; ryR = 0; rLen = 1; }
+              rxR /= rLen; ryR /= rLen;
+              // Up vector (cross right with forward)
+              var uxR = ryR * fwZ - rzR * fwY;
+              var uyR = rzR * fwX - rxR * fwZ;
+              var uzR = rxR * fwY - ryR * fwX;
+              // Close offset behind + right + up for over-the-shoulder
+              // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
               var vpDist = Math.sqrt(vx * vx + vy * vy + vz * vz);
-              var offset = Math.max(0.5, Math.min(50, vpDist * 0.003));
-              var camX = vx - ldx * offset;
-              var camY = vy - ldy * offset;
-              var camZ = vz - ldz * offset;
+              var back = Math.max(0.08, Math.min(10, vpDist * 0.0005));
+              var side = back * 0.35;
+              var up = back * 0.2;
+              var camX = vx - fwX * back - rxR * side + uxR * up;
+              var camY = vy - fwY * back - ryR * side + uyR * up;
+              var camZ = vz - fwZ * back - rzR * 0 + uzR * up;
               var la = computeLookAngles(camX, camY, camZ, lookPos.x, lookPos.y, lookPos.z);
               cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
                 yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
@@ -4133,11 +4146,13 @@ var tourEngine = {
               cam3dAnim.startTime = performance.now();
               cam3dAnim.active = true;
               // Enter orbit mode around the viewFrom star
+              var orbDx = camX - vx, orbDy = camY - vy, orbDz = camZ - vz;
+              var orbDist = Math.sqrt(orbDx * orbDx + orbDy * orbDy + orbDz * orbDz);
               orbitMode.focalX = vx; orbitMode.focalY = vy; orbitMode.focalZ = vz;
               orbitMode.focalName = vpPreset.label || vpKey;
-              orbitMode.orbitDist = offset;
-              orbitMode.orbitYaw = Math.atan2(camY - vy, camX - vx);
-              orbitMode.orbitPitch = Math.atan2(camZ - vz, Math.sqrt((camX - vx) * (camX - vx) + (camY - vy) * (camY - vy)));
+              orbitMode.orbitDist = orbDist;
+              orbitMode.orbitYaw = Math.atan2(orbDy, orbDx);
+              orbitMode.orbitPitch = Math.atan2(orbDz, Math.sqrt(orbDx * orbDx + orbDy * orbDy));
               orbitMode.active = true;
               orbitMode.focalAnim.active = false;
               state.dirty = true;
