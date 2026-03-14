@@ -3,9 +3,17 @@
 var AU_IN_LY = 1 / 63241;
 var MLY = 1e6;
 var KM_IN_LY = 1 / 9.461e12;  // 1 km in light-years
-var STANDARD_ORBIT_KM = 700000; // 700,000 km minimum orbit altitude
-var STANDARD_ORBIT_LY = STANDARD_ORBIT_KM * KM_IN_LY;
-var ORBIT_RADIUS_MULT = 3; // orbit at 3× physRadius for large objects
+var ORBIT_CLOSE_KM = 50000;    // 50,000 km — planets and moons
+var ORBIT_FAR_KM = 700000;    // 700,000 km — stars, nebulae, galaxies
+var ORBIT_CLOSE_LY = ORBIT_CLOSE_KM * KM_IN_LY;
+var ORBIT_FAR_LY = ORBIT_FAR_KM * KM_IN_LY;
+var ORBIT_RADIUS_MULT = 3;    // orbit at 3× physRadius for large objects
+
+function standardOrbitDist(obj) {
+  var physR = (obj && obj.physRadius) || 0;
+  var minDist = (obj && obj.category === 'solar') ? ORBIT_CLOSE_LY : ORBIT_FAR_LY;
+  return Math.max(minDist, physR * ORBIT_RADIUS_MULT);
+}
 var MIN_LOG = Math.log10(0.000000005); // ~0.0003 AU, close enough to see planet surface details
 var MAX_LOG = Math.log10(400 * MLY);
 

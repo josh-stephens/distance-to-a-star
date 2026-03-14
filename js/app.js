@@ -4151,7 +4151,7 @@ var tourEngine = {
         if (vpObj) {
           cam3dPresets[vpKey] = { px: vpObj.wx3d, py: vpObj.wy3d, pz: vpObj.wz3d,
             yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vpObj.name,
-            physRadius: vpObj.physRadius || 0 };
+            physRadius: vpObj.physRadius || 0, category: vpObj.category };
         }
       }
       var lookKey = wp.sky3d.lookAt || null;
@@ -4196,10 +4196,9 @@ var tourEngine = {
               var uzR = rxR * fwY - ryR * fwX;
               // 50k km orbit above viewpoint object's surface, slight offset to frame constellation
               // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
-              var vpPhysR = vpPreset.physRadius || 0;
-              var back = Math.max(STANDARD_ORBIT_LY, vpPhysR * ORBIT_RADIUS_MULT);
-              var side = STANDARD_ORBIT_LY * 0.15;
-              var up = STANDARD_ORBIT_LY * 0.1;
+              var back = standardOrbitDist(vpPreset);
+              var side = back * 0.15;
+              var up = back * 0.1;
               var camX = vx - fwX * back - rxR * side + uxR * up;
               var camY = vy - fwY * back - ryR * side + uyR * up;
               var camZ = vz - fwZ * back - rzR * 0 + uzR * up;
@@ -5245,8 +5244,7 @@ canvas.addEventListener('dblclick', function(e) {
       saveSelectedObject(hit.name);
       showInfo(hit);
       // Fly to standard orbit around this object
-      var surfR = hit.physRadius || 0;
-      var orbD = Math.max(STANDARD_ORBIT_LY, surfR * ORBIT_RADIUS_MULT);
+      var orbD = standardOrbitDist(hit);
       var fx = hit.wx3d, fy = hit.wy3d, fz = hit.wz3d;
       var toX = fx + orbD, toY = fy, toZ = fz;
       var angles = computeLookAngles(toX, toY, toZ, fx, fy, fz);
@@ -5432,9 +5430,8 @@ function navigateToObject3D(objName) {
 
   var fx = obj.wx3d, fy = obj.wy3d, fz = obj.wz3d;
 
-  // Standard orbit: max(700k km, 3× physRadius)
-  var surfaceR = obj.physRadius || 0;
-  var orbDist = Math.max(STANDARD_ORBIT_LY, surfaceR * ORBIT_RADIUS_MULT);
+  // Standard orbit: planets 50k km, stars 700k km, or 3× physRadius
+  var orbDist = standardOrbitDist(obj);
 
   // Fly camera to an orbit position around the object
   var toX = fx + orbDist;
@@ -5540,12 +5537,13 @@ var cam3dPresets = {};
 function initCam3dPresets() {
   for (var i = 0; i < cam3dViewpoints.length; i++) {
     var vp = cam3dViewpoints[i];
-    var px = 0, py = 0, pz = 0, vpPhysR = 0;
+    var px = 0, py = 0, pz = 0, vpPhysR = 0, vpCat = '';
     if (vp.obj) {
       for (var j = 0; j < objects.length; j++) {
         if (objects[j].name === vp.obj) {
           px = objects[j].wx3d; py = objects[j].wy3d; pz = objects[j].wz3d;
           vpPhysR = objects[j].physRadius || 0;
+          vpCat = objects[j].category || '';
           break;
         }
       }
@@ -5568,7 +5566,7 @@ function initCam3dPresets() {
       defYaw = mwAngles.yaw;
       defPitch = mwAngles.pitch;
     }
-    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label, physRadius: vpPhysR };
+    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label, physRadius: vpPhysR, category: vpCat };
   }
 }
 
@@ -5701,9 +5699,48 @@ function lookAtTarget(targetKey, duration) {
   if (!pos) return;
 
   if (orbitMode.active) {
-    // In orbit mode: exit orbit, rotate to face target from current position
-    orbitMode.active = false;
+    // Stay in orbit — reposition camera so target is centered,
+    // orbited object appears below-left (over-the-shoulder framing)
+    var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
+    var fwX = pos.x - fx, fwY = pos.y - fy, fwZ = pos.z - fz;
+    var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
+    if (fwLen > 0.001) {
+      fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
+      // Right vector (cross forward with world up)
+      var rxR = fwY, ryR = -fwX, rzR = 0;
+      var rLen = Math.sqrt(rxR * rxR + ryR * ryR);
+      if (rLen < 0.001) { rxR = 1; ryR = 0; rLen = 1; }
+      rxR /= rLen; ryR /= rLen;
+      // Up vector (cross right with forward)
+      var uxR = ryR * fwZ - rzR * fwY;
+      var uyR = rzR * fwX - rxR * fwZ;
+      var uzR = rxR * fwY - ryR * fwX;
+      // Position behind focal object, offset right+up so object is lower-left
+      var back = orbitMode.orbitDist;
+      var side = back * 0.15;
+      var up = back * 0.1;
+      var camX = fx - fwX * back - rxR * side + uxR * up;
+      var camY = fy - fwY * back - ryR * side + uyR * up;
+      var camZ = fz - fwZ * back + uzR * up;
+      var la = computeLookAngles(camX, camY, camZ, pos.x, pos.y, pos.z);
+      cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+        yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+      cam3dAnim.to = { px: camX, py: camY, pz: camZ,
+        yaw: la.yaw, pitch: la.pitch, fov: cam3d.fov };
+      cam3dAnim.duration = duration || 1200;
+      cam3dAnim.startTime = performance.now();
+      cam3dAnim.active = true;
+      // Update orbit params to match new position
+      var orbDx = camX - fx, orbDy = camY - fy, orbDz = camZ - fz;
+      orbitMode.orbitDist = Math.sqrt(orbDx * orbDx + orbDy * orbDy + orbDz * orbDz);
+      orbitMode.orbitYaw = Math.atan2(orbDy, orbDx);
+      orbitMode.orbitPitch = Math.atan2(orbDz, Math.sqrt(orbDx * orbDx + orbDy * orbDy));
+      state.dirty = true;
+      return;
+    }
   }
+
+  // Free fly: just rotate in place to face the target
   var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, pos.x, pos.y, pos.z);
   cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
@@ -5776,8 +5813,7 @@ function flyCamera(presetName, duration, lookTarget) {
 
   // Compute orbit position around the viewpoint object
   var fx = preset.px, fy = preset.py, fz = preset.pz;
-  var physR = preset.physRadius || 0;
-  var orbDist = Math.max(STANDARD_ORBIT_LY, physR * ORBIT_RADIUS_MULT);
+  var orbDist = standardOrbitDist(preset);
 
   var toX = fx + orbDist, toY = fy, toZ = fz;
   var toYaw, toPitch;
@@ -6166,7 +6202,7 @@ function openSlotDropdown(btn, type) {
               var lookAngles2 = computeLookAngles(obj.wx3d, obj.wy3d, obj.wz3d, 0, 0, 0);
               cam3dPresets[vpKey] = { px: obj.wx3d, py: obj.wy3d, pz: obj.wz3d,
                 yaw: lookAngles2.yaw, pitch: lookAngles2.pitch, fov: 60, label: c.label,
-                physRadius: obj.physRadius || 0 };
+                physRadius: obj.physRadius || 0, category: obj.category };
               btn.textContent = c.label;
               btn.setAttribute('data-cam-preset', vpKey);
               flyCamera(vpKey, 2000);
@@ -6365,7 +6401,7 @@ function loadSlotConfig() {
             var la = computeLookAngles(objects[oi].wx3d, objects[oi].wy3d, objects[oi].wz3d, 0, 0, 0);
             cam3dPresets[vp.key] = { px: objects[oi].wx3d, py: objects[oi].wy3d, pz: objects[oi].wz3d,
               yaw: la.yaw, pitch: la.pitch, fov: 60, label: vp.label,
-              physRadius: objects[oi].physRadius || 0 };
+              physRadius: objects[oi].physRadius || 0, category: objects[oi].category };
             break;
           }
         }
