@@ -550,13 +550,17 @@ var regions = [
 var objects = [
   // Solar
   { name: "Sun", x: 0, y: 0, dist: 0, radius: 4, color: "#ffdd44", glow: "#ffdd4466",
-    type: "Star (G2V)", category: "solar",
+    type: "Star (G2V)", category: "solar", physRadius: 7.35e-8,
     facts: [["Type", "G2V main-sequence"], ["Mass", "1 solar mass"], ["Age", "~4.6 billion years"]],
     desc: "Our home star. A middle-aged yellow dwarf containing 99.86% of the solar system's mass." },
   { name: "Earth", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 2.5, color: "#4488cc", glow: "#4488cc44",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 6.74e-10,
     facts: [["Distance from Sun", "1 AU (8.3 light-min)"], ["Orbital period", "365.25 days"]],
     desc: "Our home. At 1 AU from the Sun -- just 8 light-minutes." },
+  { name: "Moon", x: AU_IN_LY * 1.08, y: 0.12 * AU_IN_LY, dist: AU_IN_LY, radius: 1.8, color: "#ccccbb", glow: "#ccccbb33",
+    type: "Natural satellite", category: "solar", physRadius: 1.84e-10,
+    facts: [["Distance from Earth", "384,400 km (1.28 light-sec)"], ["Orbital period", "27.3 days"], ["Diameter", "3,474 km"]],
+    desc: "Earth's only natural satellite. The Moon stabilizes Earth's axial tilt and drives the tides. It is the only celestial body beyond Earth visited by humans." },
   { name: "Mercury", x: 0.39 * AU_IN_LY, y: -0.22 * AU_IN_LY, dist: 0.39 * AU_IN_LY, radius: 1.5, color: "#b5a08a", glow: "#b5a08a33",
     type: "Planet", category: "solar",
     facts: [["Distance from Sun", "0.39 AU (3.2 light-min)"], ["Orbital period", "88 days"], ["Surface temp", "-170 to 430 \u00b0C"]],
@@ -570,7 +574,7 @@ var objects = [
     facts: [["Distance from Sun", "1.52 AU (12.7 light-min)"], ["Orbital period", "687 days"], ["Moons", "Phobos, Deimos"]],
     desc: "The Red Planet. Home to Olympus Mons, the tallest volcano in the solar system." },
   { name: "Jupiter", x: 3.5 * AU_IN_LY, y: 3.8 * AU_IN_LY, dist: 5.2 * AU_IN_LY, radius: 3, color: "#d4a56a", glow: "#d4a56a44",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 7.37e-9,
     facts: [["Distance from Sun", "5.2 AU (43 light-min)"], ["Orbital period", "11.9 years"], ["Mass", "318x Earth"]],
     desc: "The solar system's giant. More massive than all other planets combined." },
   { name: "Saturn", x: -6.0 * AU_IN_LY, y: 7.3 * AU_IN_LY, dist: 9.58 * AU_IN_LY, radius: 2.8, color: "#e8d088", glow: "#e8d08844",
@@ -689,7 +693,7 @@ var objects = [
     facts: [["Distance", "550 light-years"], ["Diameter", "680x Sun"], ["Constellation", "Scorpius (the heart)"]],
     desc: "Heart of the Scorpion. So large that if placed at the Sun, Mars would orbit inside it." },
   { name: "Betelgeuse", x: 20, y: -380, dist: 700, ra: 88.79, dec: 7.41, radius: 5, color: "#ff6633", glow: "#ff663355",
-    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 3000], constellation: "orion",
+    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 3000], constellation: "orion", physRadius: 0.0057,
     facts: [["Distance", "700 light-years"], ["Diameter", "700-1000x Sun"], ["Fate", "Supernova within 100,000 yr"]],
     desc: "A red supergiant so immense it would engulf Jupiter. Will explode as a supernova." },
   { name: "Bellatrix", x: 230, y: -400, dist: 250, ra: 81.28, dec: 6.35, radius: 3, color: "#99aaff", glow: "#99aaff44",
@@ -812,7 +816,7 @@ var objects = [
     facts: [["Distance", "655 light-years"], ["Diameter", "~5.7 ly"], ["Nickname", "Eye of God"]],
     desc: "A dying star's outer layers expelled into space, forming the 'Eye of God.'" },
   { name: "Orion Nebula", x: 400, y: -1200, dist: 1344, radius: 6, color: "#ff99aa", glow: "#ff99aa44",
-    type: "Emission nebula", category: "nebula", visRange: [200, 50000],
+    type: "Emission nebula", category: "nebula", visRange: [200, 50000], physRadius: 12,
     facts: [["Distance", "1,344 light-years"], ["Diameter", "~24 ly"], ["Contents", "Trapezium cluster, youngest known stars"]],
     desc: "Visible to the naked eye in Orion's sword. A stellar nursery birthing new stars." },
   { name: "Ring Nebula", x: 1500, y: -1800, dist: 2283, radius: 4, color: "#55ccff", glow: "#55ccff33",
@@ -937,7 +941,7 @@ var objects = [
     facts: [["Distance", "~820,000 ly"]],
     desc: "One of the most distant MW satellite galaxies." },
   { name: "Andromeda (M31)", x: -1.5 * MLY, y: -2.0 * MLY, dist: 2.537 * MLY, radius: 14, color: "#bbaaee", glow: "#bbaaee55",
-    type: "SA(s)b spiral galaxy", category: "local",
+    type: "SA(s)b spiral galaxy", category: "local", physRadius: 110000,
     facts: [["Distance", "~2.537 Mly"], ["Stars", "~1 trillion"], ["Collision", "~4.5 Gyr"]],
     desc: "The nearest major galaxy. Approaching at 110 km/s -- will merge with the MW in ~4.5 billion years." },
   { name: "Triangulum (M33)", x: -2.0 * MLY, y: -1.8 * MLY, dist: 2.73 * MLY, radius: 8, color: "#99aadd", glow: "#99aadd44",
@@ -969,7 +973,7 @@ var objects = [
 
   // Cosmic
   { name: "Milky Way (You Are Here)", x: 0, y: 0, dist: 0, radius: 5, color: "#ffdd44", glow: "#ffdd4466",
-    type: "Our galaxy", category: "cosmic",
+    type: "Our galaxy", category: "cosmic", physRadius: 52500,
     facts: [["Type", "Barred spiral"], ["Diameter", "~105,000 ly"], ["Stars", "100-400 billion"]],
     desc: "Our home galaxy." },
   { name: "Virgo Cluster", x: -40 * MLY, y: -35 * MLY, dist: 53.8 * MLY, radius: 12, color: "#ddbbff", glow: "#ddbbff44",
@@ -1033,6 +1037,7 @@ var glossaryData = [
 
   // Solar System
   { name: "Earth", cat: "Solar System", color: "#4488cc", short: "Our pale blue dot", long: "The only known planet harboring life, orbiting the Sun at a distance of 1 AU -- about 8 light-minutes. Earth's liquid water, magnetic field, and atmosphere create a narrow habitable zone that has sustained life for nearly 4 billion years. From space, it appears as a pale blue dot suspended in a sunbeam." },
+  { name: "Moon", cat: "Solar System", color: "#ccccbb", short: "Earth's faithful companion", long: "The Moon orbits Earth at 384,400 km -- just 1.28 light-seconds away. It stabilizes Earth's axial tilt, drives the tides, and has been a stepping stone for human exploration since Apollo 11 in 1969. From the Moon, Earth spans about 2 degrees of sky -- four times the Moon's apparent size from Earth. The Moon is slowly receding from Earth at 3.8 cm per year." },
   { name: "Mercury", cat: "Solar System", color: "#b5a08a", short: "Closest to the Sun", long: "The smallest planet in the solar system and the closest to the Sun, orbiting at just 0.39 AU. Mercury experiences extreme temperature swings from -170 to 430 degrees Celsius between its long nights and scorching days. Its year lasts only 88 Earth days, yet a single day-night cycle takes 176 Earth days." },
   { name: "Venus", cat: "Solar System", color: "#e8c06a", short: "Earth's toxic twin", long: "Similar in size to Earth, Venus suffered a runaway greenhouse effect that made it the hottest planet in the solar system at 465 degrees Celsius -- hot enough to melt lead. Its thick atmosphere of carbon dioxide creates crushing surface pressure 90 times Earth's. It rotates backward, so the Sun rises in the west." },
   { name: "Mars", cat: "Solar System", color: "#cc6644", short: "The Red Planet", long: "Home to Olympus Mons, the tallest volcano in the solar system at 22 km, and Valles Marineris, a canyon system stretching 4,000 km. Evidence of ancient river valleys and lake beds suggests Mars once had liquid water on its surface. It remains the prime target for human exploration beyond the Moon." },
@@ -1421,6 +1426,15 @@ function easeInOutCubic(t) {
 
 var DEG2RAD = Math.PI / 180;
 
+function formatAngularSize(radians) {
+  var deg = radians / DEG2RAD;
+  if (deg >= 1) return deg.toFixed(1) + '\u00b0';
+  var arcmin = deg * 60;
+  if (arcmin >= 1) return arcmin.toFixed(1) + "'";
+  var arcsec = deg * 3600;
+  return arcsec.toFixed(1) + '"';
+}
+
 function raDecToXYZ(raDeg, decDeg, dist) {
   var ra = raDeg * DEG2RAD;
   var dec = decDeg * DEG2RAD;
@@ -1439,6 +1453,21 @@ function initObjects3D() {
       o.wx3d = c.x;
       o.wy3d = c.y;
       o.wz3d = c.z;
+    } else if (o.name === 'Moon') {
+      // Moon: ~384,400 km = ~4.06e-8 ly from Earth
+      // Earth is at ~(AU_IN_LY, 0, 0); place Moon offset from Earth
+      o.wx3d = AU_IN_LY + 3.5e-8;
+      o.wy3d = 1.8e-8;
+      o.wz3d = 0.9e-8;
+    } else if (o.name === 'Sun') {
+      o.wx3d = 0; o.wy3d = 0; o.wz3d = 0;
+    } else if (o.name === 'Earth') {
+      o.wx3d = AU_IN_LY; o.wy3d = 0; o.wz3d = 0;
+    } else if (o.category === 'solar') {
+      // Other solar objects: place on XY plane scaled down
+      o.wx3d = o.x;
+      o.wy3d = o.y;
+      o.wz3d = 0;
     } else {
       // Fallback: place on XY plane using 2D map coords
       o.wx3d = o.x;
@@ -1483,10 +1512,12 @@ function getVisibleObjects3D() {
   var sh = H / devicePixelRatio;
   var m = 80;
   var result = [];
+  // Show solar objects when camera is within ~0.01 ly of origin
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  var showSolar = camDist < 0.01;
   for (var i = 0; i < objects.length; i++) {
     var o = objects[i];
-    // Skip solar system objects in 3D (too close, not meaningful)
-    if (o.category === 'solar') continue;
+    if (o.category === 'solar' && !showSolar) continue;
     var sp = worldToScreen3D(o.wx3d, o.wy3d, o.wz3d);
     if (!sp) continue;
     if (sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m) {
@@ -4349,6 +4380,62 @@ function draw3D(ts) {
   }
   drawLabels();
 
+  // Draw apparent size brackets for objects with physical radii
+  for (var bi = 0; bi < visible.length; bi++) {
+    var bObj = visible[bi];
+    if (!bObj.physRadius || !bObj._sp3d) continue;
+    var bSp = bObj._sp3d;
+    // Angular diameter = 2 * arctan(physRadius / distance)
+    var angRad = 2 * Math.atan(bObj.physRadius / bSp.depth);
+    // Only show if angular size >= 0.5 arcsecond and has meaningful screen extent
+    if (angRad < 0.5 / 3600 * DEG2RAD) continue;
+    // Convert angular size to screen pixels
+    var focalLen = 1 / Math.tan(cam3d.fov * DEG2RAD / 2);
+    var halfW = sw / 2;
+    var angPx = angRad * focalLen * halfW;
+    // Only draw brackets if they'd be at least 12px and at most 600px
+    if (angPx < 12 || angPx > 600) continue;
+    var half = angPx / 2;
+    var cx = bSp.x, cy = bSp.y;
+    var corner = Math.min(half * 0.3, 12);
+    ctx.save();
+    ctx.strokeStyle = bObj.color;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1;
+    // Four L-shaped corner brackets
+    // Top-left
+    ctx.beginPath();
+    ctx.moveTo(cx - half, cy - half + corner);
+    ctx.lineTo(cx - half, cy - half);
+    ctx.lineTo(cx - half + corner, cy - half);
+    ctx.stroke();
+    // Top-right
+    ctx.beginPath();
+    ctx.moveTo(cx + half - corner, cy - half);
+    ctx.lineTo(cx + half, cy - half);
+    ctx.lineTo(cx + half, cy - half + corner);
+    ctx.stroke();
+    // Bottom-left
+    ctx.beginPath();
+    ctx.moveTo(cx - half, cy + half - corner);
+    ctx.lineTo(cx - half, cy + half);
+    ctx.lineTo(cx - half + corner, cy + half);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(cx + half - corner, cy + half);
+    ctx.lineTo(cx + half, cy + half);
+    ctx.lineTo(cx + half, cy + half - corner);
+    ctx.stroke();
+    // Angular size label below brackets
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = bObj.color;
+    ctx.globalAlpha = 0.6;
+    ctx.fillText(formatAngularSize(angRad), cx, cy + half + 12);
+    ctx.restore();
+  }
+
   // Draw 3D HUD
   draw3DHUD(sw, sh);
 
@@ -4360,17 +4447,24 @@ function draw3DHUD(sw, sh) {
 
   // Camera position label
   var posLabel = 'Earth';
-  if (Math.abs(cam3d.px) > 0.1 || Math.abs(cam3d.py) > 0.1 || Math.abs(cam3d.pz) > 0.1) {
+  var camFromOrigin = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  if (camFromOrigin > 1e-6) {
     // Check if near a known object
     var nearest = null, nearDist = Infinity;
     for (var i = 0; i < objects.length; i++) {
       var o = objects[i];
-      if (o.ra === undefined) continue;
+      if (o.wx3d === undefined) continue;
       var dx = cam3d.px - o.wx3d, dy = cam3d.py - o.wy3d, dz = cam3d.pz - o.wz3d;
       var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (d < nearDist) { nearDist = d; nearest = o; }
     }
-    posLabel = nearest && nearDist < nearest.dist * 0.1 ? nearest.name : 'Custom';
+    if (nearest && nearDist < 1e-6) {
+      posLabel = nearest.name;
+    } else if (nearest && nearest.dist > 0 && nearDist < nearest.dist * 0.1) {
+      posLabel = nearest.name;
+    } else {
+      posLabel = 'Custom';
+    }
   }
 
   ctx.font = '11px -apple-system, system-ui, sans-serif';
@@ -5740,10 +5834,53 @@ canvas.addEventListener('click', function(e) {
 canvas.addEventListener('dblclick', function(e) {
   e.preventDefault();
   if (tourEngine.active) return;
-  if (state.mode3d) return;
 
   var rect = canvas.getBoundingClientRect();
   var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+
+  if (state.mode3d) {
+    // 3D: double-click to fly to an object
+    var visible = getVisibleObjects3D();
+    var hit = null, minD = 40;
+    visible.forEach(function(o) {
+      var sp = o._sp3d;
+      if (!sp) return;
+      var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
+      if (d < minD) { minD = d; hit = o; }
+    });
+    if (hit) {
+      // Fly camera to this object's position, looking at current look direction
+      var toYaw = cam3d.yaw, toPitch = cam3d.pitch;
+      // Try to look toward the nearest interesting target (not self)
+      var bestTarget = null, bestTargetDist = Infinity;
+      for (var ti = 0; ti < cam3dLookTargets.length; ti++) {
+        var tPos = getLookTarget(cam3dLookTargets[ti].key);
+        if (!tPos) continue;
+        var tdx = tPos.x - hit.wx3d, tdy = tPos.y - hit.wy3d, tdz = tPos.z - hit.wz3d;
+        var tDist = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
+        // Skip if same location as destination (self) or too close
+        if (tDist < 0.001) continue;
+        if (tDist < bestTargetDist) {
+          bestTargetDist = tDist;
+          bestTarget = tPos;
+        }
+      }
+      if (bestTarget) {
+        var angles = computeLookAngles(hit.wx3d, hit.wy3d, hit.wz3d, bestTarget.x, bestTarget.y, bestTarget.z);
+        toYaw = angles.yaw;
+        toPitch = angles.pitch;
+      }
+      cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+        yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+      cam3dAnim.to = { px: hit.wx3d, py: hit.wy3d, pz: hit.wz3d,
+        yaw: toYaw, pitch: toPitch, fov: 60 };
+      cam3dAnim.duration = 2000;
+      cam3dAnim.startTime = performance.now();
+      cam3dAnim.active = true;
+      state.dirty = true;
+    }
+    return;
+  }
 
   var visible = getVisibleObjects();
   var hit = null, minD = 40;
@@ -5948,18 +6085,22 @@ document.getElementById('info-close').addEventListener('click', function() {
 // Viewpoint presets: name -> object to stand at (null = origin/Earth)
 var cam3dViewpoints = [
   { key: 'earth', label: 'Earth', obj: null },
+  { key: 'moon', label: 'Moon', obj: 'Moon' },
   { key: 'barnard', label: "Barnard's Star", obj: "Barnard's Star" },
   { key: 'sirius', label: 'Sirius', obj: 'Sirius' },
   { key: 'vega', label: 'Vega', obj: 'Vega' },
   { key: 'trappist', label: 'TRAPPIST-1', obj: 'TRAPPIST-1 System' },
   { key: 'polaris', label: 'Polaris', obj: 'Polaris' },
   { key: 'betelgeuse', label: 'Betelgeuse', obj: 'Betelgeuse' },
-  { key: 'deneb', label: 'Deneb', obj: 'Deneb' }
+  { key: 'deneb', label: 'Deneb', obj: 'Deneb' },
+  { key: 'greatattractor', label: 'Great Attractor', obj: 'Great Attractor' }
 ];
 
 // Look-at targets: constellations (centroid) + individual objects
 var cam3dLookTargets = [
   { key: 'sol', label: 'Sol', type: 'object', obj: 'Sun' },
+  { key: 'earth', label: 'Earth', type: 'object', obj: 'Earth' },
+  { key: 'moon', label: 'Moon', type: 'object', obj: 'Moon' },
   { key: 'orion', label: 'Orion', type: 'constellation', id: 'orion' },
   { key: 'bigdipper', label: 'Big Dipper', type: 'constellation', id: 'bigdipper' },
   { key: 'scorpius', label: 'Scorpius', type: 'constellation', id: 'scorpius' },
@@ -5967,7 +6108,9 @@ var cam3dLookTargets = [
   { key: 'cassiopeia', label: 'Cassiopeia', type: 'constellation', id: 'cassiopeia' },
   { key: 'sirius', label: 'Sirius', type: 'object', obj: 'Sirius' },
   { key: 'polaris', label: 'Polaris', type: 'object', obj: 'Polaris' },
-  { key: 'canopus', label: 'Canopus', type: 'object', obj: 'Canopus' }
+  { key: 'canopus', label: 'Canopus', type: 'object', obj: 'Canopus' },
+  { key: 'milkyway', label: 'Milky Way', type: 'object', obj: 'Milky Way (You Are Here)' },
+  { key: 'greatattractor', label: 'Great Attractor', type: 'object', obj: 'Great Attractor' }
 ];
 
 var cam3dPresets = {};
@@ -5985,8 +6128,25 @@ function initCam3dPresets() {
         }
       }
     }
-    // Default look toward Orion
-    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vp.label };
+    // Default look toward Orion; Moon looks at Earth
+    var defYaw = 83 * DEG2RAD, defPitch = -1 * DEG2RAD;
+    if (vp.key === 'moon') {
+      // Look toward Earth from the Moon
+      for (var ei = 0; ei < objects.length; ei++) {
+        if (objects[ei].name === 'Earth') {
+          var eaAngles = computeLookAngles(px, py, pz, objects[ei].wx3d, objects[ei].wy3d, objects[ei].wz3d);
+          defYaw = eaAngles.yaw;
+          defPitch = eaAngles.pitch;
+          break;
+        }
+      }
+    } else if (vp.key === 'greatattractor') {
+      // Look toward the Milky Way from the Great Attractor
+      var gaAngles = computeLookAngles(px, py, pz, 0, 0, 0);
+      defYaw = gaAngles.yaw;
+      defPitch = gaAngles.pitch;
+    }
+    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label };
   }
 }
 
