@@ -239,105 +239,644 @@ function drawOverlay_flat(d) {
 }
 
 function drawOverlay_albedo(d) {
+  var ctx = d.ctx;
+  var x = d.x;
+  var y = d.y;
+  var r = d.r;
+  var color = d.color;
+  var name = d.obj.name;
+  var PI = Math.PI;
+  var TWO_PI = PI * 2;
+
   var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
-               d.obj.name === 'Sun (You Are Here)';
+               name === 'Sun (You Are Here)';
+
   if (isStar) {
-    // Limb darkening for self-luminous objects
-    var grad = d.ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
-    grad.addColorStop(0, lightenHex(d.color, 1.2));
-    grad.addColorStop(0.6, d.color);
-    grad.addColorStop(0.9, darkenHex(d.color, 0.6));
-    grad.addColorStop(1, darkenHex(d.color, 0.3));
-    d.ctx.fillStyle = grad;
-  } else {
-    // Directional lighting for reflective bodies
-    var grad = d.ctx.createRadialGradient(
-      d.x + d.lightOffX * 0.4, d.y + d.lightOffY * 0.4, 0,
-      d.x - d.lightOffX * 0.3, d.y - d.lightOffY * 0.3, d.r
-    );
-    grad.addColorStop(0, lightenHex(d.color, 1.3));
-    grad.addColorStop(0.5, d.color);
-    grad.addColorStop(0.8, darkenHex(d.color, 0.35));
-    grad.addColorStop(1, darkenHex(d.color, 0.08));
-    d.ctx.fillStyle = grad;
+    // Realistic limb darkening with many gradient stops
+    // Stars are brighter at center, darker at limb following I(r) ~ (1 - u*(1 - sqrt(1 - r^2)))
+    var grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0,    lightenHex(color, 1.35));
+    grad.addColorStop(0.1,  lightenHex(color, 1.3));
+    grad.addColorStop(0.2,  lightenHex(color, 1.22));
+    grad.addColorStop(0.3,  lightenHex(color, 1.14));
+    grad.addColorStop(0.4,  lightenHex(color, 1.06));
+    grad.addColorStop(0.5,  color);
+    grad.addColorStop(0.6,  darkenHex(color, 0.88));
+    grad.addColorStop(0.7,  darkenHex(color, 0.72));
+    grad.addColorStop(0.8,  darkenHex(color, 0.52));
+    grad.addColorStop(0.88, darkenHex(color, 0.35));
+    grad.addColorStop(0.94, darkenHex(color, 0.2));
+    grad.addColorStop(1,    darkenHex(color, 0.08));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TWO_PI);
+    ctx.fill();
+    return;
   }
-  d.ctx.beginPath();
-  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-  d.ctx.fill();
+
+  // --- Reflective bodies (planets, moons) ---
+  var lightAngle = Math.atan2(d.lightOffY, d.lightOffX);
+  var cosL = Math.cos(lightAngle);
+  var sinL = Math.sin(lightAngle);
+
+  // Identify body types
+  var isGasGiant = (name === 'Jupiter' || name === 'Saturn' ||
+                    name === 'Uranus' || name === 'Neptune');
+  var hasAtmosphere = (name === 'Earth' || name === 'Venus' ||
+                       name === 'Jupiter' || name === 'Saturn');
+
+  ctx.save();
+
+  // 1) Base sphere fill
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TWO_PI);
+  ctx.fill();
+
+  // 2) Gas giant horizontal banding (drawn before shadow for realism)
+  if (isGasGiant && r > 3) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TWO_PI);
+    ctx.clip();
+    var bandCount = (name === 'Jupiter') ? 12 : (name === 'Saturn') ? 8 : 6;
+    var bandAlpha = (name === 'Jupiter') ? 0.18 : 0.1;
+    for (var bi = 0; bi < bandCount; bi++) {
+      var bandY = y - r + (2 * r * (bi + 0.5) / bandCount);
+      var bandH = (2 * r / bandCount) * 0.6;
+      var bandColor = (bi % 2 === 0)
+        ? 'rgba(255,255,255,' + bandAlpha + ')'
+        : 'rgba(0,0,0,' + (bandAlpha * 0.8) + ')';
+      ctx.fillStyle = bandColor;
+      ctx.fillRect(x - r, bandY - bandH * 0.5, r * 2, bandH);
+    }
+    ctx.restore();
+  }
+
+  // 3) Lit-side radial gradient (soft illumination from light direction)
+  var litCX = x + cosL * r * 0.35;
+  var litCY = y + sinL * r * 0.35;
+  var litGrad = ctx.createRadialGradient(litCX, litCY, 0, litCX, litCY, r * 1.1);
+  litGrad.addColorStop(0, lightenHex(color, 1.25));
+  litGrad.addColorStop(0.4, 'rgba(255,255,255,0.06)');
+  litGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TWO_PI);
+  ctx.clip();
+  ctx.fillStyle = litGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TWO_PI);
+  ctx.fill();
+  ctx.restore();
+
+  // 4) Terminator shadow using clip path — dark side is very dark but not pure black
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TWO_PI);
+  ctx.clip();
+
+  // Rotate so the shadow edge is perpendicular to the light direction
+  ctx.translate(x, y);
+  ctx.rotate(lightAngle);
+
+  // Shadow hemisphere: the half facing away from the light
+  ctx.beginPath();
+  ctx.rect(-r * 1.1, -r * 1.1, r * 1.1, r * 2.2);
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fill();
+
+  // Soften the terminator with a gradient across the boundary
+  var termGrad = ctx.createLinearGradient(-r * 0.35, 0, r * 0.25, 0);
+  termGrad.addColorStop(0, 'rgba(0,0,0,0.5)');
+  termGrad.addColorStop(0.4, 'rgba(0,0,0,0.25)');
+  termGrad.addColorStop(0.7, 'rgba(0,0,0,0.05)');
+  termGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = termGrad;
+  ctx.fillRect(-r * 0.35, -r * 1.1, r * 0.6, r * 2.2);
+
+  // Slight ambient light on the dark side so it is not pure black
+  ctx.fillStyle = 'rgba(40,50,70,0.12)';
+  ctx.fillRect(-r * 1.1, -r * 1.1, r * 1.1, r * 2.2);
+
+  ctx.restore();
+
+  // 5) Specular highlight — small bright spot on the lit side
+  if (r > 2) {
+    var specDist = r * 0.38;
+    var specX = x + cosL * specDist;
+    var specY = y + sinL * specDist;
+    var specR = r * 0.22;
+    var specGrad = ctx.createRadialGradient(specX, specY, 0, specX, specY, specR);
+    specGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
+    specGrad.addColorStop(0.4, 'rgba(255,255,255,0.2)');
+    specGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TWO_PI);
+    ctx.clip();
+    ctx.fillStyle = specGrad;
+    ctx.beginPath();
+    ctx.arc(specX, specY, specR, 0, TWO_PI);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 6) Atmospheric limb glow for bodies with atmospheres
+  if (hasAtmosphere && r > 3) {
+    var limbColor;
+    if (name === 'Earth') {
+      limbColor = '100,180,255';
+    } else if (name === 'Venus') {
+      limbColor = '240,220,160';
+    } else if (name === 'Jupiter') {
+      limbColor = '220,180,120';
+    } else {
+      limbColor = '230,210,150';
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r + r * 0.06, 0, TWO_PI);
+    ctx.arc(x, y, r * 0.92, 0, TWO_PI, true);
+    ctx.clip();
+
+    // Brighter on the lit side, faint on the dark side
+    var limbGrad = ctx.createRadialGradient(
+      x + cosL * r * 0.3, y + sinL * r * 0.3, r * 0.7,
+      x, y, r + r * 0.06
+    );
+    limbGrad.addColorStop(0, 'rgba(' + limbColor + ',0)');
+    limbGrad.addColorStop(0.5, 'rgba(' + limbColor + ',0.15)');
+    limbGrad.addColorStop(0.8, 'rgba(' + limbColor + ',0.35)');
+    limbGrad.addColorStop(1, 'rgba(' + limbColor + ',0.08)');
+    ctx.fillStyle = limbGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r + r * 0.06, 0, TWO_PI);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
 }
 
 function drawOverlay_wireframe(d) {
   drawOverlay_flat(d);
-  d.ctx.save();
-  d.ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  d.ctx.lineWidth = Math.max(0.5, d.r / 80);
+  var ctx = d.ctx;
+  var x = d.x, y = d.y, r = d.r;
+
+  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
+               d.obj.name === 'Sun (You Are Here)';
+
+  // Light direction angle and magnitude
+  var lMag = Math.sqrt(d.lightOffX * d.lightOffX + d.lightOffY * d.lightOffY);
+  var lightAngle = lMag > 0.01 ? Math.atan2(d.lightOffY, d.lightOffX) : 0;
+  var hasLight = lMag > 0.01 && !isStar;
+
+  // Scale line count with radius, capped for performance
+  var latCount = Math.min(12, Math.max(4, Math.round(r / 12)));
+  var lonCount = Math.min(14, Math.max(4, Math.round(r / 10)));
+
+  // Base line width
+  var baseWidth = Math.max(0.5, r / 100);
+
+  // Grid color: warm for stars, cool white for others
+  var gridR, gridG, gridB;
+  if (isStar) {
+    gridR = 255; gridG = 220; gridB = 160;
+  } else {
+    gridR = 200; gridG = 220; gridB = 255;
+  }
+
+  ctx.save();
+
   // Clip to sphere
-  d.ctx.beginPath();
-  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-  d.ctx.clip();
-  // Latitude lines
-  for (var i = 1; i < 6; i++) {
-    var frac = i / 6;
-    var yOff = d.r * (2 * frac - 1);
-    var rAtLat = Math.sqrt(Math.max(0, d.r * d.r - yOff * yOff));
-    d.ctx.beginPath();
-    d.ctx.ellipse(d.x, d.y + yOff, rAtLat, rAtLat * 0.25, 0, 0, Math.PI * 2);
-    d.ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Normalized light direction for dot-product shading
+  var lnx = hasLight ? d.lightOffX / lMag : 0;
+  var lny = hasLight ? d.lightOffY / lMag : 0;
+
+  // --- Latitude lines ---
+  for (var i = 1; i < latCount; i++) {
+    var frac = i / latCount;
+    var yOff = r * (2 * frac - 1);
+    var rAtLat = Math.sqrt(Math.max(0, r * r - yOff * yOff));
+    if (rAtLat < 1) continue;
+
+    var isEquator = (i === Math.floor(latCount / 2));
+
+    // Shading: fade lines on the dark hemisphere
+    var lineAlpha;
+    if (hasLight) {
+      // Dot product of line center direction with light direction
+      var dot = lny * (yOff / r);
+      // Bias toward light side: bright = 0.35, dark = 0.06
+      lineAlpha = 0.06 + 0.29 * Math.max(0, 0.5 + 0.5 * dot);
+    } else {
+      lineAlpha = isStar ? 0.25 : 0.2;
+    }
+
+    if (isEquator) {
+      lineAlpha = Math.min(1, lineAlpha * 1.8);
+      ctx.lineWidth = baseWidth * 2;
+    } else {
+      ctx.lineWidth = baseWidth;
+    }
+
+    ctx.strokeStyle = 'rgba(' + gridR + ',' + gridG + ',' + gridB + ',' + lineAlpha.toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(x, y + yOff, rAtLat, rAtLat * 0.25, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
-  // Longitude lines
-  for (var j = 0; j < 6; j++) {
-    var angle = j * Math.PI / 6;
-    d.ctx.beginPath();
-    d.ctx.ellipse(d.x, d.y, d.r * Math.abs(Math.cos(angle)), d.r, 0, 0, Math.PI * 2);
-    d.ctx.stroke();
+
+  // --- Longitude lines (rotated by light direction) ---
+  for (var j = 0; j < lonCount; j++) {
+    var lonAngle = j * Math.PI / lonCount + lightAngle;
+    var cosA = Math.cos(lonAngle);
+    var sinA = Math.sin(lonAngle);
+    var rX = r * Math.abs(cosA);
+    if (rX < 1) rX = 1;
+
+    // Shading: lines facing the light are brighter
+    var lineAlpha2;
+    if (hasLight) {
+      // Direction the line faces (its normal) is perpendicular to its plane
+      var nrmX = cosA;
+      var nrmY = sinA;
+      var dot2 = nrmX * lnx + nrmY * lny;
+      lineAlpha2 = 0.05 + 0.3 * Math.max(0, 0.5 + 0.5 * Math.abs(dot2));
+    } else {
+      lineAlpha2 = isStar ? 0.25 : 0.2;
+    }
+
+    ctx.lineWidth = baseWidth;
+    ctx.strokeStyle = 'rgba(' + gridR + ',' + gridG + ',' + gridB + ',' + lineAlpha2.toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(x, y, rX, r, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
-  d.ctx.restore();
+
+  // --- Terminator line (day/night boundary) for non-stars ---
+  if (hasLight && r > 6) {
+    // Terminator is the great circle perpendicular to the light direction
+    var termAngle = lightAngle + Math.PI / 2;
+    ctx.lineWidth = baseWidth * 2.5;
+    ctx.strokeStyle = 'rgba(' + gridR + ',' + gridG + ',' + gridB + ',0.4)';
+    ctx.beginPath();
+    // Draw as an ellipse: full height, narrow width to look like a great circle edge-on
+    ctx.ellipse(x, y, r * 0.12, r, termAngle, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 function drawOverlay_depth(d) {
-  // Specular highlight offset toward light
-  var hlX = d.x + d.lightOffX * 0.3;
-  var hlY = d.y + d.lightOffY * 0.3;
-  var grad = d.ctx.createRadialGradient(hlX, hlY, 0, d.x, d.y, d.r);
-  grad.addColorStop(0, lightenHex(d.color, 1.5));
-  grad.addColorStop(0.3, lightenHex(d.color, 1.1));
-  grad.addColorStop(0.6, d.color);
-  grad.addColorStop(0.85, darkenHex(d.color, 0.4));
-  grad.addColorStop(1, darkenHex(d.color, 0.15));
-  d.ctx.fillStyle = grad;
-  d.ctx.beginPath();
-  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-  d.ctx.fill();
+  var ctx = d.ctx;
+  var x = d.x;
+  var y = d.y;
+  var r = d.r;
+  var color = d.color;
+  var lx = d.lightOffX;
+  var ly = d.lightOffY;
+
+  // Parse base color into RGB components
+  var bR = parseInt(color.substr(1, 2), 16);
+  var bG = parseInt(color.substr(3, 2), 16);
+  var bB = parseInt(color.substr(5, 2), 16);
+
+  // Determine if this is a star (warm topo palette) or planet/other (base color palette)
+  var objType = (d.obj && d.obj.type) ? d.obj.type : '';
+  var isStar = objType.indexOf('Star') !== -1 ||
+               objType.indexOf('dwarf') !== -1 ||
+               objType.indexOf('giant') !== -1 ||
+               objType.indexOf('supergiant') !== -1 ||
+               objType.indexOf('Pulsar') !== -1 ||
+               objType.indexOf('White Dwarf') !== -1 ||
+               (d.obj && d.obj.category === 'stellar' && objType.indexOf('planet') === -1 && objType.indexOf('Planet') === -1) ||
+               (d.obj && d.obj.name === 'Sun (You Are Here)');
+
+  // Ring count scales with screen radius, capped at 12
+  var ringCount = Math.min(12, Math.max(4, Math.round(r / 8)));
+
+  // Build topo color palette: warm center to cool edge for stars,
+  // light-to-dark base color for planets/other
+  var topoColors = [];
+  var i, t, cr, cg, cb, s;
+  for (i = 0; i < ringCount; i++) {
+    t = i / (ringCount - 1); // 0 = center, 1 = edge
+    if (isStar) {
+      // Warm palette: white-yellow center -> gold -> orange -> deep red edge
+      if (t < 0.25) {
+        s = t / 0.25;
+        cr = 255;
+        cg = Math.round(255 - s * 30);
+        cb = Math.round(220 - s * 150);
+      } else if (t < 0.5) {
+        s = (t - 0.25) / 0.25;
+        cr = 255;
+        cg = Math.round(225 - s * 90);
+        cb = Math.round(70 - s * 50);
+      } else if (t < 0.75) {
+        s = (t - 0.5) / 0.25;
+        cr = Math.round(255 - s * 40);
+        cg = Math.round(135 - s * 85);
+        cb = Math.round(20 - s * 10);
+      } else {
+        s = (t - 0.75) / 0.25;
+        cr = Math.round(215 - s * 100);
+        cg = Math.round(50 - s * 40);
+        cb = Math.round(10 + s * 15);
+      }
+    } else {
+      // Planet/other: lighten center, darken edge, using base color
+      var lumFactor = 1.6 - t * 1.3; // 1.6 at center, 0.3 at edge
+      cr = Math.min(255, Math.round(bR * lumFactor));
+      cg = Math.min(255, Math.round(bG * lumFactor));
+      cb = Math.min(255, Math.round(bB * lumFactor));
+    }
+    topoColors.push({ r: cr, g: cg, b: cb });
+  }
+
+  ctx.save();
+
+  // Clip to circle so nothing bleeds out
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Draw concentric topo rings from outer to inner
+  for (i = ringCount - 1; i >= 0; i--) {
+    var ringT = (i + 1) / ringCount; // 1 = outer, decreasing inward
+    var ringR = r * ringT;
+    var c = topoColors[i];
+
+    ctx.fillStyle = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+    ctx.beginPath();
+    ctx.arc(x, y, ringR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Subtle ring border for definition (skip outermost)
+    if (i < ringCount - 1) {
+      var borderAlpha = Math.min(0.4, 0.15 + (ringCount - i) * 0.02);
+      ctx.strokeStyle = 'rgba(255,255,255,' + borderAlpha.toFixed(2) + ')';
+      ctx.lineWidth = Math.max(0.5, r / 150);
+      ctx.beginPath();
+      ctx.arc(x, y, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // Spherical shading: limb darkening via radial gradient overlay
+  var limbGrad = ctx.createRadialGradient(x, y, r * 0.3, x, y, r);
+  limbGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  limbGrad.addColorStop(0.6, 'rgba(0,0,0,0.05)');
+  limbGrad.addColorStop(0.85, 'rgba(0,0,0,0.15)');
+  limbGrad.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = limbGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Directional shadow on the side opposite the light source
+  var shadowX = x - lx * 0.5;
+  var shadowY = y - ly * 0.5;
+  var shadowGrad = ctx.createRadialGradient(shadowX, shadowY, r * 0.2, shadowX, shadowY, r * 1.1);
+  shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+  shadowGrad.addColorStop(0.5, 'rgba(0,0,0,0.15)');
+  shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = shadowGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Specular highlight toward light source for gloss
+  var hlX = x + lx * 0.35;
+  var hlY = y + ly * 0.35;
+  var hlR = r * 0.35;
+  var specGrad = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, hlR);
+  specGrad.addColorStop(0, 'rgba(255,255,255,0.35)');
+  specGrad.addColorStop(0.5, 'rgba(255,255,255,0.1)');
+  specGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = specGrad;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 function drawOverlay_layers(d) {
+  var ctx = d.ctx;
+  var x = d.x, y = d.y, r = d.r;
   var layerDef = objectLayers[d.obj.name] || defaultLayers;
+  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
+               d.obj.name === 'Sun (You Are Here)';
+  var hasConvective = false;
+  var convIdx = -1;
+  var PI = Math.PI;
+
+  // Detect convective zone for stars
+  if (isStar) {
+    for (var ci = 0; ci < layerDef.length; ci++) {
+      if (layerDef[ci].label.toLowerCase().indexOf('convect') >= 0) {
+        hasConvective = true;
+        convIdx = ci;
+        break;
+      }
+    }
+  }
+
+  ctx.save();
+
+  // ── Right half: surface with lit gradient ──────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.arc(x, y, r, -PI / 2, PI / 2, false);
+  ctx.closePath();
+  ctx.clip();
+
+  var outerColor = layerDef[layerDef.length - 1].color;
+  if (isStar) {
+    var surfGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    surfGrad.addColorStop(0, lightenHex(outerColor, 1.3));
+    surfGrad.addColorStop(0.5, outerColor);
+    surfGrad.addColorStop(0.85, darkenHex(outerColor, 0.6));
+    surfGrad.addColorStop(1, darkenHex(outerColor, 0.3));
+    ctx.fillStyle = surfGrad;
+  } else {
+    var lx = d.lightOffX * 0.3;
+    var ly = d.lightOffY * 0.3;
+    var surfGrad = ctx.createRadialGradient(x + lx, y + ly, 0, x - lx * 0.5, y - ly * 0.5, r);
+    surfGrad.addColorStop(0, lightenHex(outerColor, 1.3));
+    surfGrad.addColorStop(0.5, outerColor);
+    surfGrad.addColorStop(0.85, darkenHex(outerColor, 0.4));
+    surfGrad.addColorStop(1, darkenHex(outerColor, 0.15));
+    ctx.fillStyle = surfGrad;
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // ── Left half: cross-section layers ────────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.arc(x, y, r, -PI / 2, PI / 2, true);
+  ctx.closePath();
+  ctx.clip();
+
+  // Draw layers from outermost to innermost
   for (var i = layerDef.length - 1; i >= 0; i--) {
     var layer = layerDef[i];
-    d.ctx.fillStyle = layer.color;
-    d.ctx.beginPath();
-    d.ctx.arc(d.x, d.y, d.r * layer.ratio, 0, Math.PI * 2);
-    d.ctx.fill();
+    var lr = r * layer.ratio;
+    var prevR = i > 0 ? r * layerDef[i - 1].ratio : 0;
+
+    // Radial gradient within each layer for depth
+    var innerC = darkenHex(layer.color, 0.55);
+    var outerC = lightenHex(layer.color, 1.15);
+
+    var lg = ctx.createRadialGradient(x, y, prevR, x, y, lr);
+    lg.addColorStop(0, innerC);
+    lg.addColorStop(0.4, layer.color);
+    lg.addColorStop(0.85, layer.color);
+    lg.addColorStop(1, outerC);
+    ctx.fillStyle = lg;
+
+    ctx.beginPath();
+    ctx.arc(x, y, lr, 0, PI * 2);
+    ctx.fill();
+
+    // Convection streaks for convective zone in stars
+    if (hasConvective && i === convIdx && r > 25) {
+      var streakCount = Math.min(18, Math.max(6, Math.round(r / 8)));
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, lr, 0, PI * 2);
+      if (prevR > 0) {
+        ctx.arc(x, y, prevR, 0, PI * 2, true);
+      }
+      ctx.clip();
+
+      for (var si = 0; si < streakCount; si++) {
+        var angle = (si / streakCount) * PI * 2 + 0.3;
+        var midAngle = angle + 0.08;
+        var startR = prevR + (lr - prevR) * 0.1;
+        var endR = prevR + (lr - prevR) * (0.7 + Math.sin(si * 2.7) * 0.25);
+        var sx = x + Math.cos(angle) * startR;
+        var sy = y + Math.sin(angle) * startR;
+        var ex = x + Math.cos(midAngle) * endR;
+        var ey = y + Math.sin(midAngle) * endR;
+
+        ctx.strokeStyle = 'rgba(255,255,200,' + (0.12 + Math.sin(si * 1.9) * 0.06).toFixed(3) + ')';
+        ctx.lineWidth = Math.max(0.5, r / 60);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        var cx1 = x + Math.cos(angle + 0.04) * (startR + endR) * 0.55;
+        var cy1 = y + Math.sin(angle + 0.04) * (startR + endR) * 0.55;
+        ctx.quadraticCurveTo(cx1, cy1, ex, ey);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Bright boundary line between layers
     if (i > 0) {
-      d.ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      d.ctx.lineWidth = Math.max(0.5, d.r / 100);
-      d.ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = Math.max(0.5, r / 120);
+      ctx.beginPath();
+      ctx.arc(x, y, lr, 0, PI * 2);
+      ctx.stroke();
     }
   }
-  // Label layers when large enough
-  if (d.r > 60) {
-    d.ctx.save();
-    d.ctx.font = Math.max(8, d.r / 12) + 'px -apple-system, system-ui, sans-serif';
-    d.ctx.textAlign = 'center';
-    d.ctx.fillStyle = 'rgba(255,255,255,0.6)';
+
+  ctx.restore();
+
+  // ── Cutaway edge: vertical line with highlight ─────────────────────
+  // Broad soft highlight behind the cut
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = Math.max(3, r / 20);
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x, y + r);
+  ctx.stroke();
+
+  // Sharp cut edge
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = Math.max(1, r / 60);
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x, y + r);
+  ctx.stroke();
+
+  // Outer rim
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = Math.max(0.5, r / 100);
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, PI * 2);
+  ctx.stroke();
+
+  // ── Labels with leader lines (left side only) ─────────────────────
+  if (r > 40) {
+    var fontSize = Math.max(9, Math.min(14, r / 10));
+    ctx.font = fontSize + 'px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
     for (var li = 0; li < layerDef.length; li++) {
-      var lr = d.r * layerDef[li].ratio;
-      var prevR = li > 0 ? d.r * layerDef[li - 1].ratio : 0;
-      var midR = (lr + prevR) / 2;
-      d.ctx.fillText(layerDef[li].label, d.x + midR * 0.5, d.y);
+      var lyr = layerDef[li];
+      var layerR = r * lyr.ratio;
+      var prevLR = li > 0 ? r * layerDef[li - 1].ratio : 0;
+      var midR = (layerR + prevLR) / 2;
+
+      // Place anchor at midpoint of the layer band, on the left
+      var labelAngle = PI + (PI * 0.6) * ((li + 0.5) / layerDef.length - 0.5);
+      var anchorX = x + Math.cos(labelAngle) * midR;
+      var anchorY = y + Math.sin(labelAngle) * midR;
+
+      // Leader line endpoint — extend left of the sphere
+      var leaderEndX = x - r - fontSize * 0.8 - 8;
+      var leaderMidX = x - r - 4;
+      var leaderY = anchorY;
+
+      // Clamp label Y so it stays within the sphere bounds
+      if (leaderY < y - r + fontSize * 0.5) leaderY = y - r + fontSize * 0.5;
+      if (leaderY > y + r - fontSize * 0.5) leaderY = y + r - fontSize * 0.5;
+
+      if (r > 60) {
+        // Leader line
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = Math.max(0.5, r / 200);
+        ctx.beginPath();
+        ctx.moveTo(anchorX, anchorY);
+        ctx.lineTo(leaderMidX, leaderY);
+        ctx.lineTo(leaderEndX, leaderY);
+        ctx.stroke();
+
+        // Small dot at anchor point
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.arc(anchorX, anchorY, Math.max(1.5, r / 80), 0, PI * 2);
+        ctx.fill();
+
+        // Label text
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillText(lyr.label, leaderEndX - 3, leaderY);
+      } else {
+        // Simpler labels without leader lines when 40 < r <= 60
+        var simpleX = x - midR * 0.7;
+        var simpleY = y + (li - (layerDef.length - 1) / 2) * (fontSize + 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.fillText(lyr.label, simpleX, simpleY);
+      }
     }
-    d.ctx.restore();
   }
+
+  ctx.restore();
 }
 
 var overlayRenderers = {
