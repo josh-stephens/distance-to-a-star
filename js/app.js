@@ -3218,9 +3218,8 @@ function draw3D(ts) {
       twinkle = 0.85 + 0.15 * Math.sin(tSec3d * (1.5 + (j % 7) * 0.3) + j * 2.1);
     }
 
-    // Scale radius by perspective — grows beyond cap when very close
-    var rawApp = 1 + Math.log10(Math.max(1, 50 / sp.depth));
-    var appMag = Math.max(0.5, rawApp <= 4 ? rawApp : 4 + (rawApp - 4) * 4);
+    // Scale radius by perspective
+    var appMag = Math.max(0.5, Math.min(4, 1 + Math.log10(Math.max(1, 50 / sp.depth))));
     var r3d = Math.max(1.5, obj.radius * appMag);
 
     ctx.globalAlpha = objAlpha * twinkle;
