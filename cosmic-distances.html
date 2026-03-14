@@ -58,6 +58,41 @@
   .tour-dropdown-item:hover { background: #1a1a38; color: #c8c8e0; }
   .tour-dropdown-item .tour-item-name { font-weight: 600; color: #b8b8d0; }
   .tour-dropdown-item .tour-item-desc { font-size: 10px; color: #6a6a88; margin-top: 2px; }
+  .tour-dropdown-item .tour-key-hint { float: right; opacity: 0.3; font-size: 10px; margin-left: 8px; }
+  .feedback-btn {
+    padding: 5px 12px; border: 1px solid #2a2a44; background: #14141e;
+    color: #6a6a88; border-radius: 4px; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap; text-decoration: none;
+  }
+  .feedback-btn:hover { background: #1a1a38; color: #9898b0; border-color: #3a3a55; }
+  .feedback-popover {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(400px, 90vw); background: rgba(14, 14, 26, 0.96); border: 1px solid #2a2a44;
+    border-radius: 10px; padding: 24px; z-index: 50; backdrop-filter: blur(16px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  }
+  .feedback-popover.open { display: block; }
+  .feedback-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 49; }
+  .feedback-overlay.open { display: block; }
+  .feedback-popover h3 { margin: 0 0 16px; color: #c8c8e0; font-size: 15px; }
+  .feedback-popover label { display: block; font-size: 11px; color: #6a6a88; margin-bottom: 4px; }
+  .feedback-popover input, .feedback-popover textarea {
+    width: 100%; box-sizing: border-box; background: #0a0a14; border: 1px solid #2a2a44;
+    border-radius: 5px; color: #c8c8e0; padding: 8px 10px; font-size: 12px;
+    font-family: -apple-system, system-ui, sans-serif; margin-bottom: 12px; resize: vertical;
+  }
+  .feedback-popover input:focus, .feedback-popover textarea:focus { outline: none; border-color: #3a5a8a; }
+  .feedback-popover textarea { min-height: 80px; }
+  .feedback-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .feedback-actions button {
+    padding: 6px 16px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .feedback-cancel { background: none; border: 1px solid #2a2a44; color: #6a6a88; }
+  .feedback-cancel:hover { border-color: #3a3a55; color: #9898b0; }
+  .feedback-send { background: #1a3a2a; border: 1px solid #3a6a4a; color: #88cc88; }
+  .feedback-send:hover { background: #224a34; color: #aaddaa; }
+  .feedback-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .feedback-status { font-size: 11px; margin-top: 8px; text-align: center; }
 
   .main-area { flex: 1; overflow: hidden; position: relative; }
   canvas { width: 100%; height: 100%; display: block; cursor: grab; }
@@ -248,9 +283,24 @@
   <button class="preset-btn" data-preset="cosmic">Great Attractor <span class="key-hint">6</span></button>
   <button class="glossary-btn" id="glossary-toggle-btn">Glossary <span class="key-hint">/</span></button>
   <div class="tour-menu-wrap">
-    <button class="tour-btn" id="tour-btn">Tours &#x25be;</button>
+    <button class="tour-btn" id="tour-btn">Tours <span class="key-hint">T</span> &#x25be;</button>
     <div class="tour-dropdown" id="tour-dropdown"></div>
   </div>
+  <button class="feedback-btn" id="feedback-btn" title="Send feedback">Feedback &#x2709;</button>
+</div>
+
+<div class="feedback-overlay" id="feedback-overlay"></div>
+<div class="feedback-popover" id="feedback-popover">
+  <h3>&#x2709; Send Feedback</h3>
+  <label for="fb-name">Name (optional)</label>
+  <input type="text" id="fb-name" placeholder="Your name" autocomplete="off">
+  <label for="fb-msg">Message</label>
+  <textarea id="fb-msg" placeholder="What did you think? Ideas, bugs, suggestions..."></textarea>
+  <div class="feedback-actions">
+    <button class="feedback-cancel" id="fb-cancel">Cancel</button>
+    <button class="feedback-send" id="fb-send">Send</button>
+  </div>
+  <div class="feedback-status" id="fb-status"></div>
 </div>
 
 <div class="main-area" id="main-area">
@@ -486,6 +536,18 @@ var objects = [
     type: "Exoplanet (super-Earth)", category: "stellar", visRange: [80, 8000],
     facts: [["Distance", "1,800 light-years"], ["Radius", "~1.6 Earth radii"], ["Orbital period", "385 days"], ["Star", "Sun-like (G2V)"]],
     desc: "Dubbed 'Earth 2.0' -- the first near-Earth-sized planet found in the habitable zone of a Sun-like star. Its year lasts 385 days and its star is nearly identical to our Sun, making it the most Earth-like world discovered by Kepler." },
+  { name: "51 Pegasi b", x: 35, y: -35, dist: 50.45, radius: 1.8, color: "#ff9944", glow: "#ff994433",
+    type: "Hot Jupiter (first found)", category: "stellar", visRange: [8, 300],
+    facts: [["Distance", "50.45 light-years"], ["Mass", "~0.47 Jupiter masses"], ["Orbital period", "4.23 days"], ["Discovery", "1995 (Nobel Prize 2019)"]],
+    desc: "The planet that changed everything. In 1995, Mayor and Queloz discovered this gas giant orbiting impossibly close to its star -- completing a year in just 4 days. It shattered assumptions about planetary formation and launched the exoplanet revolution. Nobel Prize in Physics, 2019." },
+  { name: "HD 209458 b", x: -100, y: 120, dist: 159, radius: 2, color: "#ffaa55", glow: "#ffaa5544",
+    type: "Hot Jupiter (evaporating)", category: "stellar", visRange: [20, 800],
+    facts: [["Distance", "159 light-years"], ["Nickname", "Osiris"], ["Orbital period", "3.52 days"], ["Discovery", "First transiting exoplanet (1999)"]],
+    desc: "The first exoplanet caught crossing its star's face. Nicknamed 'Osiris' after the Egyptian god of the dead, this gas giant is so close to its star that its atmosphere is boiling away into space, leaving a comet-like tail of hydrogen and carbon." },
+  { name: "WASP-12b", x: -950, y: 1050, dist: 1410, radius: 2, color: "#ff6633", glow: "#ff663344",
+    type: "Ultra-hot Jupiter (doomed)", category: "stellar", visRange: [80, 6000],
+    facts: [["Distance", "1,410 light-years"], ["Surface temp", "~2,600\u00b0C"], ["Orbital period", "1.09 days"], ["Fate", "Being consumed by its star"]],
+    desc: "One of the hottest and most extreme planets known. Orbiting so close that tidal forces stretch it into an egg shape, WASP-12b is being slowly devoured by its star. It reflects almost no light -- darker than asphalt. It will be consumed entirely within 10 million years." },
 
   { name: "Barnard's Star", x: 3.0, y: 4.5, dist: 5.96, radius: 1.5, color: "#dd5533", glow: "#dd553322",
     type: "Red dwarf (M4Ve)", category: "stellar",
@@ -952,6 +1014,9 @@ var glossaryData = [
   { name: "Observable Universe", cat: "Concepts", color: "#9977bb", short: "The cosmic horizon at 46.5 billion light-years", long: "The observable universe extends 46.5 billion light-years in every direction -- not because the universe is 46.5 billion years old (it is 13.8 billion), but because space itself has been expanding. Light from the most distant visible objects has been traveling for 13.8 billion years, but the expansion of space has stretched that distance to 46.5 billion light-years. Beyond this horizon, light has not had time to reach us. There may be infinitely more universe beyond what we can observe." },
   { name: "Supernovae", cat: "Concepts", color: "#ff7744", short: "Stellar explosions that forge the elements", long: "A supernova is the explosive death of a star, briefly outshining its entire host galaxy. Type II supernovae occur when massive stars (8+ solar masses) exhaust their fuel and their cores collapse. Type Ia supernovae happen when white dwarfs exceed the Chandrasekhar limit by accreting matter from a companion. Both types seed the cosmos with heavy elements -- every atom of iron, gold, and uranium on Earth was forged in a supernova. Historic supernovae observed by Tycho (1572), Kepler (1604), and in the LMC (1987A) have shaped our understanding of stellar death." },
   { name: "Exoplanets", cat: "Concepts", color: "#66aacc", short: "Worlds beyond our solar system", long: "As of 2025, over 5,700 exoplanets have been confirmed orbiting other stars. The Kepler mission alone found thousands, revealing that planets are the rule rather than the exception -- on average, every star in the Milky Way has at least one planet. The nearest known exoplanet, Proxima Centauri b, orbits our closest stellar neighbor just 4.24 light-years away. JWST is now characterizing exoplanet atmospheres, searching for biosignatures like water vapor, methane, and oxygen." },
+  { name: "51 Pegasi b", cat: "Stars", color: "#ff9944", short: "The first exoplanet found around a Sun-like star", long: "Discovered in 1995 by Michel Mayor and Didier Queloz, 51 Pegasi b shattered assumptions about planetary systems. A gas giant orbiting its star in just 4.2 days, it proved that 'hot Jupiters' could exist -- giant planets hugging their parent stars. This discovery earned the 2019 Nobel Prize in Physics and launched the exoplanet revolution." },
+  { name: "HD 209458 b", cat: "Stars", color: "#ffaa55", short: "First transiting exoplanet -- 'Osiris'", long: "The first exoplanet observed crossing its star's face (1999), enabling astronomers to measure its size and study its atmosphere. Nicknamed 'Osiris,' observations revealed its atmosphere is boiling away, streaming hydrogen, carbon, and oxygen into space like a comet tail. It proved that exoplanet atmospheres could be studied from Earth." },
+  { name: "WASP-12b", cat: "Stars", color: "#ff6633", short: "Ultra-hot Jupiter being devoured by its star", long: "One of the hottest known exoplanets at 2,600 C, WASP-12b orbits so close to its star that tidal forces stretch it into an egg shape. Darker than asphalt (it absorbs 94% of light), it is being slowly consumed -- losing mass that spirals onto its star. It will be completely destroyed within about 10 million years, a blink in cosmic time." },
   { name: "Constellations", cat: "Concepts", color: "#7888bb", short: "Flat patterns from a 3D universe", long: "Constellations are patterns of stars that appear close together on the sky but are typically at vastly different distances. Orion is a perfect example: Bellatrix (250 ly), Betelgeuse (700 ly), Rigel (863 ly), and the belt stars (1,200-2,000 ly) span nearly 10x in depth. The familiar shapes are accidents of our viewpoint -- from another star system, these constellations would be unrecognizable. Ancient cultures independently drew different patterns from the same stars." },
 
   // Orion constellation stars
@@ -1031,6 +1096,74 @@ var tourDefs = {
       { vr: 30 * MLY, target: "M87", title: "M87* \u2014 The First Image", body: "In 2019, humanity captured the first-ever image of a black hole: M87*, a 6.5-billion-solar-mass monster at the heart of the Virgo Cluster. Its relativistic jet extends 5,000 light-years, powered by matter spiraling in.", scale: "53.8 Mly from Earth", dwell: 7500 },
       { vr: 150 * MLY, target: "Great Attractor", title: "The Great Attractor \u2014 Cosmic Mystery", body: "Something massive is pulling hundreds of thousands of galaxies toward it at 600 km/s. Hidden behind our galaxy's dusty disk, the Great Attractor's true nature remains uncertain \u2014 a vast concentration of mass equivalent to 10 quadrillion Suns.", scale: "250 Mly from Earth", dwell: 8000 },
       { vr: 350 * MLY, title: "The Edge of Sight", body: "Beyond the Great Attractor, the observable universe extends 46.5 billion light-years in every direction. At that boundary lies the cosmic microwave background \u2014 the afterglow of the Big Bang, light that has traveled for 13.8 billion years to reach us.", scale: "The observable universe", dwell: 8000 }
+    ]
+  },
+  lifecycle: {
+    name: "Death & Rebirth Tour",
+    desc: "The stellar lifecycle from nursery to black hole",
+    steps: [
+      { vr: 700, target: "Orion Nebula", title: "Where Stars Are Born", body: "Stars begin inside vast clouds of gas and dust. In the Orion Nebula, gravity pulls pockets of hydrogen together until they ignite with nuclear fusion. Hundreds of stars are being born here right now, including some just 10,000 years old \u2014 newborns by cosmic standards.", scale: "1,344 ly from Earth", dwell: 7500 },
+      { vr: 0.00004, title: "A Star Lives", body: "Our Sun is a middle-aged star, 4.6 billion years into a 10-billion-year life. It fuses 600 million tons of hydrogen per second, converting 4 million tons of matter into pure energy via E=mc\u00b2. This is the main sequence \u2014 the long, stable prime of a star's life.", scale: "Our solar system", dwell: 7000 },
+      { vr: 350, target: "Betelgeuse", title: "A Star Ages", body: "When a massive star exhausts its hydrogen, it swells into a red supergiant. Betelgeuse has expanded to 700 times the Sun's diameter \u2014 if placed at our Sun's position, it would swallow Mars. Its core is desperately fusing heavier elements: helium, carbon, oxygen, silicon. When it reaches iron, the end comes.", scale: "700 ly from Earth", dwell: 8000 },
+      { vr: 350, target: "Helix Nebula", title: "A Gentle Death", body: "Smaller stars like our Sun die gracefully. They shed their outer layers into space, forming planetary nebulae \u2014 some of the most beautiful objects in the cosmos. The Helix Nebula is the 'Eye of God': a dying star's last breath, illuminated by the tiny white dwarf at its center.", scale: "655 ly from Earth", dwell: 7500 },
+      { vr: 1200, target: "Ring Nebula", title: "Beautiful Remains", body: "The Ring Nebula in Lyra \u2014 another star's final exhale. These shells of glowing gas enrich the cosmos with carbon, nitrogen, and oxygen forged in the star's core. In 5 billion years, our Sun will create its own planetary nebula, and the atoms in your body will return to interstellar space.", scale: "2,283 ly from Earth", dwell: 7500 },
+      { vr: 3200, target: "Crab Nebula", title: "A Violent Death", body: "Massive stars die explosively. In 1054 AD, Chinese astronomers recorded a 'guest star' visible in daylight for 23 days. What they witnessed was a supernova \u2014 a star detonating with the energy of 10 billion Suns. The expanding shrapnel is the Crab Nebula, still racing outward at 1,500 km/s.", scale: "6,500 ly from Earth", dwell: 7500 },
+      { vr: 3200, target: "Crab Pulsar", title: "The Compact Corpse", body: "At the Crab Nebula's heart spins a neutron star \u2014 the crushed core of the exploded star. Just 20 km across but with more mass than the Sun, a teaspoon would weigh a billion tons. It spins 30 times per second, sweeping beams of radiation like a lighthouse, powering the entire nebula's glow.", scale: "6,500 ly from Earth", dwell: 7500 },
+      { vr: 3000, target: "Cygnus X-1", title: "Beyond the Grave", body: "The most massive stars leave behind something stranger: a black hole. Cygnus X-1 contains 21 solar masses compressed into a point of infinite density. It feeds on a blue supergiant companion, pulling streams of gas that spiral inward at near-light speed, radiating X-rays before crossing the event horizon forever.", scale: "6,070 ly from Earth", dwell: 8000 },
+      { vr: 700, target: "Orion Nebula", title: "And It Begins Again", body: "But destruction seeds creation. The heavy elements forged in stellar cores and scattered by supernovae \u2014 the iron in your blood, the calcium in your bones, the oxygen you breathe \u2014 all were made inside stars that died before our Sun was born. From these ashes, new stars and planets form. The cycle never ends.", scale: "1,344 ly from Earth", dwell: 8000 }
+    ]
+  },
+  ladder: {
+    name: "The Distance Ladder Tour",
+    desc: "How we measure the cosmos, rung by rung",
+    steps: [
+      { vr: 0.00004, target: "Earth", title: "Rung 1: Radar", body: "The first rung is direct measurement. We bounce radar signals off nearby planets and time the echo. Light travels to the Moon in 1.3 seconds, to Mars in ~3 minutes. This gives us the exact scale of the solar system \u2014 the baseline for everything that follows.", scale: "The solar system", dwell: 7000 },
+      { vr: 3, target: "Proxima Centauri", title: "Rung 2: Parallax", body: "Hold your thumb up and blink each eye \u2014 it shifts against the background. Stars do the same as Earth orbits the Sun. By measuring a star's tiny angular shift over 6 months, we triangulate its distance. Proxima Centauri shifts by 0.77 arcseconds \u2014 the width of a quarter seen from 6.5 km away. Parallax works reliably out to about 1,000 light-years.", scale: "4.24 ly from Earth", dwell: 8000 },
+      { vr: 220, target: "Polaris", title: "Rung 3: Cepheid Variables", body: "Beyond parallax range, we use 'standard candles' \u2014 objects of known brightness. Cepheid variables pulsate with periods that reveal their true luminosity. Polaris is a Cepheid: by comparing how bright it appears vs. how bright it truly is, we calculate its distance. Henrietta Leavitt discovered this relationship in 1908, unlocking the cosmos.", scale: "433 ly from Earth", dwell: 8000 },
+      { vr: 2 * MLY, target: "Andromeda (M31)", title: "Rung 4: Cepheids in Other Galaxies", body: "In 1923, Edwin Hubble found Cepheid variables in the Andromeda 'nebula' and proved it was a separate galaxy 2.5 million light-years away \u2014 vastly farther than anything in the Milky Way. Overnight, the known universe expanded a thousandfold. JWST continues finding Cepheids in ever more distant galaxies.", scale: "2.5 Mly from Earth", dwell: 8000 },
+      { vr: 4000, target: "Tycho's SN Remnant", title: "Rung 5: Type Ia Supernovae", body: "For the greatest distances, we need brighter candles. Type Ia supernovae \u2014 thermonuclear white dwarf explosions \u2014 all peak at nearly the same brightness: 5 billion Suns. Tycho saw one in 1572. By finding these explosions in distant galaxies, we measure distances across billions of light-years. This method revealed that the universe's expansion is accelerating.", scale: "8,000 ly from Earth", dwell: 8000 },
+      { vr: 35 * MLY, target: "M87", title: "Rung 6: Hubble's Law", body: "The universe is expanding. Distant galaxies are receding, their light stretched to redder wavelengths. Hubble discovered that a galaxy's recession speed is proportional to its distance. By measuring redshift, we determine distance. M87 in the Virgo Cluster recedes at ~1,000 km/s, placing it 54 million light-years away.", scale: "53.8 Mly from Earth", dwell: 8000 },
+      { vr: 350 * MLY, title: "The Furthest Reach", body: "Each rung of the ladder calibrates the next: radar anchors parallax, parallax anchors Cepheids, Cepheids anchor supernovae, supernovae anchor Hubble's Law. Any error in a lower rung propagates upward. The 'Hubble tension' \u2014 a disagreement in the expansion rate \u2014 suggests we may be missing something fundamental. The ladder reaches 13.8 billion light-years, but the mystery deepens with every rung we climb.", scale: "The observable universe", dwell: 8000 }
+    ]
+  },
+  constellations: {
+    name: "Constellations Up Close",
+    desc: "Flat patterns from a 3D universe",
+    steps: [
+      { vr: 600, title: "Patterns in the Sky", body: "Constellations are the oldest maps. For millennia, humans connected stars into pictures \u2014 hunters, animals, gods. But these patterns are illusions of perspective. Stars that appear side by side can be separated by hundreds of light-years in depth. Let's visit each constellation and see how deep the illusion goes.", scale: "Constellation scale", dwell: 7000 },
+      { vr: 350, target: "Betelgeuse", title: "Orion \u2014 The Hunter", body: "Orion's bright stars span a 10x range in distance: Bellatrix at 250 ly, Betelgeuse at 700 ly, Rigel at 863 ly, and the belt stars at 1,200\u20132,000 ly. The 'aligned' belt is pure coincidence \u2014 Alnilam (center) is twice as far as its companions. From another star system, Orion would be unrecognizable.", scale: "700 ly from Earth", dwell: 8000 },
+      { vr: 450, target: "Rigel", title: "Orion's Depth", body: "Zoom past Betelgeuse to Rigel, Orion's blue foot at 863 ly. Despite being farther, Rigel blazes at 120,000 times the Sun's luminosity. Beyond Rigel, the belt stars continue to 1,200+ ly. Orion is not a structure \u2014 it's a corridor of unrelated stars stretching 1,800 light-years deep.", scale: "863 ly from Earth", dwell: 7000 },
+      { vr: 300, target: "Antares", title: "Scorpius \u2014 The Scorpion", body: "The red heart of Scorpius, Antares at 550 ly, anchors a sinuous chain. But nearby Sargas (300 ly) and distant Shaula (570 ly) reveal the constellation's depth. The Scorpion's body twists through space, with stars scattered across a 300 light-year range.", scale: "550 ly from Earth", dwell: 7500 },
+      { vr: 250, target: "Dubhe", title: "Big Dipper \u2014 A Moving Group", body: "Five of the Big Dipper's seven stars are part of the Ursa Major Moving Group \u2014 born from the same gas cloud, traveling through space together at ~54\u201379 ly. But Dubhe (124 ly) and Alkaid (104 ly) are outsiders, drifting away. In 50,000 years, the Dipper will be unrecognizable as these two orphan stars diverge.", scale: "124 ly from Earth", dwell: 8000 },
+      { vr: 200, target: "Gacrux", title: "Southern Cross \u2014 The Nearby Outsider", body: "Gacrux, the red star at the top of the Cross, is just 88 ly away \u2014 less than a third the distance of the other three main stars (280\u2013321 ly). Its warm orange color against their blue-white betrays its different nature and distance. Used for navigation across the Southern Hemisphere for centuries.", scale: "88 ly from Earth", dwell: 7500 },
+      { vr: 300, target: "Gamma Cassiopeiae", title: "Cassiopeia \u2014 The W's Depth", body: "Cassiopeia's five W-shaped stars span a 10x range: Caph at just 54 ly, and Gamma Cas at 550 ly. The nearest and farthest stars of this small constellation are separated by the same distance as Earth to the Orion Nebula. What looks like five stars on a flat surface is really a tunnel half a thousand light-years deep.", scale: "550 ly from Earth", dwell: 8000 },
+      { vr: 600, title: "Accidents of Perspective", body: "Every constellation tells the same story: patterns that feel fixed and eternal are really snapshots of stars at wildly different distances, each moving through the galaxy on its own trajectory. In a few hundred thousand years, every constellation will dissolve. Future civilizations will connect different stars into different pictures, and wonder if they, too, are permanent.", scale: "Constellation scale", dwell: 7500 }
+    ]
+  },
+  exoworlds: {
+    name: "Worlds Beyond Tour",
+    desc: "Alien planets from our doorstep to deep space",
+    steps: [
+      { vr: 3, target: "Proxima Centauri b", title: "The Nearest World", body: "Just 4.24 light-years away orbits an Earth-mass planet in its star's habitable zone \u2014 where liquid water could exist. But Proxima Centauri is a violent red dwarf, blasting its planets with flares. Whether Proxima b retains an atmosphere is one of astrobiology's biggest questions. At Voyager speed, it would take 73,000 years to visit.", scale: "4.24 ly from Earth", dwell: 7500 },
+      { vr: 22, target: "TRAPPIST-1 System", title: "Seven Worlds, One Star", body: "A dim red dwarf smaller than Jupiter hosts seven Earth-sized rocky planets, three in the habitable zone. The planets orbit so close that from one, you could see the others as large as our Moon. JWST is actively studying their atmospheres, searching for water vapor and signs of life. This tiny system may be humanity's best chance of finding life nearby.", scale: "39 ly from Earth", dwell: 8000 },
+      { vr: 30, target: "51 Pegasi b", title: "The Planet That Changed Everything", body: "In 1995, Mayor and Queloz detected a Jupiter-mass planet orbiting its star in just 4.2 days \u2014 something thought impossible. 51 Pegasi b proved that giant planets could exist scorchingly close to their stars, forcing a revolution in planetary science. This single discovery opened the floodgates: over 5,700 exoplanets have been found since.", scale: "50 ly from Earth", dwell: 8000 },
+      { vr: 80, target: "HD 209458 b", title: "Osiris \u2014 The Evaporating World", body: "The first exoplanet caught crossing its star's face, enabling us to measure its size and study its atmosphere. 'Osiris' is so close to its star that its atmosphere is boiling away, streaming hydrogen and carbon into space like a comet tail. This technique \u2014 transit spectroscopy \u2014 is how JWST now searches for biosignatures on distant worlds.", scale: "159 ly from Earth", dwell: 7500 },
+      { vr: 700, target: "WASP-12b", title: "The Doomed Planet", body: "One of the most extreme worlds known. Surface temperature: 2,600\u00b0C. Darker than asphalt. Stretched into an egg by tidal forces. And slowly being devoured by its star \u2014 losing mass that spirals inward to its doom. WASP-12b will be completely consumed within 10 million years, a reminder that not all worlds endure.", scale: "1,410 ly from Earth", dwell: 7500 },
+      { vr: 900, target: "Kepler-452b", title: "Earth's Older Cousin", body: "The most Earth-like planet found by Kepler: orbiting a Sun-like star, in the habitable zone, with a 385-day year. Its star is 1.5 billion years older than ours, offering a glimpse of Earth's possible future. At 1,800 light-years, we cannot yet study its atmosphere \u2014 but future telescopes may reveal whether this world has oceans, clouds, or life.", scale: "1,800 ly from Earth", dwell: 8000 },
+      { vr: 18, title: "The Search Continues", body: "We have confirmed over 5,700 exoplanets, but the Milky Way holds an estimated 100\u2013400 billion more. Statistically, there are more planets than stars. Some are rocky worlds in habitable zones; others are gas giants, lava worlds, or rogue planets drifting starless through the dark. The question is no longer whether other worlds exist \u2014 it's whether any of them harbor life.", scale: "Our neighborhood", dwell: 7500 }
+    ]
+  },
+  monsters: {
+    name: "Cosmic Monsters Tour",
+    desc: "The biggest, brightest, and most extreme",
+    steps: [
+      { vr: 350, target: "Betelgeuse", title: "The Giant Star", body: "700 times the Sun's diameter. If Betelgeuse replaced our Sun, its surface would engulf Mars \u2014 possibly Jupiter. Despite its immensity, it's a dying star, burning through its remaining fuel at a furious rate. It will explode as a supernova within 100,000 years, briefly visible in daylight from Earth.", scale: "700 ly from Earth", dwell: 7000 },
+      { vr: 4000, target: "Carina Nebula", title: "The Monster Nebula", body: "One of the largest and brightest nebulae in the sky, spanning 300 light-years. Inside lurks Eta Carinae \u2014 an unstable hypergiant 100 times the Sun's mass that erupted violently in 1843, briefly becoming the second brightest star in the sky. It may explode as a hypernova at any time, potentially producing a gamma-ray burst.", scale: "8,500 ly from Earth", dwell: 7500 },
+      { vr: 8000, target: "Omega Centauri", title: "The Captured Galaxy", body: "Officially a globular cluster, Omega Centauri is something far stranger: likely the stripped core of a dwarf galaxy consumed by the Milky Way billions of years ago. With 10 million stars and multiple stellar populations of different ages, it is the most massive globular cluster in our galaxy \u2014 a galaxy within a galaxy.", scale: "15,800 ly from Earth", dwell: 7500 },
+      { vr: 25000, target: "SGR 1806-20", title: "The Ultimate Magnet", body: "The most powerful magnetic object in the known universe. In 2004, this magnetar released a gamma-ray flare so intense it altered Earth's ionosphere \u2014 from 50,000 light-years away. Its magnetic field is a quadrillion times Earth's. If it were halfway to the Moon, it would erase every credit card on Earth.", scale: "50,000 ly from Earth", dwell: 7500 },
+      { vr: 13000, target: "Sagittarius A*", title: "Our Supermassive Black Hole", body: "At the Milky Way's center sits a 4-million-solar-mass black hole. Stars orbit it at 3% the speed of light. Its event horizon is smaller than Mercury's orbit, yet it anchors an entire galaxy of 200\u2013400 billion stars. First imaged by the Event Horizon Telescope in 2022, revealing the glowing ring of superheated gas spiraling to oblivion.", scale: "26,000 ly from Earth", dwell: 8000 },
+      { vr: 30 * MLY, target: "M87", title: "The 6.5-Billion-Solar-Mass Monster", body: "The supermassive black hole at the heart of galaxy M87 \u2014 1,600 times more massive than Sagittarius A*. In 2019, the Event Horizon Telescope captured its shadow: the first direct image of a black hole. Its relativistic jet, powered by matter spiraling in, extends 5,000 light-years \u2014 a beam of plasma traveling at nearly light speed.", scale: "53.8 Mly from Earth", dwell: 8000 },
+      { vr: 150 * MLY, target: "Great Attractor", title: "The Invisible Force", body: "Something equivalent to 10 quadrillion Suns is pulling hundreds of thousands of galaxies \u2014 including ours \u2014 toward it at 600 km/s. Hidden behind the Milky Way's dusty plane, the Great Attractor's true nature remains uncertain. It may be a vast supercluster of galaxies, or something we haven't yet imagined. The ultimate cosmic monster may be the one we can't see.", scale: "250 Mly from Earth", dwell: 8000 }
     ]
   }
 };
@@ -1754,6 +1887,49 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   }
 
   // ──── EXOPLANETS ────
+
+  // Hot Jupiters
+  if (name === '51 Pegasi b' || name === 'HD 209458 b' || name === 'WASP-12b') {
+    var hjr = Math.max(r, 2.5);
+    // Glowing body (overheated)
+    var hjGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, hjr * 2);
+    hjGrad.addColorStop(0, color);
+    hjGrad.addColorStop(0.5, color);
+    hjGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = hjGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, hjr * 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Core
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, hjr, 0, Math.PI * 2);
+    ctx.fill();
+    // Heat shimmer ring
+    ctx.save();
+    ctx.strokeStyle = '#ff4422';
+    ctx.globalAlpha = 0.15 + Math.sin(tSec * 2.5) * 0.08;
+    ctx.lineWidth = hjr * 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, hjr * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // Evaporation tail for HD 209458 b
+    if (name === 'HD 209458 b' || name === 'WASP-12b') {
+      ctx.save();
+      var tailAngle = tSec * 0.3;
+      ctx.globalAlpha = 0.12 + Math.sin(tSec * 1.8) * 0.05;
+      ctx.strokeStyle = '#ff884466';
+      ctx.lineWidth = hjr * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(tailAngle) * hjr, cy + Math.sin(tailAngle) * hjr);
+      ctx.lineTo(cx + Math.cos(tailAngle) * hjr * 5, cy + Math.sin(tailAngle) * hjr * 5);
+      ctx.stroke();
+      ctx.restore();
+    }
+    state.dirty = true;
+    return;
+  }
 
   if (name === 'Proxima Centauri b' || name === 'Kepler-452b') {
     var epr = Math.max(r, 2.5);
@@ -4278,16 +4454,21 @@ var tourEngine = {
 
 // ─── Tour dropdown ────────────────────────────────────────────────────
 
+var tourIds = ['paleblue', 'starlovers', 'extreme', 'lifecycle', 'ladder', 'constellations', 'exoworlds', 'monsters'];
+
 function buildTourDropdown() {
   var dd = document.getElementById('tour-dropdown');
   while (dd.firstChild) dd.removeChild(dd.firstChild);
-  var ids = ['paleblue', 'starlovers', 'extreme'];
-  ids.forEach(function(id) {
+  tourIds.forEach(function(id, idx) {
     var item = document.createElement('div');
     item.className = 'tour-dropdown-item';
     var nameSpan = document.createElement('div');
     nameSpan.className = 'tour-item-name';
     nameSpan.textContent = tourDefs[id].name;
+    var hint = document.createElement('span');
+    hint.className = 'tour-key-hint';
+    hint.textContent = String(idx + 1);
+    nameSpan.appendChild(hint);
     var descSpan = document.createElement('div');
     descSpan.className = 'tour-item-desc';
     descSpan.textContent = tourDefs[id].desc;
@@ -4581,6 +4762,67 @@ function buildEffectsPanel() {
 document.getElementById('effects-toggle').addEventListener('click', function() {
   document.getElementById('effects-panel').classList.toggle('open');
 });
+
+// ─── Feedback form ───────────────────────────────────────────────────
+
+(function() {
+  var btn = document.getElementById('feedback-btn');
+  var popover = document.getElementById('feedback-popover');
+  var overlay = document.getElementById('feedback-overlay');
+  var cancelBtn = document.getElementById('fb-cancel');
+  var sendBtn = document.getElementById('fb-send');
+  var nameInput = document.getElementById('fb-name');
+  var msgInput = document.getElementById('fb-msg');
+  var statusEl = document.getElementById('fb-status');
+
+  function openFeedback() {
+    popover.classList.add('open');
+    overlay.classList.add('open');
+    msgInput.focus();
+  }
+
+  function closeFeedback() {
+    popover.classList.remove('open');
+    overlay.classList.remove('open');
+    nameInput.value = '';
+    msgInput.value = '';
+    statusEl.textContent = '';
+    sendBtn.disabled = false;
+  }
+
+  btn.addEventListener('click', openFeedback);
+  cancelBtn.addEventListener('click', closeFeedback);
+  overlay.addEventListener('click', closeFeedback);
+
+  sendBtn.addEventListener('click', function() {
+    var msg = msgInput.value.trim();
+    if (!msg) { statusEl.style.color = '#cc6644'; statusEl.textContent = 'Please enter a message.'; return; }
+
+    sendBtn.disabled = true;
+    statusEl.style.color = '#6a6a88';
+    statusEl.textContent = 'Sending...';
+
+    var payload = { name: nameInput.value.trim() || 'Anonymous', message: msg };
+
+    fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      if (r.ok) {
+        statusEl.style.color = '#88cc88';
+        statusEl.textContent = 'Sent! Thank you for your feedback.';
+        setTimeout(closeFeedback, 2000);
+      } else {
+        throw new Error('Server error');
+      }
+    }).catch(function() {
+      statusEl.style.color = '#cc6644';
+      statusEl.textContent = 'Could not send. Try again later.';
+      sendBtn.disabled = false;
+    });
+  });
+})();
 
 // ─── URL hash state ───────────────────────────────────────────────────
 
@@ -5100,6 +5342,14 @@ document.addEventListener('keydown', function(e) {
     } else {
       document.getElementById('tour-dropdown').classList.toggle('open');
     }
+    return;
+  }
+
+  // Tour hotkeys when dropdown is open
+  var tourDD = document.getElementById('tour-dropdown');
+  if (tourDD.classList.contains('open') && e.key >= '1' && e.key <= String(tourIds.length)) {
+    var tourIdx = parseInt(e.key) - 1;
+    if (tourIds[tourIdx]) tourEngine.start(tourIds[tourIdx]);
     return;
   }
 
