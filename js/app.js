@@ -42,6 +42,26 @@ var orbitMode = {
                toX: 0, toY: 0, toZ: 0, toName: '' }
 };
 
+var hudStyle = 'cinematic';
+var hudStyles = {
+  cinematic: { nameFont: '600 22px -apple-system, system-ui, sans-serif',
+               nameColor: 'rgba(200, 210, 230, 0.85)',
+               distFont: '12px SF Mono, Menlo, monospace',
+               distColor: 'rgba(140, 170, 140, 0.7)' },
+  minimal: { nameFont: '300 16px -apple-system, system-ui, sans-serif',
+             nameColor: 'rgba(180, 190, 200, 0.5)',
+             distFont: '10px SF Mono, Menlo, monospace',
+             distColor: 'rgba(120, 140, 120, 0.4)' },
+  bold: { nameFont: '800 28px -apple-system, system-ui, sans-serif',
+          nameColor: 'rgba(255, 255, 255, 0.95)',
+          distFont: '14px SF Mono, Menlo, monospace',
+          distColor: 'rgba(100, 200, 255, 0.8)' },
+  retro: { nameFont: '14px SF Mono, Menlo, Courier, monospace',
+           nameColor: 'rgba(0, 255, 100, 0.8)',
+           distFont: '12px SF Mono, Menlo, Courier, monospace',
+           distColor: 'rgba(0, 200, 80, 0.6)' }
+};
+
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
 var pendingLabels = [];
 var parallaxState = { active: false, progress: 0, constellation: null, shiftK: 0, shiftAngle: 0, animId: null, label: '', flashAlpha: 0 };
@@ -3412,7 +3432,7 @@ function draw3DHUD(sw, sh) {
     ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, sh - 26);
   }
 
-  // Distance to selected object
+  // Cinematic selected object display — bottom right
   if (state.selected && state.selected.wx3d !== undefined) {
     var sdx = cam3d.px - state.selected.wx3d;
     var sdy = cam3d.py - state.selected.wy3d;
@@ -3425,8 +3445,16 @@ function draw3DHUD(sw, sh) {
     else if (selDist < 1000) sdLabel = selDist.toFixed(2) + ' ly';
     else if (selDist < 1e6) sdLabel = (selDist / 1000).toFixed(1) + ' kly';
     else sdLabel = (selDist / 1e6).toFixed(1) + ' Mly';
-    ctx.fillStyle = '#6a8a6a';
-    ctx.fillText(displayName(state.selected) + ': ' + sdLabel, 52, sh - 26);
+    var hs = hudStyles[hudStyle] || hudStyles.cinematic;
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.font = hs.nameFont;
+    ctx.fillStyle = hs.nameColor;
+    ctx.fillText(displayName(state.selected), sw - 20, sh - 38);
+    ctx.font = hs.distFont;
+    ctx.fillStyle = hs.distColor;
+    ctx.fillText(sdLabel, sw - 20, sh - 20);
+    ctx.restore();
   }
 
   // Look direction in RA/Dec
@@ -4589,7 +4617,11 @@ function buildGlossary() {
         gotoBtn.addEventListener('click', (function(name) {
           return function(e) {
             e.stopPropagation();
-            navigateToObject(name);
+            if (state.mode3d) {
+              navigateToObject3D(name);
+            } else {
+              navigateToObject(name);
+            }
           };
         })(matchObj.name));
         header.appendChild(gotoBtn);
@@ -4752,6 +4784,35 @@ function buildEffectsPanel() {
   sliderRow.appendChild(sliderInput);
   sliderRow.appendChild(sliderVal);
   panel.appendChild(sliderRow);
+
+  // HUD style selector
+  var styleRow = document.createElement('div');
+  styleRow.className = 'slider-row';
+  var styleLabel = document.createElement('span');
+  styleLabel.textContent = 'HUD Style';
+  var styleSelect = document.createElement('select');
+  styleSelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
+  var styleNames = { cinematic: 'Cinematic', minimal: 'Minimal', bold: 'Bold', retro: 'Retro' };
+  Object.keys(styleNames).forEach(function(key) {
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = styleNames[key];
+    if (key === hudStyle) opt.selected = true;
+    styleSelect.appendChild(opt);
+  });
+  styleSelect.addEventListener('change', function() {
+    hudStyle = styleSelect.value;
+    try { localStorage.setItem('cosmos_hud_style', hudStyle); } catch(e) {}
+    state.dirty = true;
+  });
+  // Load saved style
+  try {
+    var saved = localStorage.getItem('cosmos_hud_style');
+    if (saved && hudStyles[saved]) { hudStyle = saved; styleSelect.value = saved; }
+  } catch(e) {}
+  styleRow.appendChild(styleLabel);
+  styleRow.appendChild(styleSelect);
+  panel.appendChild(styleRow);
 }
 
 document.getElementById('effects-toggle').addEventListener('click', function() {
@@ -4860,6 +4921,7 @@ function readHash() {
     for (var i = 0; i < objects.length; i++) {
       if (objects[i].name === params.obj) {
         state.selected = objects[i];
+        saveSelectedObject(objects[i].name);
         showInfo(objects[i]);
         break;
       }
@@ -5082,6 +5144,7 @@ canvas.addEventListener('click', function(e) {
 
   if (hit) {
     state.selected = hit;
+    saveSelectedObject(hit.name);
     showInfo(hit);
     state.dirty = true;
     updateHash();
@@ -5109,8 +5172,8 @@ canvas.addEventListener('click', function(e) {
     if (dx * dx + dy * dy <= 1.05) hitR = r;
   });
 
-  if (hitR) { state.selected = null; showRegionInfo(hitR); state.dirty = true; return; }
-  state.selected = null;
+  if (hitR) { state.selected = null; saveSelectedObject(''); showRegionInfo(hitR); state.dirty = true; return; }
+  state.selected = null; saveSelectedObject('');
   state.dirty = true;
 });
 
@@ -5137,6 +5200,7 @@ canvas.addEventListener('dblclick', function(e) {
       // Orbit mode: re-center on clicked object
       if (orbitMode.active) {
         state.selected = hit;
+        saveSelectedObject(hit.name);
         showInfo(hit);
         animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, displayName(hit));
         state.dirty = true;
@@ -5286,6 +5350,7 @@ function navigateToObject(objName) {
   var startTime = performance.now();
 
   state.selected = obj;
+  saveSelectedObject(obj.name);
   showInfo(obj);
   document.getElementById('info-panel').classList.remove('hidden');
 
@@ -5305,6 +5370,68 @@ function navigateToObject(objName) {
     else { updateHash(); }
   }
   requestAnimationFrame(animate);
+}
+
+function navigateToObject3D(objName) {
+  var obj = null;
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].name === objName || objects[i].name.indexOf(objName) === 0) {
+      obj = objects[i]; break;
+    }
+  }
+  if (!obj) return;
+  if (tourEngine.active) tourEngine.stop();
+
+  state.selected = obj;
+  showInfo(obj);
+  document.getElementById('info-panel').classList.remove('hidden');
+  saveSelectedObject(obj.name);
+
+  // Need 3D world coords — compute them if not yet available
+  if (obj.wx3d === undefined) {
+    var angle = obj.angle || 0;
+    var elev = obj.elevation || 0;
+    var d = obj.dist || 0.0001;
+    var cosE = Math.cos(elev);
+    obj.wx3d = d * cosE * Math.cos(angle);
+    obj.wy3d = d * cosE * Math.sin(angle);
+    obj.wz3d = d * Math.sin(elev);
+  }
+
+  var fx = obj.wx3d, fy = obj.wy3d, fz = obj.wz3d;
+
+  // Compute orbit distance based on object's distance from origin
+  var objDist = Math.sqrt(fx * fx + fy * fy + fz * fz);
+  var orbDist = Math.max(0.0001, Math.min(1000, objDist * 0.002));
+  if (objDist < 0.001) orbDist = 0.0001; // very close objects like Sun
+
+  // Fly camera to an orbit position around the object
+  var toX = fx + orbDist;
+  var toY = fy;
+  var toZ = fz;
+  var angles = computeLookAngles(toX, toY, toZ, fx, fy, fz);
+
+  cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+    yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+  cam3dAnim.to = { px: toX, py: toY, pz: toZ,
+    yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
+  cam3dAnim.duration = 2000;
+  cam3dAnim.startTime = performance.now();
+  cam3dAnim.active = true;
+
+  // Enter orbit mode once animation completes — set up orbit state now
+  orbitMode.focalX = fx;
+  orbitMode.focalY = fy;
+  orbitMode.focalZ = fz;
+  orbitMode.focalName = displayName(obj);
+  orbitMode.orbitDist = orbDist;
+  orbitMode.orbitYaw = 0;
+  orbitMode.orbitPitch = 0;
+  orbitMode.active = true;
+  orbitMode.focalAnim.active = false;
+
+  state.dirty = true;
+  updateHash();
 }
 
 function animatePanToSun() {
@@ -6125,6 +6252,25 @@ function getSlotConfig() {
   return { viewpoints: vps, lookTargets: las };
 }
 
+function saveSelectedObject(name) {
+  try { localStorage.setItem('cosmos_selected', name); } catch(e) {}
+}
+
+function loadSelectedObject() {
+  try {
+    var name = localStorage.getItem('cosmos_selected');
+    if (!name) return;
+    for (var i = 0; i < objects.length; i++) {
+      if (objects[i].name === name) {
+        state.selected = objects[i];
+        showInfo(objects[i]);
+        document.getElementById('info-panel').classList.remove('hidden');
+        return;
+      }
+    }
+  } catch(e) {}
+}
+
 function saveSlotConfig() {
   try { localStorage.setItem('cosmos_cam_slots', JSON.stringify(getSlotConfig())); } catch(e) {}
 }
@@ -6163,6 +6309,7 @@ function loadSlotConfig() {
 }
 
 loadSlotConfig();
+loadSelectedObject();
 
 // Welcome screen
 var welcomeShowing = true;
