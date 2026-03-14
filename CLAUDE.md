@@ -1,16 +1,27 @@
 # Cosmic Distance Explorer
 
 ## Project Overview
-Single-file HTML playground (`cosmic-distances.html`) — interactive visualization of cosmic distances from Earth to the Great Attractor. All CSS/JS inline, no external dependencies.
+Interactive visualization of cosmic distances from Earth to the Great Attractor. No external dependencies, ES5 only.
+
+## File Structure
+```
+index.html         # Markup + CSS (~490 lines)
+js/data.js         # Pure data declarations (~920 lines)
+js/app.js          # All application logic (~5900 lines)
+deploy.sh          # rsync-based deploy to bill + skippy
+```
+Files load via `<script>` tags in order, sharing globals. No modules (ES5 constraint).
 
 ## Code Conventions
 - **ES5 only**: `var` declarations, no arrow functions, no template literals, no `let`/`const`
 - **No innerHTML**: All DOM manipulation uses `createElement()`/`textContent` (enforced by PreToolUse hook)
-- **Single file**: Everything in `cosmic-distances.html` — CSS in `<style>`, JS in `<script>`
+- **Data in `js/data.js`**: Pure `var` declarations only — no functions, no DOM access
+- **Logic in `js/app.js`**: All functions, state, rendering, interaction, initialization
 - **State pattern**: Single `state` object, `updateAll`-style rendering
 - **Canvas rendering**: 2D context with `devicePixelRatio` scaling
 
-## Data Architecture
+## Data Architecture (`js/data.js`)
+- `AU_IN_LY`, `MLY`, `MIN_LOG`, `MAX_LOG` — Unit constants
 - `objects[]` — Celestial objects with position, distance, category, visual properties, facts
 - `glossaryData[]` — Educational entries with name, category, color, short/long descriptions
 - `regions[]` — Structural regions (orbits, arms, clusters) with visibility ranges
@@ -18,6 +29,9 @@ Single-file HTML playground (`cosmic-distances.html`) — interactive visualizat
 - `tourDefs{}` — Guided tour definitions with steps, narration, zoom targets
 - `catRanges{}` — Category-level visibility ranges for object filtering
 - `effects{}` — Visual effect toggles and settings
+- `constellationDefs{}` — Constellation line patterns and metadata
+- `cosmicFilamentNodes[]`, `cosmicFilamentLinks[]`, `cosmicVoids[]` — Large-scale structure
+- `cam3dViewpoints[]`, `cam3dLookTargets[]` — 3D camera slot defaults (8+8)
 
 ## Housekeeping Checklist
 Run this checklist after adding new objects or features:
@@ -52,19 +66,27 @@ After changes, verify at each zoom preset:
 5. Great Attractor — cosmic filaments, voids, galaxy clusters visible
 
 ## Deployment
-- **Deploy script**: `./deploy.sh` — copies `cosmic-distances.html` to bill and skippy
+- **Deploy script**: `./deploy.sh` — rsyncs `index.html` + `js/` to bill and skippy
 - **Auto-deploy**: `pre-push` git hook runs `deploy.sh` when pushing to `main`
-- **bill**: `cosmos.eusd.org` — `/opt/caddy/sites-content/distance-to-a-star/index.html`
-- **skippy**: `cosmos.711bf.org` — `/var/www/cosmos/index.html`
+- **bill**: `cosmos.eusd.org` — `/opt/caddy/sites-content/distance-to-a-star/`
+- **skippy**: `cosmos.711bf.org` — `/var/www/cosmos/`
 - **No `Infinity` in visibility ranges** — use `400 * MLY` as upper bound (matches MAX_LOG). Infinity corrupts `navigateToObject` via `Math.sqrt(lo * Infinity) = Infinity`.
 
-## Key Functions
+## Key Functions (`js/app.js`)
 - `navigateToObject(name)` — Zoom+pan to frame an object
+- `panTowardTargetOnZoomIn()` — Zoom pulls toward selected object (or Sol)
 - `drawSpiralArms(...)` — Logarithmic spiral galaxy renderer
 - `drawCosmicFilaments()` — Large-scale structure at supercluster scale
 - `drawSunIndicator()` — Always-visible Sun position marker
 - `buildGlossary()` — Constructs glossary panel with search/filter
 - `getVisibleObjects()` — Filters objects by zoom level and viewport
+- `flyCamera()` — 3D camera fly animation (scaled by `tourEngine.transitionSpeed`)
+- `saveSlotConfig()` / `loadSlotConfig()` — 3D camera slot persistence via localStorage
+
+## Tour Engine
+- `tourEngine.transitionSpeed` — Fly speed multiplier (0.5x–3x)
+- `tourEngine.autoAdvance` — When false, timer fills but doesn't auto-advance
+- `tourEngine.narrationCollapsed` — Persists collapsed card state across steps
 
 ## Categories
 Objects: solar, stellar, nebula, cluster, exotic, galaxy, local, cosmic

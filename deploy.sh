@@ -1,24 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-FILE="cosmic-distances.html"
-SRC="$(cd "$(dirname "$0")" && pwd)/$FILE"
-
-if [ ! -f "$SRC" ]; then
-  echo "Error: $FILE not found" >&2
-  exit 1
-fi
-
-echo "Deploying $FILE..."
+SRC="$(cd "$(dirname "$0")" && pwd)"
+echo "Deploying Cosmic Distance Explorer..."
 
 # bill (cosmos.eusd.org)
-scp "$SRC" bill:/tmp/cosmos.html
-ssh bill "sudo cp /tmp/cosmos.html /opt/caddy/sites-content/distance-to-a-star/index.html"
+ssh bill "mkdir -p /tmp/cosmos-deploy/js"
+scp "$SRC/index.html" bill:/tmp/cosmos-deploy/index.html
+scp "$SRC/js/data.js" "$SRC/js/app.js" bill:/tmp/cosmos-deploy/js/
+ssh bill "sudo rsync -a --delete /tmp/cosmos-deploy/ /opt/caddy/sites-content/distance-to-a-star/ && rm -rf /tmp/cosmos-deploy"
 echo "  bill: done"
 
 # skippy (cosmos.711bf.org)
-scp "$SRC" skippy:/tmp/cosmos.html
-ssh skippy "sudo cp /tmp/cosmos.html /var/www/cosmos/index.html"
+ssh skippy "mkdir -p /tmp/cosmos-deploy/js"
+scp "$SRC/index.html" skippy:/tmp/cosmos-deploy/index.html
+scp "$SRC/js/data.js" "$SRC/js/app.js" skippy:/tmp/cosmos-deploy/js/
+ssh skippy "sudo rsync -a --delete /tmp/cosmos-deploy/ /var/www/cosmos/ && rm -rf /tmp/cosmos-deploy"
 echo "  skippy: done"
 
 echo "Deployed to cosmos.eusd.org and cosmos.711bf.org"
