@@ -4914,7 +4914,7 @@ canvas.addEventListener('wheel', function(e) {
     if (orbitMode.active) {
       // Orbit mode: multiplicative zoom on distance
       orbitMode.orbitDist *= (1 + e.deltaY * 0.003);
-      orbitMode.orbitDist = Math.max(1e-10, Math.min(1e8, orbitMode.orbitDist));
+      orbitMode.orbitDist = Math.max(1e-14, Math.min(1e8, orbitMode.orbitDist));
       orbitToCamera();
     } else {
       // 3D: scroll changes FOV
@@ -5825,7 +5825,7 @@ canvas.addEventListener('touchmove', function(e) {
     var dist = getTouchDist(e.touches);
     var ratio = touchState.startDist / dist;
     if (state.mode3d && orbitMode.active) {
-      orbitMode.orbitDist = Math.max(1e-10, Math.min(1e8, touchState.startZoom * ratio));
+      orbitMode.orbitDist = Math.max(1e-14, Math.min(1e8, touchState.startZoom * ratio));
       orbitToCamera();
       state.dirty = true;
     } else if (state.mode3d) {
