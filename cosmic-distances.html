@@ -3873,7 +3873,7 @@ function animationLoop(ts) {
 
   if (state.dirty) {
     state.dirty = false;
-    draw(ts);
+    try { draw(ts); } catch(e) { /* canvas render error, skip frame */ }
   }
   lastFrameTime = ts;
 }
@@ -4185,9 +4185,11 @@ var tourEngine = {
   dwellTimeout: null,
   zoomAnimId: null,
   timerAnimId: null,
+  transitTimeout: null,
   dwellStart: 0,
   dwellDuration: 0,
   dwellElapsed: 0,
+  startedAt: 0,
 
   start: function(id) {
     dismissWelcome();
@@ -4197,6 +4199,7 @@ var tourEngine = {
     this.paused = false;
     this.tourId = id;
     this.stepIndex = -1;
+    this.startedAt = performance.now();
     var tourBtn = document.getElementById('tour-btn');
     tourBtn.textContent = tourDefs[id].name;
     tourBtn.classList.add('running');
@@ -4211,6 +4214,7 @@ var tourEngine = {
     this.tourId = null;
     this.stepIndex = -1;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
+    if (this.transitTimeout) { clearTimeout(this.transitTimeout); this.transitTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     document.getElementById('tour-timer-fill').style.width = '0%';
@@ -4256,6 +4260,7 @@ var tourEngine = {
     var steps = tourDefs[this.tourId].steps;
     if (idx < 0 || idx >= steps.length) return;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
+    if (this.transitTimeout) { clearTimeout(this.transitTimeout); this.transitTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     document.getElementById('tour-timer-fill').style.width = '0%';
@@ -4290,6 +4295,7 @@ var tourEngine = {
   nextStep: function() {
     if (!this.active) return;
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
+    if (this.transitTimeout) { clearTimeout(this.transitTimeout); this.transitTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     document.getElementById('tour-timer-fill').style.width = '0%';
@@ -4349,20 +4355,23 @@ var tourEngine = {
         } else {
           self.zoomAnimId = null;
           // Brief pause at wide view, then phase 2
-          setTimeout(function() {
+          self.transitTimeout = setTimeout(function() {
+            self.transitTimeout = null;
             if (!self.active) return;
             self.animateToTarget(wp, targetPanX, targetPanY, targetSlider);
           }, 600);
         }
       }
 
-      setTimeout(function() {
+      self.transitTimeout = setTimeout(function() {
+        self.transitTimeout = null;
         if (!self.active) return;
         self.zoomAnimId = requestAnimationFrame(animateOut);
       }, 400);
     } else {
       // Simple single-phase animation (first step, or no target)
-      setTimeout(function() {
+      self.transitTimeout = setTimeout(function() {
+        self.transitTimeout = null;
         if (!self.active) return;
         self.animateToTarget(wp, targetPanX, targetPanY, targetSlider);
       }, self.stepIndex === 0 ? 200 : 600);
@@ -4417,6 +4426,7 @@ var tourEngine = {
     if (!this.active) return;
     var target = Math.max(0, this.stepIndex - 1);
     if (this.dwellTimeout) { clearTimeout(this.dwellTimeout); this.dwellTimeout = null; }
+    if (this.transitTimeout) { clearTimeout(this.transitTimeout); this.transitTimeout = null; }
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     document.getElementById('tour-timer-fill').style.width = '0%';
@@ -4879,10 +4889,29 @@ window.addEventListener('hashchange', readHash);
 
 var slider = document.getElementById('zoom-slider');
 
+// When zooming in (slider decreasing), gradually pull the view toward Sol (0,0).
+// The pull strength increases with distance from origin and zoom-in speed.
+function panTowardSolOnZoomIn(prevZoom, newZoom) {
+  if (newZoom >= prevZoom) return; // only on zoom-in (slider decreasing)
+  var dist = Math.sqrt(state.panX * state.panX + state.panY * state.panY);
+  if (dist < 0.001) return; // already centered
+  var vr = sliderToViewRadius(newZoom);
+  // Pull fraction: stronger when origin is outside the viewport
+  var ratio = dist / vr;
+  if (ratio < 0.1) return; // origin already visible in viewport
+  var zoomDelta = prevZoom - newZoom;
+  var pull = Math.min(0.15, zoomDelta * 0.006) * Math.min(1, ratio * 0.3);
+  state.panX *= (1 - pull);
+  state.panY *= (1 - pull);
+  updateRecenterBtn();
+}
+
 slider.addEventListener('input', function() {
   dismissWelcome();
   if (tourEngine.active) tourEngine.stop();
+  var prevZoom = state.zoom;
   state.zoom = parseInt(slider.value);
+  panTowardSolOnZoomIn(prevZoom, state.zoom);
   state.activePreset = null;
   state.dirty = true;
   updateHash();
@@ -4892,7 +4921,9 @@ canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
   dismissWelcome();
   if (tourEngine.active) tourEngine.stop();
+  var prevZoom = state.zoom;
   state.zoom = Math.max(0, Math.min(1000, state.zoom - e.deltaY * 0.5));
+  panTowardSolOnZoomIn(prevZoom, state.zoom);
   slider.value = Math.round(state.zoom);
   state.activePreset = null;
   state.dirty = true;
@@ -5002,7 +5033,11 @@ canvas.addEventListener('click', function(e) {
     }
   }
 
-  if (tourEngine.active) { tourEngine.stop(); return; }
+  if (tourEngine.active) {
+    // Ignore clicks within 1s of tour start (prevents dropdown click-through)
+    if (performance.now() - tourEngine.startedAt < 1000) return;
+    tourEngine.stop(); return;
+  }
 
   var visible = getVisibleObjects();
   var hit = null, minD = 25;
@@ -5435,7 +5470,9 @@ canvas.addEventListener('touchmove', function(e) {
     var ratio = touchState.startDist / dist;
     var logRatio = Math.log(ratio) / Math.log(2);
     var newZoom = touchState.startZoom + logRatio * 100;
+    var prevZoom = state.zoom;
     state.zoom = Math.max(0, Math.min(1000, newZoom));
+    panTowardSolOnZoomIn(prevZoom, state.zoom);
     slider.value = Math.round(state.zoom);
     state.activePreset = null;
     state.dirty = true;
