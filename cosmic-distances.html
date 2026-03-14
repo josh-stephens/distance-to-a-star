@@ -53,7 +53,11 @@
     transition: all 0.2s; white-space: nowrap;
   }
   .cam3d-presets .cam-preset-btn:hover { background: #1e1e38; color: #bbbbdd; }
+  .cam3d-presets .cam-look-btn { border-color: #2a3a44; }
+  .cam3d-presets .cam-look-btn:hover { background: #162a38; color: #aaddee; }
   .cam3d-presets .cam-label { font-size: 10px; color: #5a5a7a; }
+  .cam3d-presets .cam-sep { color: #2a2a44; font-size: 14px; margin: 0 2px; }
+  .cam3d-presets { flex-wrap: wrap; }
   .tour-menu-wrap { position: relative; margin-left: auto; }
   .tour-btn {
     padding: 5px 14px; border: 1px solid #3a4a2a; background: #1a2a16;
@@ -4384,6 +4388,24 @@ function draw3DHUD(sw, sh) {
   var lookDec = cam3d.pitch / DEG2RAD;
   ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 52, sh - 10);
 
+  // Find what we're facing — check constellation centroids and bright stars
+  var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
+    y: Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw), z: Math.sin(cam3d.pitch) };
+  var bestDot = -1, facingLabel = '';
+  for (var ci = 0; ci < cam3dLookTargets.length; ci++) {
+    var tgt = getLookTarget(cam3dLookTargets[ci].key);
+    if (!tgt) continue;
+    var dx2 = tgt.x - cam3d.px, dy2 = tgt.y - cam3d.py, dz2 = tgt.z - cam3d.pz;
+    var len = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+    if (len < 0.001) continue;
+    var dot = (dx2 * fwd.x + dy2 * fwd.y + dz2 * fwd.z) / len;
+    if (dot > bestDot) { bestDot = dot; facingLabel = cam3dLookTargets[ci].label; }
+  }
+  if (bestDot > 0.85 && facingLabel) {
+    ctx.fillStyle = '#6a6a8a';
+    ctx.fillText('Facing ' + facingLabel, 52, sh - 58);
+  }
+
   // Mode label
   ctx.textAlign = 'right';
   ctx.fillStyle = '#3a3a55';
@@ -5923,27 +5945,113 @@ document.getElementById('info-close').addEventListener('click', function() {
 
 // ─── 3D Mode Toggle ─────────────────────────────────────────────────
 
-var cam3dPresets = {
-  earth: { px: 0, py: 0, pz: 0, yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: 'Earth' },
-  trappist: { px: 0, py: 0, pz: 0, yaw: 346.62 * DEG2RAD, pitch: -5.04 * DEG2RAD, fov: 60, label: 'TRAPPIST-1' }
-};
+// Viewpoint presets: name -> object to stand at (null = origin/Earth)
+var cam3dViewpoints = [
+  { key: 'earth', label: 'Earth', obj: null },
+  { key: 'barnard', label: "Barnard's Star", obj: "Barnard's Star" },
+  { key: 'sirius', label: 'Sirius', obj: 'Sirius' },
+  { key: 'vega', label: 'Vega', obj: 'Vega' },
+  { key: 'trappist', label: 'TRAPPIST-1', obj: 'TRAPPIST-1 System' },
+  { key: 'polaris', label: 'Polaris', obj: 'Polaris' },
+  { key: 'betelgeuse', label: 'Betelgeuse', obj: 'Betelgeuse' },
+  { key: 'deneb', label: 'Deneb', obj: 'Deneb' }
+];
 
-// Compute TRAPPIST-1 position for its preset
-(function() {
-  var t1 = null;
-  for (var i = 0; i < objects.length; i++) {
-    if (objects[i].name === 'TRAPPIST-1 System') { t1 = objects[i]; break; }
+// Look-at targets: constellations (centroid) + individual objects
+var cam3dLookTargets = [
+  { key: 'sol', label: 'Sol', type: 'object', obj: 'Sun' },
+  { key: 'orion', label: 'Orion', type: 'constellation', id: 'orion' },
+  { key: 'bigdipper', label: 'Big Dipper', type: 'constellation', id: 'bigdipper' },
+  { key: 'scorpius', label: 'Scorpius', type: 'constellation', id: 'scorpius' },
+  { key: 'crux', label: 'Southern Cross', type: 'constellation', id: 'crux' },
+  { key: 'cassiopeia', label: 'Cassiopeia', type: 'constellation', id: 'cassiopeia' },
+  { key: 'sirius', label: 'Sirius', type: 'object', obj: 'Sirius' },
+  { key: 'polaris', label: 'Polaris', type: 'object', obj: 'Polaris' },
+  { key: 'canopus', label: 'Canopus', type: 'object', obj: 'Canopus' }
+];
+
+var cam3dPresets = {};
+
+// Resolve presets from object data after initObjects3D
+function initCam3dPresets() {
+  for (var i = 0; i < cam3dViewpoints.length; i++) {
+    var vp = cam3dViewpoints[i];
+    var px = 0, py = 0, pz = 0;
+    if (vp.obj) {
+      for (var j = 0; j < objects.length; j++) {
+        if (objects[j].name === vp.obj) {
+          px = objects[j].wx3d; py = objects[j].wy3d; pz = objects[j].wz3d;
+          break;
+        }
+      }
+    }
+    // Default look toward Orion
+    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vp.label };
   }
-  if (t1 && t1.ra !== undefined) {
-    var c = raDecToXYZ(t1.ra, t1.dec, t1.dist);
-    cam3dPresets.trappist.px = c.x;
-    cam3dPresets.trappist.py = c.y;
-    cam3dPresets.trappist.pz = c.z;
-    // Look toward Orion from TRAPPIST-1
-    cam3dPresets.trappist.yaw = 83 * DEG2RAD;
-    cam3dPresets.trappist.pitch = -1 * DEG2RAD;
+}
+
+function getLookTarget(targetKey) {
+  var target = null;
+  for (var i = 0; i < cam3dLookTargets.length; i++) {
+    if (cam3dLookTargets[i].key === targetKey) { target = cam3dLookTargets[i]; break; }
   }
-})();
+  if (!target) return null;
+
+  var tx = 0, ty = 0, tz = 0;
+  if (target.type === 'object') {
+    if (target.obj === 'Sun') return { x: 0, y: 0, z: 0 };
+    for (var j = 0; j < objects.length; j++) {
+      if (objects[j].name === target.obj) {
+        return { x: objects[j].wx3d, y: objects[j].wy3d, z: objects[j].wz3d };
+      }
+    }
+  } else if (target.type === 'constellation') {
+    var cDef = constellationDefs[target.id];
+    if (!cDef) return null;
+    var count = 0;
+    var seen = {};
+    for (var li = 0; li < cDef.lines.length; li++) {
+      for (var si = 0; si < 2; si++) {
+        var sName = cDef.lines[li][si];
+        if (seen[sName]) continue;
+        seen[sName] = true;
+        for (var oi = 0; oi < objects.length; oi++) {
+          if (objects[oi].name === sName) {
+            tx += objects[oi].wx3d; ty += objects[oi].wy3d; tz += objects[oi].wz3d;
+            count++;
+            break;
+          }
+        }
+      }
+    }
+    if (count > 0) return { x: tx / count, y: ty / count, z: tz / count };
+  }
+  return null;
+}
+
+function computeLookAngles(px, py, pz, tx, ty, tz) {
+  var dx = tx - px, dy = ty - py, dz = tz - pz;
+  var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (dist < 0.0001) return { yaw: 0, pitch: 0 };
+  return {
+    yaw: Math.atan2(dy, dx),
+    pitch: Math.atan2(dz, Math.sqrt(dx * dx + dy * dy))
+  };
+}
+
+function lookAtTarget(targetKey, duration) {
+  var pos = getLookTarget(targetKey);
+  if (!pos) return;
+  var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, pos.x, pos.y, pos.z);
+  cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+    yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+  cam3dAnim.to = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+    yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
+  cam3dAnim.duration = duration || 1200;
+  cam3dAnim.startTime = performance.now();
+  cam3dAnim.active = true;
+  state.dirty = true;
+}
 
 function toggle3D() {
   state.mode3d = !state.mode3d;
@@ -5981,13 +6089,23 @@ function toggle3D() {
   state.dirty = true;
 }
 
-function flyCamera(presetName, duration) {
+function flyCamera(presetName, duration, lookTarget) {
   var preset = cam3dPresets[presetName];
   if (!preset) return;
+  var toYaw = preset.yaw, toPitch = preset.pitch;
+  // If a look target is specified, compute angles from the destination
+  if (lookTarget) {
+    var pos = getLookTarget(lookTarget);
+    if (pos) {
+      var angles = computeLookAngles(preset.px, preset.py, preset.pz, pos.x, pos.y, pos.z);
+      toYaw = angles.yaw;
+      toPitch = angles.pitch;
+    }
+  }
   cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: preset.px, py: preset.py, pz: preset.pz,
-    yaw: preset.yaw, pitch: preset.pitch, fov: preset.fov };
+    yaw: toYaw, pitch: toPitch, fov: preset.fov };
   cam3dAnim.duration = duration || 2000;
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
@@ -6242,6 +6360,7 @@ canvas.addEventListener('touchend', function(e) {
 
 initParticles();
 initObjects3D();
+initCam3dPresets();
 buildTourDropdown();
 buildGlossary();
 buildEffectsPanel();
@@ -6252,24 +6371,45 @@ document.getElementById('mode3d-btn').addEventListener('click', toggle3D);
 // Build 3D camera presets bar
 (function() {
   var bar = document.getElementById('cam3d-presets');
-  var label = document.createElement('span');
-  label.className = 'cam-label';
-  label.textContent = 'Fly to:';
-  bar.appendChild(label);
 
-  var presetList = [
-    { key: 'earth', text: 'Earth Sky' },
-    { key: 'trappist', text: 'TRAPPIST-1 Sky' }
-  ];
-  for (var i = 0; i < presetList.length; i++) {
+  // Viewpoints row
+  var vpLabel = document.createElement('span');
+  vpLabel.className = 'cam-label';
+  vpLabel.textContent = 'View from:';
+  bar.appendChild(vpLabel);
+
+  for (var i = 0; i < cam3dViewpoints.length; i++) {
     var btn = document.createElement('button');
     btn.className = 'cam-preset-btn';
-    btn.textContent = presetList[i].text;
-    btn.setAttribute('data-cam-preset', presetList[i].key);
+    btn.textContent = cam3dViewpoints[i].label;
+    btn.setAttribute('data-cam-preset', cam3dViewpoints[i].key);
     btn.addEventListener('click', function() {
       flyCamera(this.getAttribute('data-cam-preset'), 2000);
     });
     bar.appendChild(btn);
+  }
+
+  // Separator
+  var sep = document.createElement('span');
+  sep.className = 'cam-sep';
+  sep.textContent = '\u2502';
+  bar.appendChild(sep);
+
+  // Look-at row
+  var laLabel = document.createElement('span');
+  laLabel.className = 'cam-label';
+  laLabel.textContent = 'Look at:';
+  bar.appendChild(laLabel);
+
+  for (var j = 0; j < cam3dLookTargets.length; j++) {
+    var laBtn = document.createElement('button');
+    laBtn.className = 'cam-preset-btn cam-look-btn';
+    laBtn.textContent = cam3dLookTargets[j].label;
+    laBtn.setAttribute('data-look-target', cam3dLookTargets[j].key);
+    laBtn.addEventListener('click', function() {
+      lookAtTarget(this.getAttribute('data-look-target'), 1200);
+    });
+    bar.appendChild(laBtn);
   }
 })();
 
