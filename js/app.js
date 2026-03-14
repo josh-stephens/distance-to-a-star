@@ -419,8 +419,8 @@ function cullOverlapping(visibleList) {
   var kept = [];
   for (var i = 0; i < byScore.length; i++) {
     var obj = byScore[i];
-    // Anchor objects are never culled
-    if (obj.name === 'Sun (You Are Here)' || obj.name === 'Milky Way (You Are Here)') {
+    // Anchor and selected objects are never culled
+    if (obj.name === 'Sun (You Are Here)' || obj.name === 'Milky Way (You Are Here)' || obj === state.selected) {
       kept.push(obj); continue;
     }
     var dominated = false;
