@@ -19,7 +19,72 @@ var MAX_LOG = Math.log10(400 * MLY);
 
 // ─── Effects settings ──────────────────────────────────────────────────
 
-var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true };
+var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: false, occlusion: false };
+
+// ─── Overlay layer definitions ────────────────────────────────────────
+
+var defaultLayers = [
+  { ratio: 0.3, color: '#ff4400', label: 'Core' },
+  { ratio: 0.7, color: '#cc6633', label: 'Mantle' },
+  { ratio: 1.0, color: '#888888', label: 'Surface' }
+];
+
+var objectLayers = {
+  'Sun (You Are Here)': [
+    { ratio: 0.25, color: '#ffaa00', label: 'Core' },
+    { ratio: 0.5, color: '#ffcc33', label: 'Radiative zone' },
+    { ratio: 0.85, color: '#ffdd55', label: 'Convective zone' },
+    { ratio: 1.0, color: '#ffee88', label: 'Photosphere' }
+  ],
+  'Earth': [
+    { ratio: 0.18, color: '#ff3300', label: 'Inner core' },
+    { ratio: 0.35, color: '#ff6600', label: 'Outer core' },
+    { ratio: 0.85, color: '#cc6633', label: 'Mantle' },
+    { ratio: 1.0, color: '#4488cc', label: 'Crust' }
+  ],
+  'Mars': [
+    { ratio: 0.25, color: '#cc4400', label: 'Core' },
+    { ratio: 0.7, color: '#aa5533', label: 'Mantle' },
+    { ratio: 1.0, color: '#cc6644', label: 'Crust' }
+  ],
+  'Jupiter': [
+    { ratio: 0.15, color: '#aa6600', label: 'Rocky core' },
+    { ratio: 0.5, color: '#886644', label: 'Metallic hydrogen' },
+    { ratio: 0.8, color: '#bb8855', label: 'Liquid hydrogen' },
+    { ratio: 1.0, color: '#d4a56a', label: 'Atmosphere' }
+  ],
+  'Saturn': [
+    { ratio: 0.15, color: '#997744', label: 'Rocky core' },
+    { ratio: 0.45, color: '#887755', label: 'Metallic hydrogen' },
+    { ratio: 0.75, color: '#bbaa77', label: 'Liquid hydrogen' },
+    { ratio: 1.0, color: '#ddcc99', label: 'Atmosphere' }
+  ],
+  'Venus': [
+    { ratio: 0.3, color: '#ff5500', label: 'Core' },
+    { ratio: 0.85, color: '#cc7744', label: 'Mantle' },
+    { ratio: 1.0, color: '#eebb66', label: 'Atmosphere' }
+  ],
+  'Moon': [
+    { ratio: 0.2, color: '#666655', label: 'Core' },
+    { ratio: 0.7, color: '#888877', label: 'Mantle' },
+    { ratio: 1.0, color: '#aaaaaa', label: 'Crust' }
+  ]
+};
+
+// ─── Orbital plane data ───────────────────────────────────────────────
+// sma = semi-major axis in AU, inc = inclination in degrees, lan = longitude of ascending node
+
+var orbitalPlaneData = {
+  'Mercury':  { sma: 0.39,  inc: 7.0,   lan: 48.3 },
+  'Venus':    { sma: 0.72,  inc: 3.4,   lan: 76.7 },
+  'Earth':    { sma: 1.0,   inc: 0.0,   lan: 0.0 },
+  'Mars':     { sma: 1.52,  inc: 1.85,  lan: 49.6 },
+  'Jupiter':  { sma: 5.20,  inc: 1.30,  lan: 100.5 },
+  'Saturn':   { sma: 9.58,  inc: 2.49,  lan: 113.7 },
+  'Uranus':   { sma: 19.2,  inc: 0.77,  lan: 74.0 },
+  'Neptune':  { sma: 30.07, inc: 1.77,  lan: 131.8 },
+  'Pluto':    { sma: 39.5,  inc: 17.14, lan: 110.3 }
+};
 
 // ─── Category visibility ranges ────────────────────────────────────────
 

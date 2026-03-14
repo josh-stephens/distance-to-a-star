@@ -208,6 +208,238 @@ function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+// ─── Color utilities for overlay styles ──────────────────────────────
+
+function darkenHex(hex, factor) {
+  var r = Math.round(parseInt(hex.substr(1, 2), 16) * factor);
+  var g = Math.round(parseInt(hex.substr(3, 2), 16) * factor);
+  var b = Math.round(parseInt(hex.substr(5, 2), 16) * factor);
+  return '#' + ('0' + r.toString(16)).slice(-2)
+             + ('0' + g.toString(16)).slice(-2)
+             + ('0' + b.toString(16)).slice(-2);
+}
+
+function lightenHex(hex, factor) {
+  var r = Math.min(255, Math.round(parseInt(hex.substr(1, 2), 16) * factor));
+  var g = Math.min(255, Math.round(parseInt(hex.substr(3, 2), 16) * factor));
+  var b = Math.min(255, Math.round(parseInt(hex.substr(5, 2), 16) * factor));
+  return '#' + ('0' + r.toString(16)).slice(-2)
+             + ('0' + g.toString(16)).slice(-2)
+             + ('0' + b.toString(16)).slice(-2);
+}
+
+// ─── Object overlay styles ───────────────────────────────────────────
+// Each receives: { ctx, x, y, r, color, lightOffX, lightOffY, alpha, obj, isPhysical }
+
+function drawOverlay_flat(d) {
+  d.ctx.fillStyle = d.color;
+  d.ctx.beginPath();
+  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+  d.ctx.fill();
+}
+
+function drawOverlay_albedo(d) {
+  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
+               d.obj.name === 'Sun (You Are Here)';
+  if (isStar) {
+    // Limb darkening for self-luminous objects
+    var grad = d.ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+    grad.addColorStop(0, lightenHex(d.color, 1.2));
+    grad.addColorStop(0.6, d.color);
+    grad.addColorStop(0.9, darkenHex(d.color, 0.6));
+    grad.addColorStop(1, darkenHex(d.color, 0.3));
+    d.ctx.fillStyle = grad;
+  } else {
+    // Directional lighting for reflective bodies
+    var grad = d.ctx.createRadialGradient(
+      d.x + d.lightOffX * 0.4, d.y + d.lightOffY * 0.4, 0,
+      d.x - d.lightOffX * 0.3, d.y - d.lightOffY * 0.3, d.r
+    );
+    grad.addColorStop(0, lightenHex(d.color, 1.3));
+    grad.addColorStop(0.5, d.color);
+    grad.addColorStop(0.8, darkenHex(d.color, 0.35));
+    grad.addColorStop(1, darkenHex(d.color, 0.08));
+    d.ctx.fillStyle = grad;
+  }
+  d.ctx.beginPath();
+  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+  d.ctx.fill();
+}
+
+function drawOverlay_wireframe(d) {
+  drawOverlay_flat(d);
+  d.ctx.save();
+  d.ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  d.ctx.lineWidth = Math.max(0.5, d.r / 80);
+  // Clip to sphere
+  d.ctx.beginPath();
+  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+  d.ctx.clip();
+  // Latitude lines
+  for (var i = 1; i < 6; i++) {
+    var frac = i / 6;
+    var yOff = d.r * (2 * frac - 1);
+    var rAtLat = Math.sqrt(Math.max(0, d.r * d.r - yOff * yOff));
+    d.ctx.beginPath();
+    d.ctx.ellipse(d.x, d.y + yOff, rAtLat, rAtLat * 0.25, 0, 0, Math.PI * 2);
+    d.ctx.stroke();
+  }
+  // Longitude lines
+  for (var j = 0; j < 6; j++) {
+    var angle = j * Math.PI / 6;
+    d.ctx.beginPath();
+    d.ctx.ellipse(d.x, d.y, d.r * Math.abs(Math.cos(angle)), d.r, 0, 0, Math.PI * 2);
+    d.ctx.stroke();
+  }
+  d.ctx.restore();
+}
+
+function drawOverlay_depth(d) {
+  // Specular highlight offset toward light
+  var hlX = d.x + d.lightOffX * 0.3;
+  var hlY = d.y + d.lightOffY * 0.3;
+  var grad = d.ctx.createRadialGradient(hlX, hlY, 0, d.x, d.y, d.r);
+  grad.addColorStop(0, lightenHex(d.color, 1.5));
+  grad.addColorStop(0.3, lightenHex(d.color, 1.1));
+  grad.addColorStop(0.6, d.color);
+  grad.addColorStop(0.85, darkenHex(d.color, 0.4));
+  grad.addColorStop(1, darkenHex(d.color, 0.15));
+  d.ctx.fillStyle = grad;
+  d.ctx.beginPath();
+  d.ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+  d.ctx.fill();
+}
+
+function drawOverlay_layers(d) {
+  var layerDef = objectLayers[d.obj.name] || defaultLayers;
+  for (var i = layerDef.length - 1; i >= 0; i--) {
+    var layer = layerDef[i];
+    d.ctx.fillStyle = layer.color;
+    d.ctx.beginPath();
+    d.ctx.arc(d.x, d.y, d.r * layer.ratio, 0, Math.PI * 2);
+    d.ctx.fill();
+    if (i > 0) {
+      d.ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      d.ctx.lineWidth = Math.max(0.5, d.r / 100);
+      d.ctx.stroke();
+    }
+  }
+  // Label layers when large enough
+  if (d.r > 60) {
+    d.ctx.save();
+    d.ctx.font = Math.max(8, d.r / 12) + 'px -apple-system, system-ui, sans-serif';
+    d.ctx.textAlign = 'center';
+    d.ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    for (var li = 0; li < layerDef.length; li++) {
+      var lr = d.r * layerDef[li].ratio;
+      var prevR = li > 0 ? d.r * layerDef[li - 1].ratio : 0;
+      var midR = (lr + prevR) / 2;
+      d.ctx.fillText(layerDef[li].label, d.x + midR * 0.5, d.y);
+    }
+    d.ctx.restore();
+  }
+}
+
+var overlayRenderers = {
+  flat: drawOverlay_flat,
+  albedo: drawOverlay_albedo,
+  wireframe: drawOverlay_wireframe,
+  depth: drawOverlay_depth,
+  layers: drawOverlay_layers
+};
+
+// ─── Orbital plane rendering ─────────────────────────────────────────
+
+function drawOrbitalPlanes3D() {
+  if (!effects.orbitalPlanes) return;
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  if (camDist > 0.01) return;
+
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.lineWidth = 0.8;
+  ctx.globalAlpha = 0.3;
+
+  for (var name in orbitalPlaneData) {
+    var op = orbitalPlaneData[name];
+    var smaLy = op.sma * AU_IN_LY;
+    var incRad = op.inc * DEG2RAD;
+    var lanRad = op.lan * DEG2RAD;
+    var cosI = Math.cos(incRad), sinI = Math.sin(incRad);
+    var cosL = Math.cos(lanRad), sinL = Math.sin(lanRad);
+
+    var pts = [];
+    for (var step = 0; step <= 72; step++) {
+      var angle = step / 72 * Math.PI * 2;
+      var ox = smaLy * Math.cos(angle);
+      var oy = smaLy * Math.sin(angle);
+      var rx = ox * cosL - oy * sinL * cosI;
+      var ry = ox * sinL + oy * cosL * cosI;
+      var rz = oy * sinI;
+      var sp = worldToScreen3D(rx, ry, rz);
+      if (sp) pts.push(sp);
+      else pts.push(null);
+    }
+
+    // Find object color
+    var col = '#6a6a8a';
+    for (var oi = 0; oi < objects.length; oi++) {
+      if (objects[oi].name === name) { col = objects[oi].color; break; }
+    }
+    ctx.strokeStyle = col;
+
+    // Draw segments, skipping nulls (behind camera)
+    var drawing = false;
+    for (var pi = 0; pi < pts.length; pi++) {
+      if (pts[pi]) {
+        if (!drawing) { ctx.beginPath(); ctx.moveTo(pts[pi].x, pts[pi].y); drawing = true; }
+        else ctx.lineTo(pts[pi].x, pts[pi].y);
+      } else {
+        if (drawing) { ctx.stroke(); drawing = false; }
+      }
+    }
+    if (drawing) ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ─── Occlusion / shadow rendering ────────────────────────────────────
+
+function drawOcclusion(disks) {
+  if (!effects.occlusion || disks.length < 2) return;
+  // Sort front-to-back (smaller depth = closer to camera)
+  var sorted = disks.slice().sort(function(a, b) { return a.depth - b.depth; });
+
+  for (var i = 0; i < sorted.length; i++) {
+    var front = sorted[i];
+    if (front.r < 3) continue;
+    for (var j = i + 1; j < sorted.length; j++) {
+      var behind = sorted[j];
+      if (behind.r < 3) continue;
+      var dx = front.x - behind.x;
+      var dy = front.y - behind.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > front.r + behind.r) continue;
+      if (dist + behind.r < front.r) continue;
+
+      // Partial occlusion: dark shadow on the behind object
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#000008';
+      ctx.beginPath();
+      ctx.arc(behind.x, behind.y, behind.r, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(front.x, front.y, front.r * 1.02, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
 // ─── 3D Coordinate Conversion ─────────────────────────────────────────
 
 var DEG2RAD = Math.PI / 180;
@@ -3235,8 +3467,12 @@ function draw3D(ts) {
   // Draw constellation lines behind objects
   drawConstellationLines3D(projected);
 
+  // Draw orbital planes behind objects
+  drawOrbitalPlanes3D();
+
   // Draw objects (already depth sorted far→near)
   pendingLabels = [];
+  var renderedDisks = [];
   var tSec3d = ts / 1000;
   for (var j = 0; j < visible.length; j++) {
     var obj = visible[j];
@@ -3343,11 +3579,25 @@ function draw3D(ts) {
       ctx.globalAlpha = savedAlpha;
     }
 
-    // Draw core
-    ctx.fillStyle = obj.color;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, r3d, 0, Math.PI * 2);
-    ctx.fill();
+    // Draw core — dispatch to active overlay style
+    if (!isDiffuse || !isPhysical) {
+      var overlayCtx = {
+        ctx: ctx, x: sp.x, y: sp.y, r: r3d, color: obj.color,
+        lightOffX: lightOffX, lightOffY: lightOffY,
+        alpha: ctx.globalAlpha, obj: obj, isPhysical: isPhysical
+      };
+      if (isPhysical && r3d > 4) {
+        var styleFn = overlayRenderers[effects.overlayStyle] || drawOverlay_flat;
+        styleFn(overlayCtx);
+      } else {
+        drawOverlay_flat(overlayCtx);
+      }
+    }
+
+    // Collect disk for occlusion pass
+    if (isPhysical && r3d > 3) {
+      renderedDisks.push({ x: sp.x, y: sp.y, r: r3d, depth: sp.depth, obj: obj });
+    }
 
     // Diffraction spikes — only for unresolved point sources
     if (!isPhysical && (obj.category === 'stellar' || obj.category === 'exotic') && r3d >= 2) {
@@ -3380,6 +3630,10 @@ function draw3D(ts) {
       });
     }
   }
+
+  // Occlusion shadows (after all objects, before labels)
+  drawOcclusion(renderedDisks);
+
   drawLabels();
 
   // Draw apparent size brackets — on selected, hovered, or Sol from distance
@@ -4794,7 +5048,9 @@ function buildEffectsPanel() {
     { key: 'warpStreaks', label: 'Warp streaks' },
     { key: 'flowLines', label: 'Gravity flow' },
     { key: 'ambientParticles', label: 'Ambient particles' },
-    { key: 'orbits', label: 'Orbit lines' }
+    { key: 'orbits', label: 'Orbit lines' },
+    { key: 'orbitalPlanes', label: 'Orbital planes (3D)' },
+    { key: 'occlusion', label: 'Shadows/occlusion' }
   ];
 
   checks.forEach(function(c) {
@@ -4862,6 +5118,37 @@ function buildEffectsPanel() {
   styleRow.appendChild(styleLabel);
   styleRow.appendChild(styleSelect);
   panel.appendChild(styleRow);
+
+  // Object overlay style selector
+  var overlayRow = document.createElement('div');
+  overlayRow.className = 'slider-row';
+  var overlayLabel = document.createElement('span');
+  overlayLabel.textContent = 'Object Style';
+  var overlaySelect = document.createElement('select');
+  overlaySelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
+  var overlayNames = { flat: 'Flat', albedo: 'Albedo', wireframe: 'Wireframe', depth: 'Depth', layers: 'Layers' };
+  Object.keys(overlayNames).forEach(function(key) {
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = overlayNames[key];
+    if (key === effects.overlayStyle) opt.selected = true;
+    overlaySelect.appendChild(opt);
+  });
+  overlaySelect.addEventListener('change', function() {
+    effects.overlayStyle = overlaySelect.value;
+    try { localStorage.setItem('cosmos_overlay_style', effects.overlayStyle); } catch(e) {}
+    state.dirty = true;
+  });
+  try {
+    var savedOverlay = localStorage.getItem('cosmos_overlay_style');
+    if (savedOverlay && overlayRenderers[savedOverlay]) {
+      effects.overlayStyle = savedOverlay;
+      overlaySelect.value = savedOverlay;
+    }
+  } catch(e) {}
+  overlayRow.appendChild(overlayLabel);
+  overlayRow.appendChild(overlaySelect);
+  panel.appendChild(overlayRow);
 }
 
 document.getElementById('effects-toggle').addEventListener('click', function() {
