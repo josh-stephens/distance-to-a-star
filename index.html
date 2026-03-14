@@ -158,8 +158,8 @@
   }
   .narration.flipped .narration-flipper { transform: rotateX(180deg); }
   .narration-inner, .narration-back {
-    background: rgba(8, 8, 18, 0.88); border: 1px solid rgba(100, 100, 160, 0.15);
-    border-radius: 10px; padding: 20px 28px; backdrop-filter: blur(12px); text-align: center;
+    background: rgba(8, 8, 18, var(--narr-opacity, 0.7)); border: 1px solid rgba(100, 100, 160, 0.15);
+    border-radius: 10px; padding: 20px 28px; backdrop-filter: blur(8px); text-align: center;
     backface-visibility: hidden; -webkit-backface-visibility: hidden;
   }
   .narration-back {
@@ -484,6 +484,11 @@
           <input type="range" class="narr-setting-slider" id="narr-speed-slider" min="0.5" max="3" step="0.25" value="1">
           <input type="number" class="narr-setting-input" id="narr-speed-input" min="0.5" max="3" step="0.25" value="1">
           <span class="narr-setting-unit">&times;</span>
+        </div>
+        <div class="narr-setting-row">
+          <span class="narr-setting-label">Opacity</span>
+          <input type="range" class="narr-setting-slider" id="narr-opacity-slider" min="0.2" max="1" step="0.05" value="0.7">
+          <input type="number" class="narr-setting-input" id="narr-opacity-input" min="0.2" max="1" step="0.05" value="0.7">
         </div>
         <div class="narr-setting-row">
           <span class="narr-setting-label">Auto-advance</span>

@@ -3218,8 +3218,9 @@ function draw3D(ts) {
       twinkle = 0.85 + 0.15 * Math.sin(tSec3d * (1.5 + (j % 7) * 0.3) + j * 2.1);
     }
 
-    // Scale radius by perspective
-    var appMag = Math.max(0.5, Math.min(4, 1 + Math.log10(Math.max(1, 50 / sp.depth))));
+    // Scale radius by perspective — grows beyond cap when very close
+    var rawApp = 1 + Math.log10(Math.max(1, 50 / sp.depth));
+    var appMag = Math.max(0.5, rawApp <= 4 ? rawApp : 4 + (rawApp - 4) * 4);
     var r3d = Math.max(1.5, obj.radius * appMag);
 
     ctx.globalAlpha = objAlpha * twinkle;
@@ -4131,9 +4132,9 @@ var tourEngine = {
               // Close offset behind + right + up for over-the-shoulder
               // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
               var vpDist = Math.sqrt(vx * vx + vy * vy + vz * vz);
-              var back = Math.max(0.08, Math.min(10, vpDist * 0.0005));
-              var side = back * 0.35;
-              var up = back * 0.2;
+              var back = Math.max(0.0005, Math.min(10, vpDist * 0.0005));
+              var side = 0;
+              var up = 0;
               var camX = vx - fwX * back - rxR * side + uxR * up;
               var camY = vy - fwY * back - ryR * side + uyR * up;
               var camZ = vz - fwZ * back - rzR * 0 + uzR * up;
@@ -4462,6 +4463,19 @@ document.getElementById('narr-next').addEventListener('click', function() { tour
   speedInput.addEventListener('change', function() { syncSpeed(Number(this.value)); });
   speedInput.addEventListener('click', function(e) { e.stopPropagation(); });
   speedSlider.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  var opacitySlider = document.getElementById('narr-opacity-slider');
+  var opacityInput = document.getElementById('narr-opacity-input');
+  function syncOpacity(val) {
+    val = Math.max(0.2, Math.min(1, Math.round(val * 20) / 20));
+    opacitySlider.value = val;
+    opacityInput.value = val;
+    narration.style.setProperty('--narr-opacity', val);
+  }
+  opacitySlider.addEventListener('input', function() { syncOpacity(Number(this.value)); });
+  opacityInput.addEventListener('change', function() { syncOpacity(Number(this.value)); });
+  opacityInput.addEventListener('click', function(e) { e.stopPropagation(); });
+  opacitySlider.addEventListener('click', function(e) { e.stopPropagation(); });
 
   var autoAdvanceChk = document.getElementById('narr-auto-advance');
   autoAdvanceChk.addEventListener('change', function() {
