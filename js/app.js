@@ -3184,9 +3184,18 @@ function draw3D(ts) {
     while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
     cam3d.yaw = from.yaw + dyaw * e;
     cam3d.pitch = from.pitch + (to.pitch - from.pitch) * e;
-    if (t >= 1) cam3dAnim.active = false;
+    if (t >= 1) {
+      cam3dAnim.active = false;
+      // Sync orbit mode to final camera position
+      if (orbitMode.active) {
+        orbitToCamera();
+      }
+    }
     state.dirty = true;
   }
+
+  // Keep redrawing while orbit mode is active (camera may need updates)
+  if (orbitMode.active) state.dirty = true;
 
   // Orbit focal point animation
   if (orbitMode.active && orbitMode.focalAnim.active) {
@@ -4183,12 +4192,12 @@ var tourEngine = {
             // Forward: from star toward constellation
             var fwX = lookPos.x - vx, fwY = lookPos.y - vy, fwZ = lookPos.z - vz;
             var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
-            if (fwLen > 0.001) {
+            if (fwLen > 1e-12) {
               fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
               // Right vector (cross forward with world up [0,0,1])
               var rxR = fwY, ryR = -fwX, rzR = 0;
               var rLen = Math.sqrt(rxR * rxR + ryR * ryR);
-              if (rLen < 0.001) { rxR = 1; ryR = 0; rLen = 1; }
+              if (rLen < 1e-6) { rxR = 1; ryR = 0; rLen = 1; }
               rxR /= rLen; ryR /= rLen;
               // Up vector (cross right with forward)
               var uxR = ryR * fwZ - rzR * fwY;
@@ -5704,12 +5713,12 @@ function lookAtTarget(targetKey, duration) {
     var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
     var fwX = pos.x - fx, fwY = pos.y - fy, fwZ = pos.z - fz;
     var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
-    if (fwLen > 0.001) {
+    if (fwLen > 1e-12) {
       fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
       // Right vector (cross forward with world up)
       var rxR = fwY, ryR = -fwX, rzR = 0;
       var rLen = Math.sqrt(rxR * rxR + ryR * ryR);
-      if (rLen < 0.001) { rxR = 1; ryR = 0; rLen = 1; }
+      if (rLen < 1e-6) { rxR = 1; ryR = 0; rLen = 1; }
       rxR /= rLen; ryR /= rLen;
       // Up vector (cross right with forward)
       var uxR = ryR * fwZ - rzR * fwY;
