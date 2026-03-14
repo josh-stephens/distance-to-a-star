@@ -154,7 +154,7 @@
 
   .narration {
     position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
-    z-index: 20; max-width: 620px; width: 90%; pointer-events: none;
+    z-index: 20; max-width: 820px; width: 94%; pointer-events: none;
     opacity: 0; transition: opacity 0.8s; perspective: 800px;
   }
   .narration.visible { opacity: 1; pointer-events: auto; }
@@ -165,7 +165,7 @@
   .narration.flipped .narration-flipper { transform: rotateX(180deg); }
   .narration-inner, .narration-back {
     background: rgba(8, 8, 18, var(--narr-opacity, 0.7)); border: 1px solid rgba(100, 100, 160, 0.15);
-    border-radius: 10px; padding: 20px 28px; backdrop-filter: blur(8px); text-align: center;
+    border-radius: 10px; padding: 12px 32px; backdrop-filter: blur(8px); text-align: center;
     backface-visibility: hidden; -webkit-backface-visibility: hidden;
   }
   .narration-back {
@@ -232,10 +232,10 @@
   .narr-toggle input:checked + .narr-toggle-track .narr-toggle-thumb {
     left: 18px; background: #7aaaee; box-shadow: 0 0 6px rgba(122, 170, 238, 0.5);
   }
-  .narration-step { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #5a5a78; margin-bottom: 8px; }
-  .narration-title { font-size: 18px; font-weight: 600; color: #e0e0f0; margin-bottom: 8px; }
-  .narration-body { font-size: 13px; line-height: 1.7; color: #9898b8; }
-  .narration-scale { font-size: 11px; color: #5a6a8a; margin-top: 10px; font-family: 'SF Mono', Menlo, monospace; }
+  .narration-step { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #5a5a78; margin-bottom: 4px; }
+  .narration-title { font-size: 16px; font-weight: 600; color: #e0e0f0; margin-bottom: 4px; }
+  .narration-body { font-size: 12px; line-height: 1.5; color: #9898b8; }
+  .narration-scale { font-size: 10px; color: #5a6a8a; margin-top: 6px; font-family: 'SF Mono', Menlo, monospace; }
   .narration-controls { display: flex; justify-content: center; gap: 12px; margin-top: 12px; pointer-events: auto; }
   .narr-ctrl-btn {
     padding: 4px 12px; border: 1px solid #2a2a44; background: #16162acc;

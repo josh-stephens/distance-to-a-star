@@ -2,6 +2,9 @@
 
 var AU_IN_LY = 1 / 63241;
 var MLY = 1e6;
+var KM_IN_LY = 1 / 9.461e12;  // 1 km in light-years
+var STANDARD_ORBIT_KM = 50000; // 50,000 km standard orbit altitude
+var STANDARD_ORBIT_LY = STANDARD_ORBIT_KM * KM_IN_LY;
 var MIN_LOG = Math.log10(0.000000005); // ~0.0003 AU, close enough to see planet surface details
 var MAX_LOG = Math.log10(400 * MLY);
 

@@ -3388,6 +3388,9 @@ function draw3D(ts) {
     // For Sol anchor, use minimum visible bracket size
     if (isSolAnchor && angPx < 20) angPx = 20;
     if (angPx < 8 || angPx > 800) continue;
+    // Suppress brackets when the physical disk is plainly visible — brackets are
+    // for revealing invisible angular extents, not boxing obvious objects
+    if (!isSolAnchor && angPx > 30) continue;
     var half = angPx / 2;
     var bcx = bSp.x, bcy = bSp.y;
     var corner = Math.min(half * 0.3, 14);
@@ -4184,12 +4187,11 @@ var tourEngine = {
               var uxR = ryR * fwZ - rzR * fwY;
               var uyR = rzR * fwX - rxR * fwZ;
               var uzR = rxR * fwY - ryR * fwX;
-              // Close offset behind + right + up for over-the-shoulder
+              // 50k km orbit with slight offset to frame constellation as main focus
               // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
-              var vpDist = Math.sqrt(vx * vx + vy * vy + vz * vz);
-              var back = Math.max(0.0005, Math.min(10, vpDist * 0.0005));
-              var side = 0;
-              var up = 0;
+              var back = STANDARD_ORBIT_LY;
+              var side = STANDARD_ORBIT_LY * 0.15;
+              var up = STANDARD_ORBIT_LY * 0.1;
               var camX = vx - fwX * back - rxR * side + uxR * up;
               var camY = vy - fwY * back - ryR * side + uyR * up;
               var camZ = vz - fwZ * back - rzR * 0 + uzR * up;
@@ -5231,43 +5233,31 @@ canvas.addEventListener('dblclick', function(e) {
       if (d < minD) { minD = d; hit = o; }
     });
     if (hit) {
-      // Orbit mode: re-center on clicked object
-      if (orbitMode.active) {
-        state.selected = hit;
-        saveSelectedObject(hit.name);
-        showInfo(hit);
-        animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, displayName(hit));
-        state.dirty = true;
-        return;
-      }
-      // Fly camera to this object's position, looking at current look direction
-      var toYaw = cam3d.yaw, toPitch = cam3d.pitch;
-      // Try to look toward the nearest interesting target (not self)
-      var bestTarget = null, bestTargetDist = Infinity;
-      for (var ti = 0; ti < cam3dLookTargets.length; ti++) {
-        var tPos = getLookTarget(cam3dLookTargets[ti].key);
-        if (!tPos) continue;
-        var tdx = tPos.x - hit.wx3d, tdy = tPos.y - hit.wy3d, tdz = tPos.z - hit.wz3d;
-        var tDist = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
-        // Skip if same location as destination (self) or too close
-        if (tDist < 0.001) continue;
-        if (tDist < bestTargetDist) {
-          bestTargetDist = tDist;
-          bestTarget = tPos;
-        }
-      }
-      if (bestTarget) {
-        var angles = computeLookAngles(hit.wx3d, hit.wy3d, hit.wz3d, bestTarget.x, bestTarget.y, bestTarget.z);
-        toYaw = angles.yaw;
-        toPitch = angles.pitch;
-      }
+      state.selected = hit;
+      saveSelectedObject(hit.name);
+      showInfo(hit);
+      // Fly to standard 50k km orbit around this object
+      var surfR = hit.physRadius || 0;
+      var orbD = surfR + STANDARD_ORBIT_LY;
+      var fx = hit.wx3d, fy = hit.wy3d, fz = hit.wz3d;
+      var toX = fx + orbD, toY = fy, toZ = fz;
+      var angles = computeLookAngles(toX, toY, toZ, fx, fy, fz);
       cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
         yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
-      cam3dAnim.to = { px: hit.wx3d, py: hit.wy3d, pz: hit.wz3d,
-        yaw: toYaw, pitch: toPitch, fov: 60 };
+      cam3dAnim.to = { px: toX, py: toY, pz: toZ,
+        yaw: angles.yaw, pitch: angles.pitch, fov: 60 };
       cam3dAnim.duration = 2000;
       cam3dAnim.startTime = performance.now();
       cam3dAnim.active = true;
+      orbitMode.focalX = fx;
+      orbitMode.focalY = fy;
+      orbitMode.focalZ = fz;
+      orbitMode.focalName = displayName(hit);
+      orbitMode.orbitDist = orbD;
+      orbitMode.orbitYaw = 0;
+      orbitMode.orbitPitch = 0;
+      orbitMode.active = true;
+      orbitMode.focalAnim.active = false;
       state.dirty = true;
     }
     return;
@@ -5434,10 +5424,9 @@ function navigateToObject3D(objName) {
 
   var fx = obj.wx3d, fy = obj.wy3d, fz = obj.wz3d;
 
-  // Compute orbit distance based on object's distance from origin
-  var objDist = Math.sqrt(fx * fx + fy * fy + fz * fz);
-  var orbDist = Math.max(0.0001, Math.min(1000, objDist * 0.002));
-  if (objDist < 0.001) orbDist = 0.0001; // very close objects like Sun
+  // Standard 50,000 km orbit altitude above the surface
+  var surfaceR = obj.physRadius || 0;
+  var orbDist = surfaceR + STANDARD_ORBIT_LY;
 
   // Fly camera to an orbit position around the object
   var toX = fx + orbDist;
