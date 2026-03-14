@@ -32,6 +32,16 @@ var cam3d = {
 
 var cam3dAnim = { active: false, startTime: 0, duration: 0, from: null, to: null };
 
+var orbitMode = {
+  active: false,
+  focalX: 0, focalY: 0, focalZ: 0,
+  focalName: 'Sol',
+  orbitYaw: 0, orbitPitch: 0, orbitDist: 10,
+  focalAnim: { active: false, startTime: 0, duration: 0,
+               fromX: 0, fromY: 0, fromZ: 0,
+               toX: 0, toY: 0, toZ: 0, toName: '' }
+};
+
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
 var pendingLabels = [];
 var parallaxState = { active: false, progress: 0, constellation: null, shiftK: 0, shiftAngle: 0, animId: null, label: '', flashAlpha: 0 };
@@ -3134,6 +3144,23 @@ function draw3D(ts) {
     state.dirty = true;
   }
 
+  // Orbit focal point animation
+  if (orbitMode.active && orbitMode.focalAnim.active) {
+    var fa = orbitMode.focalAnim;
+    var elapsed = ts - fa.startTime;
+    var t2 = Math.min(1, elapsed / fa.duration);
+    var e2 = easeInOutCubic(t2);
+    orbitMode.focalX = fa.fromX + (fa.toX - fa.fromX) * e2;
+    orbitMode.focalY = fa.fromY + (fa.toY - fa.fromY) * e2;
+    orbitMode.focalZ = fa.fromZ + (fa.toZ - fa.fromZ) * e2;
+    orbitToCamera();
+    if (t2 >= 1) {
+      fa.active = false;
+      orbitMode.focalName = fa.toName;
+    }
+    state.dirty = true;
+  }
+
   ctx.clearRect(0, 0, sw, sh);
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, sw, sh);
@@ -3364,7 +3391,20 @@ function draw3DHUD(sw, sh) {
   // Mode label
   ctx.textAlign = 'right';
   ctx.fillStyle = '#3a3a55';
-  ctx.fillText('3D Sky View', sw - 16, 20);
+  ctx.fillText(orbitMode.active ? '3D Orbit Mode' : '3D Sky View', sw - 16, 20);
+
+  // Orbit info
+  if (orbitMode.active) {
+    var od = orbitMode.orbitDist;
+    var odLabel;
+    if (od < 0.001) odLabel = (od * AU_IN_LY).toFixed(1) + ' AU';
+    else if (od < 1000) odLabel = od.toFixed(2) + ' ly';
+    else if (od < 1e6) odLabel = (od / 1000).toFixed(1) + ' kly';
+    else odLabel = (od / 1e6).toFixed(1) + ' Mly';
+    ctx.fillStyle = '#5a7a5a';
+    ctx.fillText('Orbiting: ' + orbitMode.focalName, sw - 16, 36);
+    ctx.fillText('Distance: ' + odLabel, sw - 16, 50);
+  }
 
   ctx.restore();
 }
@@ -3833,6 +3873,7 @@ var tourEngine = {
 
   start: function(id) {
     dismissWelcome();
+    if (orbitMode.active) orbitMode.active = false;
     if (this.active) this.stop();
     if (!tourDefs[id]) return;
     this.active = true;
@@ -4731,8 +4772,15 @@ canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
   dismissWelcome();
   if (state.mode3d) {
-    // 3D: scroll changes FOV
-    cam3d.fov = Math.max(5, Math.min(120, cam3d.fov + e.deltaY * 0.05));
+    if (orbitMode.active) {
+      // Orbit mode: multiplicative zoom on distance
+      orbitMode.orbitDist *= (1 + e.deltaY * 0.002);
+      orbitMode.orbitDist = Math.max(0.001, Math.min(1e8, orbitMode.orbitDist));
+      orbitToCamera();
+    } else {
+      // 3D: scroll changes FOV
+      cam3d.fov = Math.max(5, Math.min(120, cam3d.fov + e.deltaY * 0.05));
+    }
     state.dirty = true;
     return;
   }
@@ -4773,8 +4821,13 @@ canvas.addEventListener('mousedown', function(e) {
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
   if (state.mode3d) {
-    dragState.startYaw = cam3d.yaw;
-    dragState.startPitch = cam3d.pitch;
+    if (orbitMode.active) {
+      dragState.startYaw = orbitMode.orbitYaw;
+      dragState.startPitch = orbitMode.orbitPitch;
+    } else {
+      dragState.startYaw = cam3d.yaw;
+      dragState.startPitch = cam3d.pitch;
+    }
   } else {
     dragState.startPanX = state.panX;
     dragState.startPanY = state.panY;
@@ -4789,11 +4842,17 @@ window.addEventListener('mousemove', function(e) {
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
     if (dragState.moved) {
       if (state.mode3d) {
-        // Sensitivity scales with FOV
         var sens = cam3d.fov / 1000;
-        cam3d.yaw = dragState.startYaw - dx * sens * DEG2RAD;
-        cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
-          dragState.startPitch + dy * sens * DEG2RAD));
+        if (orbitMode.active) {
+          orbitMode.orbitYaw = dragState.startYaw - dx * sens * DEG2RAD;
+          orbitMode.orbitPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
+            dragState.startPitch + dy * sens * DEG2RAD));
+          orbitToCamera();
+        } else {
+          cam3d.yaw = dragState.startYaw - dx * sens * DEG2RAD;
+          cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
+            dragState.startPitch + dy * sens * DEG2RAD));
+        }
         state.dirty = true;
       } else {
         var scale = getScale();
@@ -4887,6 +4946,10 @@ canvas.addEventListener('click', function(e) {
     showInfo(hit);
     state.dirty = true;
     updateHash();
+    // Orbit mode: animate focal point to new selection
+    if (orbitMode.active && hit.wx3d !== undefined) {
+      animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, hit.name);
+    }
     // Also jump glossary to this entry if glossary is open
     var gPanel = document.getElementById('glossary-panel');
     if (gPanel.classList.contains('open')) {
@@ -4932,6 +4995,14 @@ canvas.addEventListener('dblclick', function(e) {
       if (d < minD) { minD = d; hit = o; }
     });
     if (hit) {
+      // Orbit mode: re-center on clicked object
+      if (orbitMode.active) {
+        state.selected = hit;
+        showInfo(hit);
+        animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, hit.name);
+        state.dirty = true;
+        return;
+      }
       // Fly camera to this object's position, looking at current look direction
       var toYaw = cam3d.yaw, toPitch = cam3d.pitch;
       // Try to look toward the nearest interesting target (not self)
@@ -5252,7 +5323,74 @@ function computeLookAngles(px, py, pz, tx, ty, tz) {
   };
 }
 
+// ─── Orbit mode helpers ──────────────────────────────────────────────
+
+function orbitToCamera() {
+  cam3d.px = orbitMode.focalX + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
+  cam3d.py = orbitMode.focalY + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
+  cam3d.pz = orbitMode.focalZ + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+  var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz,
+    orbitMode.focalX, orbitMode.focalY, orbitMode.focalZ);
+  cam3d.yaw = angles.yaw;
+  cam3d.pitch = angles.pitch;
+}
+
+function cameraToOrbit(fx, fy, fz) {
+  orbitMode.focalX = fx;
+  orbitMode.focalY = fy;
+  orbitMode.focalZ = fz;
+  var dx = cam3d.px - fx, dy = cam3d.py - fy, dz = cam3d.pz - fz;
+  var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (d < 0.001) {
+    // Camera is at focal point — push out to a sensible default
+    var defaultDist = 10;
+    if (state.selected && state.selected.dist > 0) {
+      defaultDist = state.selected.dist * 0.1;
+    }
+    d = Math.max(0.1, Math.min(1000, defaultDist));
+  }
+  orbitMode.orbitDist = d;
+  orbitMode.orbitYaw = Math.atan2(dy, dx);
+  orbitMode.orbitPitch = Math.atan2(dz, Math.sqrt(dx * dx + dy * dy));
+}
+
+function toggleOrbitMode() {
+  if (!state.mode3d) return;
+  if (orbitMode.active) {
+    orbitMode.active = false;
+    state.dirty = true;
+    return;
+  }
+  // Enter orbit mode — focal point is selected object or Sol
+  var fx = 0, fy = 0, fz = 0, fname = 'Sol';
+  if (state.selected && state.selected.wx3d !== undefined) {
+    fx = state.selected.wx3d;
+    fy = state.selected.wy3d;
+    fz = state.selected.wz3d;
+    fname = state.selected.name;
+  }
+  orbitMode.focalName = fname;
+  cameraToOrbit(fx, fy, fz);
+  orbitMode.active = true;
+  orbitMode.focalAnim.active = false;
+  state.dirty = true;
+}
+
+function animateOrbitFocal(tx, ty, tz, tname) {
+  orbitMode.focalAnim.fromX = orbitMode.focalX;
+  orbitMode.focalAnim.fromY = orbitMode.focalY;
+  orbitMode.focalAnim.fromZ = orbitMode.focalZ;
+  orbitMode.focalAnim.toX = tx;
+  orbitMode.focalAnim.toY = ty;
+  orbitMode.focalAnim.toZ = tz;
+  orbitMode.focalAnim.toName = tname;
+  orbitMode.focalAnim.duration = 1200;
+  orbitMode.focalAnim.startTime = performance.now();
+  orbitMode.focalAnim.active = true;
+}
+
 function lookAtTarget(targetKey, duration) {
+  if (orbitMode.active) orbitMode.active = false;
   var pos = getLookTarget(targetKey);
   if (!pos) return;
   var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, pos.x, pos.y, pos.z);
@@ -5276,10 +5414,33 @@ function toggle3D() {
     state.lastPanX = state.panX;
     state.lastPanY = state.panY;
     state.lastZoom = state.zoom;
-    // Initialize camera at Earth looking toward Orion
-    var preset = cam3dPresets.earth;
-    cam3d.px = preset.px; cam3d.py = preset.py; cam3d.pz = preset.pz;
-    cam3d.yaw = preset.yaw; cam3d.pitch = preset.pitch; cam3d.fov = preset.fov;
+    // Initialize camera at selected object (or Earth)
+    if (state.selected && state.selected.wx3d !== undefined) {
+      cam3d.px = state.selected.wx3d;
+      cam3d.py = state.selected.wy3d;
+      cam3d.pz = state.selected.wz3d;
+      cam3d.fov = 60;
+      // Look toward nearest interesting target from this position
+      var bestTarget = null, bestDist = Infinity;
+      for (var lt = 0; lt < cam3dLookTargets.length; lt++) {
+        var tPos = getLookTarget(cam3dLookTargets[lt].key);
+        if (!tPos) continue;
+        var tdx = tPos.x - cam3d.px, tdy = tPos.y - cam3d.py, tdz = tPos.z - cam3d.pz;
+        var tDist = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
+        if (tDist < 0.001) continue;
+        if (tDist < bestDist) { bestDist = tDist; bestTarget = tPos; }
+      }
+      if (bestTarget) {
+        var la = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, bestTarget.x, bestTarget.y, bestTarget.z);
+        cam3d.yaw = la.yaw; cam3d.pitch = la.pitch;
+      } else {
+        cam3d.yaw = 83 * DEG2RAD; cam3d.pitch = -1 * DEG2RAD;
+      }
+    } else {
+      var preset = cam3dPresets.earth;
+      cam3d.px = preset.px; cam3d.py = preset.py; cam3d.pz = preset.pz;
+      cam3d.yaw = preset.yaw; cam3d.pitch = preset.pitch; cam3d.fov = preset.fov;
+    }
     btn3d.classList.add('active');
     presetBar.style.display = 'flex';
     // Hide 2D-only controls
@@ -5295,6 +5456,7 @@ function toggle3D() {
     btn3d.classList.remove('active');
     presetBar.style.display = 'none';
     cam3dAnim.active = false;
+    orbitMode.active = false;
     document.querySelector('.zoom-control').style.display = '';
     document.getElementById('hint').style.display = '';
     document.querySelector('.scale-bar').style.display = '';
@@ -5303,6 +5465,7 @@ function toggle3D() {
 }
 
 function flyCamera(presetName, duration, lookTarget) {
+  if (orbitMode.active) orbitMode.active = false;
   var preset = cam3dPresets[presetName];
   if (!preset) return;
   var toYaw = preset.yaw, toPitch = preset.pitch;
@@ -5408,6 +5571,7 @@ document.addEventListener('keydown', function(e) {
 
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
   if (e.key === 'v' || e.key === 'V') { toggle3D(); return; }
+  if (e.key === 'o' || e.key === 'O') { toggleOrbitMode(); return; }
   if (e.key === 'w' || e.key === 'W') { showWelcome(); return; }
   if (e.key === 'd' || e.key === 'D') { showDocs(); return; }
   if (e.key === 'l' || e.key === 'L') {
@@ -5493,7 +5657,11 @@ canvas.addEventListener('touchstart', function(e) {
   dismissWelcome();
   if (e.touches.length === 2) {
     touchState.startDist = getTouchDist(e.touches);
-    touchState.startZoom = state.mode3d ? cam3d.fov : state.zoom;
+    if (state.mode3d && orbitMode.active) {
+      touchState.startZoom = orbitMode.orbitDist;
+    } else {
+      touchState.startZoom = state.mode3d ? cam3d.fov : state.zoom;
+    }
     touchState.pinching = true;
     touchState.panning = false;
   } else if (e.touches.length === 1) {
@@ -5503,8 +5671,13 @@ canvas.addEventListener('touchstart', function(e) {
     touchState.startX = e.touches[0].clientX;
     touchState.startY = e.touches[0].clientY;
     if (state.mode3d) {
-      touchState.startYaw = cam3d.yaw;
-      touchState.startPitch = cam3d.pitch;
+      if (orbitMode.active) {
+        touchState.startYaw = orbitMode.orbitYaw;
+        touchState.startPitch = orbitMode.orbitPitch;
+      } else {
+        touchState.startYaw = cam3d.yaw;
+        touchState.startPitch = cam3d.pitch;
+      }
     } else {
       touchState.startPanX = state.panX;
       touchState.startPanY = state.panY;
@@ -5517,7 +5690,11 @@ canvas.addEventListener('touchmove', function(e) {
   if (e.touches.length === 2 && touchState.pinching) {
     var dist = getTouchDist(e.touches);
     var ratio = touchState.startDist / dist;
-    if (state.mode3d) {
+    if (state.mode3d && orbitMode.active) {
+      orbitMode.orbitDist = Math.max(0.001, Math.min(1e8, touchState.startZoom * ratio));
+      orbitToCamera();
+      state.dirty = true;
+    } else if (state.mode3d) {
       cam3d.fov = Math.max(5, Math.min(120, touchState.startZoom * ratio));
       state.dirty = true;
     } else {
@@ -5536,7 +5713,14 @@ canvas.addEventListener('touchmove', function(e) {
     var dy = e.touches[0].clientY - touchState.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchState.moved = true;
     if (touchState.moved) {
-      if (state.mode3d) {
+      if (state.mode3d && orbitMode.active) {
+        var sens = cam3d.fov / 1000;
+        orbitMode.orbitYaw = touchState.startYaw - dx * sens * DEG2RAD;
+        orbitMode.orbitPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
+          touchState.startPitch + dy * sens * DEG2RAD));
+        orbitToCamera();
+        state.dirty = true;
+      } else if (state.mode3d) {
         var sens = cam3d.fov / 1000;
         cam3d.yaw = touchState.startYaw - dx * sens * DEG2RAD;
         cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
@@ -5857,6 +6041,7 @@ function buildFeatureList(body) {
 
   var features = [
     ['V', '3D Sky View \u2014 fly to any star and see the sky from there'],
+    ['O', 'Orbit Mode \u2014 in 3D, orbit around the selected object'],
     ['T', 'Guided Tours \u2014 constellation corridors, scale of the universe'],
     ['Dbl-click', 'In 3D, double-click any object to fly there'],
     ['G', 'Glossary \u2014 searchable encyclopedia of every object'],
