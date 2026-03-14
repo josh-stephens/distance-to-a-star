@@ -5540,11 +5540,12 @@ var cam3dPresets = {};
 function initCam3dPresets() {
   for (var i = 0; i < cam3dViewpoints.length; i++) {
     var vp = cam3dViewpoints[i];
-    var px = 0, py = 0, pz = 0;
+    var px = 0, py = 0, pz = 0, vpPhysR = 0;
     if (vp.obj) {
       for (var j = 0; j < objects.length; j++) {
         if (objects[j].name === vp.obj) {
           px = objects[j].wx3d; py = objects[j].wy3d; pz = objects[j].wz3d;
+          vpPhysR = objects[j].physRadius || 0;
           break;
         }
       }
@@ -5567,7 +5568,7 @@ function initCam3dPresets() {
       defYaw = mwAngles.yaw;
       defPitch = mwAngles.pitch;
     }
-    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label };
+    cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label, physRadius: vpPhysR };
   }
 }
 
@@ -6127,7 +6128,8 @@ function openSlotDropdown(btn, type) {
             if (obj) {
               var lookAngles2 = computeLookAngles(obj.wx3d, obj.wy3d, obj.wz3d, 0, 0, 0);
               cam3dPresets[vpKey] = { px: obj.wx3d, py: obj.wy3d, pz: obj.wz3d,
-                yaw: lookAngles2.yaw, pitch: lookAngles2.pitch, fov: 60, label: c.label };
+                yaw: lookAngles2.yaw, pitch: lookAngles2.pitch, fov: 60, label: c.label,
+                physRadius: obj.physRadius || 0 };
               btn.textContent = c.label;
               btn.setAttribute('data-cam-preset', vpKey);
               flyCamera(vpKey, 2000);
@@ -6325,7 +6327,8 @@ function loadSlotConfig() {
           if (objects[oi].name === vp.label && objects[oi].wx3d !== undefined) {
             var la = computeLookAngles(objects[oi].wx3d, objects[oi].wy3d, objects[oi].wz3d, 0, 0, 0);
             cam3dPresets[vp.key] = { px: objects[oi].wx3d, py: objects[oi].wy3d, pz: objects[oi].wz3d,
-              yaw: la.yaw, pitch: la.pitch, fov: 60, label: vp.label };
+              yaw: la.yaw, pitch: la.pitch, fov: 60, label: vp.label,
+              physRadius: objects[oi].physRadius || 0 };
             break;
           }
         }
