@@ -4197,7 +4197,7 @@ var tourEngine = {
               // 50k km orbit above viewpoint object's surface, slight offset to frame constellation
               // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
               var vpPhysR = vpPreset.physRadius || 0;
-              var back = vpPhysR + STANDARD_ORBIT_LY;
+              var back = Math.max(STANDARD_ORBIT_LY, vpPhysR * ORBIT_RADIUS_MULT);
               var side = STANDARD_ORBIT_LY * 0.15;
               var up = STANDARD_ORBIT_LY * 0.1;
               var camX = vx - fwX * back - rxR * side + uxR * up;
@@ -5246,7 +5246,7 @@ canvas.addEventListener('dblclick', function(e) {
       showInfo(hit);
       // Fly to standard 50k km orbit around this object
       var surfR = hit.physRadius || 0;
-      var orbD = surfR + STANDARD_ORBIT_LY;
+      var orbD = Math.max(STANDARD_ORBIT_LY, surfR * ORBIT_RADIUS_MULT);
       var fx = hit.wx3d, fy = hit.wy3d, fz = hit.wz3d;
       var toX = fx + orbD, toY = fy, toZ = fz;
       var angles = computeLookAngles(toX, toY, toZ, fx, fy, fz);
@@ -5434,7 +5434,7 @@ function navigateToObject3D(objName) {
 
   // Standard 50,000 km orbit altitude above the surface
   var surfaceR = obj.physRadius || 0;
-  var orbDist = surfaceR + STANDARD_ORBIT_LY;
+  var orbDist = Math.max(STANDARD_ORBIT_LY, surfaceR * ORBIT_RADIUS_MULT);
 
   // Fly camera to an orbit position around the object
   var toX = fx + orbDist;
