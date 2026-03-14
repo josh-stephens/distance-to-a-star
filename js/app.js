@@ -3380,8 +3380,27 @@ function draw3DHUD(sw, sh) {
   ctx.fillStyle = '#5a5a7a';
   ctx.fillText('Viewing from ' + posLabel, 52, sh - 42);
 
-  // FOV indicator
-  ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, sh - 26);
+  // FOV indicator (skip in orbit mode — distance is shown top-right)
+  if (!orbitMode.active) {
+    ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, sh - 26);
+  }
+
+  // Distance to selected object
+  if (state.selected && state.selected.wx3d !== undefined) {
+    var sdx = cam3d.px - state.selected.wx3d;
+    var sdy = cam3d.py - state.selected.wy3d;
+    var sdz = cam3d.pz - state.selected.wz3d;
+    var selDist = Math.sqrt(sdx * sdx + sdy * sdy + sdz * sdz);
+    var sdAU = selDist * AU_IN_LY;
+    var sdLabel;
+    if (sdAU < 0.01) sdLabel = (sdAU * 1.496e8).toFixed(0) + ' km';
+    else if (selDist < 0.001) sdLabel = sdAU.toFixed(2) + ' AU';
+    else if (selDist < 1000) sdLabel = selDist.toFixed(2) + ' ly';
+    else if (selDist < 1e6) sdLabel = (selDist / 1000).toFixed(1) + ' kly';
+    else sdLabel = (selDist / 1e6).toFixed(1) + ' Mly';
+    ctx.fillStyle = '#6a8a6a';
+    ctx.fillText(displayName(state.selected) + ': ' + sdLabel, 52, sh - 26);
+  }
 
   // Look direction in RA/Dec
   var lookRA = cam3d.yaw / DEG2RAD;
@@ -5365,11 +5384,11 @@ function cameraToOrbit(fx, fy, fz) {
   var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (d < 0.001) {
     // Camera is at focal point — push out to a sensible default
-    var defaultDist = 10;
+    var defaultDist = 0.01;
     if (state.selected && state.selected.dist > 0) {
-      defaultDist = state.selected.dist * 0.1;
+      defaultDist = state.selected.dist * 0.002;
     }
-    d = Math.max(0.1, Math.min(1000, defaultDist));
+    d = Math.max(0.0001, Math.min(1000, defaultDist));
   }
   orbitMode.orbitDist = d;
   orbitMode.orbitYaw = Math.atan2(dy, dx);
@@ -5440,8 +5459,8 @@ function toggle3D() {
     if (state.selected && state.selected.wx3d !== undefined) {
       // Auto-enter orbit mode around selected object
       var sel = state.selected;
-      var od = sel.dist > 0 ? sel.dist * 0.05 : 0.001;
-      od = Math.max(0.001, Math.min(1000, od));
+      var od = sel.dist > 0 ? sel.dist * 0.002 : 0.0001;
+      od = Math.max(0.0001, Math.min(1000, od));
       orbitMode.focalX = sel.wx3d;
       orbitMode.focalY = sel.wy3d;
       orbitMode.focalZ = sel.wz3d;
