@@ -3241,14 +3241,35 @@ function draw3D(ts) {
     // Scale radius by perspective
     var appMag = Math.max(0.5, Math.min(4, 1 + Math.log10(Math.max(1, 50 / sp.depth))));
     var r3d = Math.max(1.5, obj.radius * appMag);
+    var isPhysical = false; // true when object appears as a resolved disk
+
+    // Physical radius projection — when close enough, object fills real angular size
+    if (obj.physRadius) {
+      var halfW3d = sw / 2;
+      var physScreenR = obj.physRadius * sp.scale * halfW3d;
+      if (physScreenR > r3d) {
+        r3d = Math.min(physScreenR, sw * 2); // cap to prevent insane sizes
+        isPhysical = true;
+      }
+    }
 
     ctx.globalAlpha = objAlpha * twinkle;
 
+    // Diffuse objects (nebulae, galaxies) become more transparent when resolved
+    var isDiffuse = obj.category === 'nebula' || obj.category === 'galaxy' ||
+                    obj.category === 'local' || obj.category === 'cosmic' ||
+                    obj.category === 'cluster';
+    if (isDiffuse && isPhysical) {
+      // Fade transparency as object grows beyond ~50px to simulate diffuse structure
+      var diffuseAlpha = Math.max(0.08, Math.min(1, 50 / r3d));
+      ctx.globalAlpha = objAlpha * twinkle * diffuseAlpha;
+    }
+
     // Category-specific rendering
     if (obj.category === 'nebula') {
-      drawNebula3D(sp.x, sp.y, r3d, obj.color, objAlpha * twinkle);
+      drawNebula3D(sp.x, sp.y, r3d, obj.color, objAlpha * twinkle * (isDiffuse && isPhysical ? Math.max(0.08, 50 / r3d) : 1));
     } else if (obj.category === 'galaxy' || obj.category === 'local') {
-      drawGalaxy3D(sp.x, sp.y, r3d, obj.color, objAlpha);
+      drawGalaxy3D(sp.x, sp.y, r3d, obj.color, objAlpha * (isDiffuse && isPhysical ? Math.max(0.08, 50 / r3d) : 1));
     }
 
     // Directional lighting — offset glow toward the sun
@@ -3279,27 +3300,34 @@ function draw3D(ts) {
     }
 
     // Draw glow (offset toward light source)
+    // Resolved disks: reduce glow proportionally — no bloom on a planet from ISS
     var gi = effects.glowIntensity;
-    var glowR = r3d * 3 * gi;
-    var g = ctx.createRadialGradient(sp.x + lightOffX, sp.y + lightOffY, r3d * 0.3, sp.x, sp.y, glowR);
-    g.addColorStop(0, obj.glow);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Extended halo for bright stars
-    if ((obj.category === 'stellar' || obj.category === 'exotic') && r3d > 2) {
-      var glowR2 = r3d * 6 * gi;
-      var haloColor = obj.color.length === 7 ? obj.color + '0d' : obj.color.substring(0, 7) + '0d';
-      var g2 = ctx.createRadialGradient(sp.x, sp.y, glowR, sp.x, sp.y, glowR2);
-      g2.addColorStop(0, haloColor);
-      g2.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g2;
+    var glowFade = isPhysical ? Math.max(0, 1 - (r3d - 8) / 40) : 1;
+    if (glowFade > 0.01) {
+      var glowR = r3d * 3 * gi;
+      var savedAlpha = ctx.globalAlpha;
+      ctx.globalAlpha = savedAlpha * glowFade;
+      var g = ctx.createRadialGradient(sp.x + lightOffX, sp.y + lightOffY, r3d * 0.3, sp.x, sp.y, glowR);
+      g.addColorStop(0, obj.glow);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(sp.x, sp.y, glowR2, 0, Math.PI * 2);
+      ctx.arc(sp.x, sp.y, glowR, 0, Math.PI * 2);
       ctx.fill();
+
+      // Extended halo for bright stars
+      if ((obj.category === 'stellar' || obj.category === 'exotic') && r3d > 2) {
+        var glowR2 = r3d * 6 * gi;
+        var haloColor = obj.color.length === 7 ? obj.color + '0d' : obj.color.substring(0, 7) + '0d';
+        var g2 = ctx.createRadialGradient(sp.x, sp.y, glowR, sp.x, sp.y, glowR2);
+        g2.addColorStop(0, haloColor);
+        g2.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, glowR2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = savedAlpha;
     }
 
     // Draw core
@@ -3308,8 +3336,8 @@ function draw3D(ts) {
     ctx.arc(sp.x, sp.y, r3d, 0, Math.PI * 2);
     ctx.fill();
 
-    // Diffraction spikes on bright stars
-    if ((obj.category === 'stellar' || obj.category === 'exotic') && r3d >= 2) {
+    // Diffraction spikes — only for unresolved point sources
+    if (!isPhysical && (obj.category === 'stellar' || obj.category === 'exotic') && r3d >= 2) {
       drawDiffractionSpikes(sp.x, sp.y, r3d, obj.color, objAlpha * twinkle);
     }
 
@@ -3318,9 +3346,9 @@ function draw3D(ts) {
     // Selection ring
     if (state.selected === obj) {
       ctx.strokeStyle = obj.color;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = isPhysical && r3d > 20 ? 2 : 1;
       ctx.beginPath();
-      ctx.arc(sp.x, sp.y, r3d + 5, 0, Math.PI * 2);
+      ctx.arc(sp.x, sp.y, r3d + (isPhysical ? Math.max(5, r3d * 0.05) : 5), 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -4817,6 +4845,12 @@ function buildEffectsPanel() {
 
 document.getElementById('effects-toggle').addEventListener('click', function() {
   document.getElementById('effects-panel').classList.toggle('open');
+});
+
+// ─── Docs button ─────────────────────────────────────────────────────
+
+document.getElementById('docs-btn').addEventListener('click', function() {
+  showDocs();
 });
 
 // ─── Feedback form ───────────────────────────────────────────────────

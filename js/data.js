@@ -88,15 +88,15 @@ var objects = [
     facts: [["Distance from Earth", "384,400 km (1.28 light-sec)"], ["Orbital period", "27.3 days"], ["Diameter", "3,474 km"]],
     desc: "Earth's only natural satellite. The Moon stabilizes Earth's axial tilt and drives the tides. It is the only celestial body beyond Earth visited by humans." },
   { name: "Mercury", x: 0.39 * AU_IN_LY, y: -0.22 * AU_IN_LY, dist: 0.39 * AU_IN_LY, radius: 1.5, color: "#b5a08a", glow: "#b5a08a33",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 2.578e-10,
     facts: [["Distance from Sun", "0.39 AU (3.2 light-min)"], ["Orbital period", "88 days"], ["Surface temp", "-170 to 430 \u00b0C"]],
     desc: "The smallest planet and closest to the Sun. Its year lasts just 88 Earth days." },
   { name: "Venus", x: -0.15 * AU_IN_LY, y: 0.70 * AU_IN_LY, dist: 0.72 * AU_IN_LY, radius: 2.2, color: "#e8c06a", glow: "#e8c06a44",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 6.394e-10,
     facts: [["Distance from Sun", "0.72 AU (6 light-min)"], ["Orbital period", "225 days"], ["Surface temp", "~465 \u00b0C"]],
     desc: "Earth's 'evil twin.' A runaway greenhouse effect makes it the hottest planet in the solar system." },
   { name: "Mars", x: -1.20 * AU_IN_LY, y: 0.90 * AU_IN_LY, dist: 1.52 * AU_IN_LY, radius: 1.8, color: "#cc6644", glow: "#cc664433",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 3.581e-10,
     facts: [["Distance from Sun", "1.52 AU (12.7 light-min)"], ["Orbital period", "687 days"], ["Moons", "Phobos, Deimos"]],
     desc: "The Red Planet. Home to Olympus Mons, the tallest volcano in the solar system." },
   { name: "Jupiter", x: 3.5 * AU_IN_LY, y: 3.8 * AU_IN_LY, dist: 5.2 * AU_IN_LY, radius: 3, color: "#d4a56a", glow: "#d4a56a44",
@@ -104,19 +104,19 @@ var objects = [
     facts: [["Distance from Sun", "5.2 AU (43 light-min)"], ["Orbital period", "11.9 years"], ["Mass", "318x Earth"]],
     desc: "The solar system's giant. More massive than all other planets combined." },
   { name: "Saturn", x: -6.0 * AU_IN_LY, y: 7.3 * AU_IN_LY, dist: 9.58 * AU_IN_LY, radius: 2.8, color: "#e8d088", glow: "#e8d08844",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 6.153e-9,
     facts: [["Distance from Sun", "9.58 AU (80 light-min)"], ["Orbital period", "29.5 years"], ["Rings", "Mostly ice particles"]],
     desc: "The ringed world. Its iconic rings span 280,000 km but are only ~10 meters thick." },
   { name: "Uranus", x: 12.0 * AU_IN_LY, y: -14.0 * AU_IN_LY, dist: 19.2 * AU_IN_LY, radius: 2, color: "#88ccdd", glow: "#88ccdd33",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 2.679e-9,
     facts: [["Distance from Sun", "19.2 AU (2.7 light-hr)"], ["Orbital period", "84 years"], ["Axial tilt", "98\u00b0"]],
     desc: "Tilted nearly on its side, this ice giant rolls around the Sun like a ball." },
   { name: "Neptune", x: -20.0 * AU_IN_LY, y: -22.0 * AU_IN_LY, dist: 30.07 * AU_IN_LY, radius: 2, color: "#4466cc", glow: "#4466cc33",
-    type: "Planet", category: "solar",
+    type: "Planet", category: "solar", physRadius: 2.601e-9,
     facts: [["Distance from Sun", "30 AU (4.2 light-hr)"], ["Orbital period", "165 years"], ["Winds", "Up to 2,100 km/h"]],
     desc: "The outermost planet. Its winds are the fastest in the solar system." },
   { name: "Pluto", x: 25.0 * AU_IN_LY, y: 30.0 * AU_IN_LY, dist: 39.5 * AU_IN_LY, radius: 1, color: "#ccbbaa", glow: "#ccbbaa22",
-    type: "Dwarf planet", category: "solar",
+    type: "Dwarf planet", category: "solar", physRadius: 1.256e-10,
     facts: [["Distance from Sun", "39.5 AU (5.5 light-hr)"], ["Orbital period", "248 years"], ["Heart feature", "Tombaugh Regio"]],
     desc: "Once the 9th planet, now classified as a dwarf planet. New Horizons revealed its heart-shaped nitrogen ice plain in 2015." },
 
@@ -132,15 +132,15 @@ var objects = [
 
   // Stellar
   { name: "Proxima Centauri", x: -3.5, y: -2.3, dist: 4.24, ra: 217.43, dec: -62.68, radius: 2, color: "#ff6644", glow: "#ff664433",
-    type: "Red dwarf (M5.5Ve)", category: "stellar",
+    type: "Red dwarf (M5.5Ve)", category: "stellar", physRadius: 1.133e-8,
     facts: [["Distance", "4.24 light-years"], ["Planets", "Proxima b (habitable zone)"], ["Travel time (Voyager 1)", "~73,000 years"]],
     desc: "The closest star to the Sun. At Voyager 1's speed it would take over 73,000 years to reach." },
   { name: "\u03b1 Centauri A", x: -3.7, y: -2.1, dist: 4.37, ra: 219.90, dec: -60.83, radius: 2.5, color: "#ffee66", glow: "#ffee6633",
-    type: "Star (G2V, Sun-like)", category: "stellar",
+    type: "Star (G2V, Sun-like)", category: "stellar", physRadius: 8.99e-8,
     facts: [["Distance", "4.37 light-years"], ["Mass", "1.1 M\u2609"]],
     desc: "Nearly identical to our Sun. The brighter half of the closest binary star system." },
   { name: "\u03b1 Centauri B", x: -3.8, y: -2.0, dist: 4.37, ra: 219.90, dec: -60.83, radius: 2, color: "#ffaa44", glow: "#ffaa4433",
-    type: "Star (K1V)", category: "stellar",
+    type: "Star (K1V)", category: "stellar", physRadius: 6.34e-8,
     facts: [["Distance", "4.37 light-years"]],
     desc: "The smaller companion to Alpha Centauri A. An orange dwarf." },
   // Exoplanets
@@ -533,6 +533,76 @@ var objects = [
     facts: [["Distance", "~1.04 Gly"], ["Diameter", "~4 Mly (largest known galaxy)"], ["Stars", "~100 trillion"], ["Cluster", "Abell 2029"]],
     desc: "One of the largest known galaxies in the observable universe. If placed where the Milky Way is, its halo would engulf both Magellanic Clouds and reach halfway to Andromeda." }
 ];
+
+// Physical radii for accurate 3D rendering (in light-years)
+// Stars: radius in solar radii × 7.35e-8 ly/R☉
+// Planets: radius in km × 1.057e-13 ly/km
+// Nebulae/clusters/galaxies: half-diameter in ly
+(function() {
+  var pr = {
+    // Spacecraft (tiny but nonzero for consistency)
+    "Voyager 1": 4e-17, "Voyager 2": 4e-17,
+    // Exoplanets
+    "Proxima Centauri b": 7.28e-10, "TRAPPIST-1 System": 8.89e-9,
+    "Kepler-452b": 1.08e-9, "51 Pegasi b": 9.36e-9,
+    "HD 209458 b": 1.017e-8, "WASP-12b": 1.40e-8,
+    // Nearby stars
+    "Barnard's Star": 1.44e-8, "Wolf 359": 1.18e-8,
+    "Sirius": 1.258e-7, "Ross 154": 1.76e-8,
+    "Tau Ceti": 5.83e-8, "Procyon": 1.505e-7,
+    // Bright stars
+    "Vega": 1.736e-7, "Arcturus": 1.867e-6,
+    "Aldebaran": 3.244e-6, "Canopus": 5.248e-6,
+    "Polaris": 2.756e-6, "Antares": 5.0e-5,
+    "Deneb": 1.492e-5,
+    // Orion constellation
+    "Bellatrix": 4.23e-7, "Alnitak": 1.47e-6,
+    "Alnilam": 3.087e-6, "Mintaka": 1.213e-6,
+    "Saiph": 1.632e-6, "Rigel": 5.799e-6,
+    // Scorpius
+    "Dschubba": 4.925e-7, "Sargas": 1.933e-6, "Shaula": 4.557e-7,
+    // Big Dipper (Ursa Major)
+    "Dubhe": 2.205e-6, "Merak": 2.22e-7, "Phecda": 2.205e-7,
+    "Megrez": 1.029e-7, "Alioth": 3.043e-7,
+    "Mizar": 1.764e-7, "Alkaid": 2.499e-7,
+    // Southern Cross
+    "Acrux": 5.733e-7, "Mimosa": 6.174e-7,
+    "Gacrux": 6.174e-6, "Delta Crucis": 5.88e-7,
+    // Cassiopeia
+    "Caph": 2.52e-7, "Schedar": 3.109e-6,
+    "Gamma Cassiopeiae": 7.35e-7, "Ruchbah": 2.867e-7, "Segin": 2.793e-7,
+    // Andromeda Cepheids
+    "V1 (Hubble's Cepheid)": 2.57e-6, "V2 (Andromeda Cepheid)": 1.84e-6,
+    "V15 (Andromeda Cepheid)": 1.47e-6,
+    // Nebulae (half-diameter in ly)
+    "Helix Nebula": 1.4, "Ring Nebula": 0.65,
+    "Crab Nebula": 2.75, "Eagle Nebula": 17.5, "Carina Nebula": 115,
+    // Exotic objects
+    "Vela Pulsar": 1.27e-12, "Crab Pulsar": 1.27e-12,
+    "Cygnus X-1": 4.69e-12, "SGR 1806-20": 1.27e-12,
+    "Tycho's SN Remnant": 12, "Kepler's SN Remnant": 14, "SN 1987A": 0.3,
+    // Globular clusters
+    "47 Tucanae": 60, "Omega Centauri": 86,
+    "M13": 84, "M22": 50, "M3": 90, "Palomar 5": 50,
+    // Galaxy landmarks
+    "Sun (You Are Here)": 7.35e-8, "Galactic Center": 500,
+    "Sagittarius A*": 1.27e-6,
+    // Local group
+    "Sagittarius Dwarf": 5000, "Large Magellanic Cloud": 7000,
+    "Small Magellanic Cloud": 3500, "Canis Major Dwarf": 4200,
+    "Leo I": 500, "Triangulum (M33)": 30000,
+    "NGC 185": 2500, "IC 10": 1500,
+    // Cosmic scale
+    "Virgo Cluster": 4e6, "Fornax Cluster": 2e6,
+    "Centaurus Cluster": 2.5e6, "Great Attractor": 1.5e8,
+    "M87": 60000, "NGC 1300": 55000, "IC 1101": 2e6
+  };
+  for (var i = 0; i < objects.length; i++) {
+    if (!objects[i].physRadius && pr[objects[i].name] !== undefined) {
+      objects[i].physRadius = pr[objects[i].name];
+    }
+  }
+})();
 
 // ─── Glossary data ────────────────────────────────────────────────────
 
