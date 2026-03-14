@@ -116,6 +116,26 @@ window.addEventListener('resize', resize);
 
 function getViewRadius() { return sliderToViewRadius(state.zoom); }
 
+function displayName(obj) {
+  if (obj.name === 'Sun (You Are Here)') {
+    if (state.mode3d) {
+      var cd = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+      if (cd < 100) return 'Sun';
+    } else if (getViewRadius() < 10) {
+      return 'Sun';
+    }
+  }
+  if (obj.name === 'Milky Way (You Are Here)') {
+    if (state.mode3d) {
+      var cd2 = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+      if (cd2 < 100000) return 'Milky Way';
+    } else if (getViewRadius() < 100000) {
+      return 'Milky Way';
+    }
+  }
+  return obj.name;
+}
+
 function getScale() {
   var vr = getViewRadius();
   var sw = W / devicePixelRatio;
@@ -2187,7 +2207,7 @@ function drawObject(obj, sp, ts) {
   // Store label info for deferred rendering.
   var labelOffset = Math.max(r, dr);
   pendingLabels.push({
-    name: obj.name,
+    name: displayName(obj),
     dist: obj.dist,
     x: sp.x,
     y: sp.y + labelOffset + 16,
@@ -3261,7 +3281,7 @@ function draw3D(ts) {
 
     // Label
     pendingLabels.push({
-      name: obj.name,
+      name: displayName(obj),
       dist: obj.dist,
       x: sp.x,
       y: sp.y + r3d + 16,
@@ -3757,7 +3777,7 @@ function formatLightTravelElapsed(years) {
 function showInfo(obj) {
   var infoPanel = document.getElementById('info-panel');
   infoPanel.classList.remove('hidden');
-  document.getElementById('info-name').textContent = obj.name;
+  document.getElementById('info-name').textContent = displayName(obj);
   document.getElementById('info-type').textContent = obj.type;
   var body = document.getElementById('info-body');
   while (body.firstChild) body.removeChild(body.firstChild);
@@ -4948,7 +4968,7 @@ canvas.addEventListener('click', function(e) {
     updateHash();
     // Orbit mode: animate focal point to new selection
     if (orbitMode.active && hit.wx3d !== undefined) {
-      animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, hit.name);
+      animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, displayName(hit));
     }
     // Also jump glossary to this entry if glossary is open
     var gPanel = document.getElementById('glossary-panel');
@@ -4999,7 +5019,7 @@ canvas.addEventListener('dblclick', function(e) {
       if (orbitMode.active) {
         state.selected = hit;
         showInfo(hit);
-        animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, hit.name);
+        animateOrbitFocal(hit.wx3d, hit.wy3d, hit.wz3d, displayName(hit));
         state.dirty = true;
         return;
       }
@@ -5367,7 +5387,7 @@ function toggleOrbitMode() {
     fx = state.selected.wx3d;
     fy = state.selected.wy3d;
     fz = state.selected.wz3d;
-    fname = state.selected.name;
+    fname = displayName(state.selected);
   }
   orbitMode.focalName = fname;
   cameraToOrbit(fx, fy, fz);
@@ -5414,28 +5434,23 @@ function toggle3D() {
     state.lastPanX = state.panX;
     state.lastPanY = state.panY;
     state.lastZoom = state.zoom;
-    // Initialize camera at selected object (or Earth)
+    // Initialize camera: orbit selected object, or default to Earth
     if (state.selected && state.selected.wx3d !== undefined) {
-      cam3d.px = state.selected.wx3d;
-      cam3d.py = state.selected.wy3d;
-      cam3d.pz = state.selected.wz3d;
+      // Auto-enter orbit mode around selected object
+      var sel = state.selected;
+      var od = sel.dist > 0 ? sel.dist * 0.05 : 0.001;
+      od = Math.max(0.001, Math.min(1000, od));
+      orbitMode.focalX = sel.wx3d;
+      orbitMode.focalY = sel.wy3d;
+      orbitMode.focalZ = sel.wz3d;
+      orbitMode.focalName = displayName(sel);
+      orbitMode.orbitDist = od;
+      orbitMode.orbitYaw = 0;
+      orbitMode.orbitPitch = 0.3;
+      orbitMode.active = true;
+      orbitMode.focalAnim.active = false;
       cam3d.fov = 60;
-      // Look toward nearest interesting target from this position
-      var bestTarget = null, bestDist = Infinity;
-      for (var lt = 0; lt < cam3dLookTargets.length; lt++) {
-        var tPos = getLookTarget(cam3dLookTargets[lt].key);
-        if (!tPos) continue;
-        var tdx = tPos.x - cam3d.px, tdy = tPos.y - cam3d.py, tdz = tPos.z - cam3d.pz;
-        var tDist = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
-        if (tDist < 0.001) continue;
-        if (tDist < bestDist) { bestDist = tDist; bestTarget = tPos; }
-      }
-      if (bestTarget) {
-        var la = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, bestTarget.x, bestTarget.y, bestTarget.z);
-        cam3d.yaw = la.yaw; cam3d.pitch = la.pitch;
-      } else {
-        cam3d.yaw = 83 * DEG2RAD; cam3d.pitch = -1 * DEG2RAD;
-      }
+      orbitToCamera();
     } else {
       var preset = cam3dPresets.earth;
       cam3d.px = preset.px; cam3d.py = preset.py; cam3d.pz = preset.pz;
