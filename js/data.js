@@ -7,7 +7,7 @@ var ORBIT_CLOSE_KM = 50000;    // 50,000 km — planets and moons
 var ORBIT_FAR_KM = 700000;    // 700,000 km — stars, nebulae, galaxies
 var ORBIT_CLOSE_LY = ORBIT_CLOSE_KM * KM_IN_LY;
 var ORBIT_FAR_LY = ORBIT_FAR_KM * KM_IN_LY;
-var ORBIT_RADIUS_MULT = 3;    // orbit at 3× physRadius for large objects
+var ORBIT_RADIUS_MULT = 5;    // orbit at 5× physRadius — object fills ~1/3 of viewport
 
 function standardOrbitDist(obj) {
   var physR = (obj && obj.physRadius) || 0;

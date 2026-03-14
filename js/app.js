@@ -3367,16 +3367,18 @@ function draw3D(ts) {
 
     ctx.globalAlpha = 1.0;
 
-    // Label
-    pendingLabels.push({
-      name: displayName(obj),
-      dist: obj.dist,
-      x: sp.x,
-      y: sp.y + r3d + 16,
-      sel: state.selected === obj,
-      priority: (state.selected === obj ? 10000 : 0) + obj.radius,
-      alpha: objAlpha
-    });
+    // Label — skip for selected object since cinematic HUD shows it bottom-right
+    if (state.selected !== obj) {
+      pendingLabels.push({
+        name: displayName(obj),
+        dist: obj.dist,
+        x: sp.x,
+        y: sp.y + r3d + 16,
+        sel: false,
+        priority: obj.radius,
+        alpha: objAlpha
+      });
+    }
   }
   drawLabels();
 
@@ -3424,9 +3426,7 @@ function draw3D(ts) {
     ctx.textAlign = 'center';
     ctx.fillStyle = isSolAnchor ? '#ffcc44' : bObj.color;
     ctx.globalAlpha = isSolAnchor ? 0.7 : (isSelected ? 0.8 : 0.5);
-    if (isSolAnchor && !isSelected) {
-      ctx.fillText('Sol', bcx, bcy + half + 14);
-    } else {
+    if (!isSolAnchor || isSelected) {
       ctx.fillText('Apparent size: ' + formatAngularSize(angRad), bcx, bcy + half + 14);
     }
     ctx.restore();
@@ -3435,10 +3435,10 @@ function draw3D(ts) {
   // Light pulse in 3D
   drawLightPulse3D(ts);
 
-  // Draw 3D HUD
-  draw3DHUD(sw, sh);
-
   drawVignette();
+
+  // Draw 3D HUD (after vignette so text isn't darkened)
+  draw3DHUD(sw, sh);
 }
 
 function draw3DHUD(sw, sh) {
@@ -3466,17 +3466,46 @@ function draw3DHUD(sw, sh) {
     }
   }
 
+  // ── Bottom-left info (stack from bottom up) ──
   ctx.font = '11px -apple-system, system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#5a5a7a';
-  ctx.fillText('Viewing from ' + posLabel, 52, sh - 42);
 
-  // FOV indicator (skip in orbit mode — distance is shown top-right)
+  var blY = sh - 10;
+  var lookRA = cam3d.yaw / DEG2RAD;
+  while (lookRA < 0) lookRA += 360;
+  while (lookRA >= 360) lookRA -= 360;
+  var lookDec = cam3d.pitch / DEG2RAD;
+  ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 52, blY);
+  blY -= 16;
+
   if (!orbitMode.active) {
-    ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, sh - 26);
+    ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, blY);
+    blY -= 16;
   }
 
-  // Cinematic selected object display — bottom right
+  ctx.fillText('Viewing from ' + posLabel, 52, blY);
+  blY -= 16;
+
+  // Facing direction
+  var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
+    y: Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw), z: Math.sin(cam3d.pitch) };
+  var bestDot = -1, facingLabel = '';
+  for (var ci = 0; ci < cam3dLookTargets.length; ci++) {
+    var tgt = getLookTarget(cam3dLookTargets[ci].key);
+    if (!tgt) continue;
+    var dx2 = tgt.x - cam3d.px, dy2 = tgt.y - cam3d.py, dz2 = tgt.z - cam3d.pz;
+    var len = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+    if (len < 0.001) continue;
+    var dot = (dx2 * fwd.x + dy2 * fwd.y + dz2 * fwd.z) / len;
+    if (dot > bestDot) { bestDot = dot; facingLabel = cam3dLookTargets[ci].label; }
+  }
+  if (bestDot > 0.85 && facingLabel) {
+    ctx.fillStyle = '#6a6a8a';
+    ctx.fillText('Facing ' + facingLabel, 52, blY);
+  }
+
+  // ── Bottom-right cinematic HUD ──
   if (state.selected && state.selected.wx3d !== undefined) {
     var sdx = cam3d.px - state.selected.wx3d;
     var sdy = cam3d.py - state.selected.wy3d;
@@ -3497,35 +3526,9 @@ function draw3DHUD(sw, sh) {
     ctx.fillText(sdLabel, sw - 24, sh - 20);
     ctx.font = hs.nameFont;
     ctx.fillStyle = hs.nameColor;
-    // Measure distance label height, position name above it
     var distH = parseInt(hs.distFont) || 12;
     ctx.fillText(displayName(state.selected), sw - 24, sh - 20 - distH - 8);
     ctx.restore();
-  }
-
-  // Look direction in RA/Dec
-  var lookRA = cam3d.yaw / DEG2RAD;
-  while (lookRA < 0) lookRA += 360;
-  while (lookRA >= 360) lookRA -= 360;
-  var lookDec = cam3d.pitch / DEG2RAD;
-  ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 52, sh - 10);
-
-  // Find what we're facing — check constellation centroids and bright stars
-  var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
-    y: Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw), z: Math.sin(cam3d.pitch) };
-  var bestDot = -1, facingLabel = '';
-  for (var ci = 0; ci < cam3dLookTargets.length; ci++) {
-    var tgt = getLookTarget(cam3dLookTargets[ci].key);
-    if (!tgt) continue;
-    var dx2 = tgt.x - cam3d.px, dy2 = tgt.y - cam3d.py, dz2 = tgt.z - cam3d.pz;
-    var len = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
-    if (len < 0.001) continue;
-    var dot = (dx2 * fwd.x + dy2 * fwd.y + dz2 * fwd.z) / len;
-    if (dot > bestDot) { bestDot = dot; facingLabel = cam3dLookTargets[ci].label; }
-  }
-  if (bestDot > 0.85 && facingLabel) {
-    ctx.fillStyle = '#6a6a8a';
-    ctx.fillText('Facing ' + facingLabel, 52, sh - 58);
   }
 
   // Mode label
