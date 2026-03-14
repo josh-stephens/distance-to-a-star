@@ -5244,7 +5244,7 @@ canvas.addEventListener('dblclick', function(e) {
       state.selected = hit;
       saveSelectedObject(hit.name);
       showInfo(hit);
-      // Fly to standard 50k km orbit around this object
+      // Fly to standard orbit around this object
       var surfR = hit.physRadius || 0;
       var orbD = Math.max(STANDARD_ORBIT_LY, surfR * ORBIT_RADIUS_MULT);
       var fx = hit.wx3d, fy = hit.wy3d, fz = hit.wz3d;
@@ -5432,7 +5432,7 @@ function navigateToObject3D(objName) {
 
   var fx = obj.wx3d, fy = obj.wy3d, fz = obj.wz3d;
 
-  // Standard 50,000 km orbit altitude above the surface
+  // Standard orbit: max(700k km, 3× physRadius)
   var surfaceR = obj.physRadius || 0;
   var orbDist = Math.max(STANDARD_ORBIT_LY, surfaceR * ORBIT_RADIUS_MULT);
 
@@ -5688,9 +5688,22 @@ function animateOrbitFocal(tx, ty, tz, tname) {
 }
 
 function lookAtTarget(targetKey, duration) {
-  if (orbitMode.active) orbitMode.active = false;
   var pos = getLookTarget(targetKey);
+  if (!pos) {
+    // Try resolving as an object name directly
+    for (var li = 0; li < objects.length; li++) {
+      if (objects[li].name === targetKey && objects[li].wx3d !== undefined) {
+        pos = { x: objects[li].wx3d, y: objects[li].wy3d, z: objects[li].wz3d };
+        break;
+      }
+    }
+  }
   if (!pos) return;
+
+  if (orbitMode.active) {
+    // In orbit mode: exit orbit, rotate to face target from current position
+    orbitMode.active = false;
+  }
   var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, pos.x, pos.y, pos.z);
   cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
@@ -5758,26 +5771,50 @@ function toggle3D() {
 }
 
 function flyCamera(presetName, duration, lookTarget) {
-  if (orbitMode.active) orbitMode.active = false;
   var preset = cam3dPresets[presetName];
   if (!preset) return;
-  var toYaw = preset.yaw, toPitch = preset.pitch;
-  // If a look target is specified, compute angles from the destination
+
+  // Compute orbit position around the viewpoint object
+  var fx = preset.px, fy = preset.py, fz = preset.pz;
+  var physR = preset.physRadius || 0;
+  var orbDist = Math.max(STANDARD_ORBIT_LY, physR * ORBIT_RADIUS_MULT);
+
+  var toX = fx + orbDist, toY = fy, toZ = fz;
+  var toYaw, toPitch;
+
+  // If a look target is specified, compute angles from the orbit position
   if (lookTarget) {
     var pos = getLookTarget(lookTarget);
     if (pos) {
-      var angles = computeLookAngles(preset.px, preset.py, preset.pz, pos.x, pos.y, pos.z);
+      var angles = computeLookAngles(toX, toY, toZ, pos.x, pos.y, pos.z);
       toYaw = angles.yaw;
       toPitch = angles.pitch;
+    } else {
+      var la = computeLookAngles(toX, toY, toZ, fx, fy, fz);
+      toYaw = la.yaw; toPitch = la.pitch;
     }
+  } else {
+    // Look at the object we're orbiting
+    var la = computeLookAngles(toX, toY, toZ, fx, fy, fz);
+    toYaw = la.yaw; toPitch = la.pitch;
   }
+
   cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
-  cam3dAnim.to = { px: preset.px, py: preset.py, pz: preset.pz,
+  cam3dAnim.to = { px: toX, py: toY, pz: toZ,
     yaw: toYaw, pitch: toPitch, fov: preset.fov };
   cam3dAnim.duration = (duration || 2000) / tourEngine.transitionSpeed;
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
+
+  // Enter orbit mode around the viewpoint
+  orbitMode.focalX = fx; orbitMode.focalY = fy; orbitMode.focalZ = fz;
+  orbitMode.focalName = preset.label || presetName;
+  orbitMode.orbitDist = orbDist;
+  orbitMode.orbitYaw = 0;
+  orbitMode.orbitPitch = 0;
+  orbitMode.active = true;
+  orbitMode.focalAnim.active = false;
   state.dirty = true;
 }
 
