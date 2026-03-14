@@ -44,22 +44,26 @@ var orbitMode = {
 
 var hudStyle = 'cinematic';
 var hudStyles = {
-  cinematic: { nameFont: '600 22px -apple-system, system-ui, sans-serif',
+  cinematic: { nameFont: '600 88px -apple-system, system-ui, sans-serif',
                nameColor: 'rgba(200, 210, 230, 0.85)',
                distFont: '12px SF Mono, Menlo, monospace',
                distColor: 'rgba(140, 170, 140, 0.7)' },
-  minimal: { nameFont: '300 16px -apple-system, system-ui, sans-serif',
+  minimal: { nameFont: '300 64px -apple-system, system-ui, sans-serif',
              nameColor: 'rgba(180, 190, 200, 0.5)',
              distFont: '10px SF Mono, Menlo, monospace',
              distColor: 'rgba(120, 140, 120, 0.4)' },
-  bold: { nameFont: '800 28px -apple-system, system-ui, sans-serif',
+  bold: { nameFont: '800 112px -apple-system, system-ui, sans-serif',
           nameColor: 'rgba(255, 255, 255, 0.95)',
           distFont: '14px SF Mono, Menlo, monospace',
           distColor: 'rgba(100, 200, 255, 0.8)' },
-  retro: { nameFont: '14px SF Mono, Menlo, Courier, monospace',
+  retro: { nameFont: '56px SF Mono, Menlo, Courier, monospace',
            nameColor: 'rgba(0, 255, 100, 0.8)',
            distFont: '12px SF Mono, Menlo, Courier, monospace',
-           distColor: 'rgba(0, 200, 80, 0.6)' }
+           distColor: 'rgba(0, 200, 80, 0.6)' },
+  'retro-sm': { nameFont: '14px SF Mono, Menlo, Courier, monospace',
+                nameColor: 'rgba(0, 255, 100, 0.8)',
+                distFont: '12px SF Mono, Menlo, Courier, monospace',
+                distColor: 'rgba(0, 200, 80, 0.6)' }
 };
 
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
@@ -3479,12 +3483,14 @@ function draw3DHUD(sw, sh) {
     var hs = hudStyles[hudStyle] || hudStyles.cinematic;
     ctx.save();
     ctx.textAlign = 'right';
-    ctx.font = hs.nameFont;
-    ctx.fillStyle = hs.nameColor;
-    ctx.fillText(displayName(state.selected), sw - 20, sh - 38);
     ctx.font = hs.distFont;
     ctx.fillStyle = hs.distColor;
-    ctx.fillText(sdLabel, sw - 20, sh - 20);
+    ctx.fillText(sdLabel, sw - 24, sh - 20);
+    ctx.font = hs.nameFont;
+    ctx.fillStyle = hs.nameColor;
+    // Measure distance label height, position name above it
+    var distH = parseInt(hs.distFont) || 12;
+    ctx.fillText(displayName(state.selected), sw - 24, sh - 20 - distH - 8);
     ctx.restore();
   }
 
@@ -4144,7 +4150,8 @@ var tourEngine = {
         var vpObj = this.resolveTarget(wp.sky3d.viewFrom);
         if (vpObj) {
           cam3dPresets[vpKey] = { px: vpObj.wx3d, py: vpObj.wy3d, pz: vpObj.wz3d,
-            yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vpObj.name };
+            yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vpObj.name,
+            physRadius: vpObj.physRadius || 0 };
         }
       }
       var lookKey = wp.sky3d.lookAt || null;
@@ -4187,9 +4194,10 @@ var tourEngine = {
               var uxR = ryR * fwZ - rzR * fwY;
               var uyR = rzR * fwX - rxR * fwZ;
               var uzR = rxR * fwY - ryR * fwX;
-              // 50k km orbit with slight offset to frame constellation as main focus
+              // 50k km orbit above viewpoint object's surface, slight offset to frame constellation
               // rxR/ryR is actually LEFT in this coord system, so negate for rightward offset
-              var back = STANDARD_ORBIT_LY;
+              var vpPhysR = vpPreset.physRadius || 0;
+              var back = vpPhysR + STANDARD_ORBIT_LY;
               var side = STANDARD_ORBIT_LY * 0.15;
               var up = STANDARD_ORBIT_LY * 0.1;
               var camX = vx - fwX * back - rxR * side + uxR * up;
@@ -4203,7 +4211,7 @@ var tourEngine = {
               cam3dAnim.duration = 1500 / self.transitionSpeed;
               cam3dAnim.startTime = performance.now();
               cam3dAnim.active = true;
-              // Enter orbit mode around the viewFrom star
+              // Enter orbit mode around the viewFrom object (star, planet, etc.)
               var orbDx = camX - vx, orbDy = camY - vy, orbDz = camZ - vz;
               var orbDist = Math.sqrt(orbDx * orbDx + orbDy * orbDy + orbDz * orbDz);
               orbitMode.focalX = vx; orbitMode.focalY = vy; orbitMode.focalZ = vz;
@@ -4822,7 +4830,7 @@ function buildEffectsPanel() {
   styleLabel.textContent = 'HUD Style';
   var styleSelect = document.createElement('select');
   styleSelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
-  var styleNames = { cinematic: 'Cinematic', minimal: 'Minimal', bold: 'Bold', retro: 'Retro' };
+  var styleNames = { cinematic: 'Cinematic', minimal: 'Minimal', bold: 'Bold', retro: 'Retro', 'retro-sm': 'Retro Small' };
   Object.keys(styleNames).forEach(function(key) {
     var opt = document.createElement('option');
     opt.value = key;
