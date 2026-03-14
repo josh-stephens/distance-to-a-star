@@ -3231,10 +3231,37 @@ function draw3D(ts) {
       drawGalaxy3D(sp.x, sp.y, r3d, obj.color, objAlpha);
     }
 
-    // Draw glow
+    // Directional lighting — offset glow toward the sun
+    var lightOffX = 0, lightOffY = 0;
+    if (obj.wx3d !== undefined && obj.name !== 'Sun (You Are Here)') {
+      // Light direction: from object toward Sun (0,0,0)
+      var lx = -obj.wx3d, ly = -obj.wy3d, lz = -obj.wz3d;
+      var ll = Math.sqrt(lx * lx + ly * ly + lz * lz);
+      if (ll > 0.001) {
+        lx /= ll; ly /= ll; lz /= ll;
+        // Project light direction to screen space
+        var fwdX = Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw);
+        var fwdY = Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw);
+        var fwdZ = Math.sin(cam3d.pitch);
+        var rightX = -Math.sin(cam3d.yaw), rightY = Math.cos(cam3d.yaw);
+        var upX = -Math.sin(cam3d.pitch) * Math.cos(cam3d.yaw);
+        var upY = -Math.sin(cam3d.pitch) * Math.sin(cam3d.yaw);
+        var upZ = Math.cos(cam3d.pitch);
+        var screenLX = lx * rightX + ly * rightY;
+        var screenLY = -(lx * upX + ly * upY + lz * upZ);
+        var sll = Math.sqrt(screenLX * screenLX + screenLY * screenLY);
+        if (sll > 0.01) {
+          screenLX /= sll; screenLY /= sll;
+          lightOffX = screenLX * r3d * 0.6;
+          lightOffY = screenLY * r3d * 0.6;
+        }
+      }
+    }
+
+    // Draw glow (offset toward light source)
     var gi = effects.glowIntensity;
     var glowR = r3d * 3 * gi;
-    var g = ctx.createRadialGradient(sp.x, sp.y, r3d * 0.3, sp.x, sp.y, glowR);
+    var g = ctx.createRadialGradient(sp.x + lightOffX, sp.y + lightOffY, r3d * 0.3, sp.x, sp.y, glowR);
     g.addColorStop(0, obj.glow);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
@@ -3391,10 +3418,10 @@ function draw3DHUD(sw, sh) {
     var sdy = cam3d.py - state.selected.wy3d;
     var sdz = cam3d.pz - state.selected.wz3d;
     var selDist = Math.sqrt(sdx * sdx + sdy * sdy + sdz * sdz);
-    var sdAU = selDist * AU_IN_LY;
+    var sdAU = selDist / AU_IN_LY;
     var sdLabel;
     if (sdAU < 0.01) sdLabel = (sdAU * 1.496e8).toFixed(0) + ' km';
-    else if (selDist < 0.001) sdLabel = sdAU.toFixed(2) + ' AU';
+    else if (selDist < 0.001) sdLabel = sdAU.toFixed(1) + ' AU';
     else if (selDist < 1000) sdLabel = selDist.toFixed(2) + ' ly';
     else if (selDist < 1e6) sdLabel = (selDist / 1000).toFixed(1) + ' kly';
     else sdLabel = (selDist / 1e6).toFixed(1) + ' Mly';
@@ -3436,9 +3463,9 @@ function draw3DHUD(sw, sh) {
   if (orbitMode.active) {
     var od = orbitMode.orbitDist;
     var odLabel;
-    var odAU = od * AU_IN_LY;
+    var odAU = od / AU_IN_LY;
     if (odAU < 0.01) odLabel = (odAU * 1.496e8).toFixed(0) + ' km';
-    else if (od < 0.001) odLabel = odAU.toFixed(2) + ' AU';
+    else if (od < 0.001) odLabel = odAU.toFixed(1) + ' AU';
     else if (od < 1000) odLabel = od.toFixed(2) + ' ly';
     else if (od < 1e6) odLabel = (od / 1000).toFixed(1) + ' kly';
     else odLabel = (od / 1e6).toFixed(1) + ' Mly';
@@ -3914,7 +3941,7 @@ var tourEngine = {
 
   start: function(id) {
     dismissWelcome();
-    if (orbitMode.active) orbitMode.active = false;
+    orbitMode.active = false;
     if (this.active) this.stop();
     if (!tourDefs[id]) return;
     this.active = true;
@@ -4080,7 +4107,50 @@ var tourEngine = {
       self.transitTimeout = setTimeout(function() {
         self.transitTimeout = null;
         if (!self.active) return;
-        flyCamera(vpKey, 1500, lookKey);
+
+        // Third-person camera: place camera behind the star, looking past it
+        var vpPreset = cam3dPresets[vpKey];
+        if (vpPreset && lookKey) {
+          var lookPos = getLookTarget(lookKey);
+          if (lookPos) {
+            var vx = vpPreset.px, vy = vpPreset.py, vz = vpPreset.pz;
+            var ldx = lookPos.x - vx, ldy = lookPos.y - vy, ldz = lookPos.z - vz;
+            var llen = Math.sqrt(ldx * ldx + ldy * ldy + ldz * ldz);
+            if (llen > 0.001) {
+              ldx /= llen; ldy /= llen; ldz /= llen;
+              // Offset: place camera behind the star relative to look target
+              var vpDist = Math.sqrt(vx * vx + vy * vy + vz * vz);
+              var offset = Math.max(0.5, Math.min(50, vpDist * 0.003));
+              var camX = vx - ldx * offset;
+              var camY = vy - ldy * offset;
+              var camZ = vz - ldz * offset;
+              var la = computeLookAngles(camX, camY, camZ, lookPos.x, lookPos.y, lookPos.z);
+              cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+                yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+              cam3dAnim.to = { px: camX, py: camY, pz: camZ,
+                yaw: la.yaw, pitch: la.pitch, fov: 60 };
+              cam3dAnim.duration = 1500 / self.transitionSpeed;
+              cam3dAnim.startTime = performance.now();
+              cam3dAnim.active = true;
+              // Enter orbit mode around the viewFrom star
+              orbitMode.focalX = vx; orbitMode.focalY = vy; orbitMode.focalZ = vz;
+              orbitMode.focalName = vpPreset.label || vpKey;
+              orbitMode.orbitDist = offset;
+              orbitMode.orbitYaw = Math.atan2(camY - vy, camX - vx);
+              orbitMode.orbitPitch = Math.atan2(camZ - vz, Math.sqrt((camX - vx) * (camX - vx) + (camY - vy) * (camY - vy)));
+              orbitMode.active = true;
+              orbitMode.focalAnim.active = false;
+              state.dirty = true;
+            } else {
+              flyCamera(vpKey, 1500, lookKey);
+            }
+          } else {
+            flyCamera(vpKey, 1500, lookKey);
+          }
+        } else {
+          flyCamera(vpKey, 1500, lookKey);
+        }
+
         setTimeout(function() {
           if (!self.active) return;
           self.showNarration(wp);
