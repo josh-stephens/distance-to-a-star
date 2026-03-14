@@ -50,14 +50,38 @@
   .cam3d-presets .cam-preset-btn {
     padding: 4px 10px; border: 1px solid #2a2a44; background: #14142a;
     color: #8888aa; border-radius: 4px; font-size: 10px; cursor: pointer;
-    transition: all 0.2s; white-space: nowrap;
+    transition: all 0.2s; white-space: nowrap; position: relative;
   }
   .cam3d-presets .cam-preset-btn:hover { background: #1e1e38; color: #bbbbdd; }
+  .cam3d-presets .cam-preset-btn .slot-edit {
+    position: absolute; top: -1px; right: -1px; width: 10px; height: 10px;
+    border-left: 1px solid #3a3a55; border-bottom: 1px solid #3a3a55;
+    border-radius: 0 3px 0 3px; background: #1a1a33; opacity: 0;
+    transition: opacity 0.2s; font-size: 7px; line-height: 10px; text-align: center;
+    color: #6a6a8a;
+  }
+  .cam3d-presets .cam-preset-btn:hover .slot-edit { opacity: 1; }
   .cam3d-presets .cam-look-btn { border-color: #2a3a44; }
   .cam3d-presets .cam-look-btn:hover { background: #162a38; color: #aaddee; }
   .cam3d-presets .cam-label { font-size: 10px; color: #5a5a7a; }
   .cam3d-presets .cam-sep { color: #2a2a44; font-size: 14px; margin: 0 2px; }
   .cam3d-presets { flex-wrap: wrap; }
+  .cam-slot-dropdown {
+    position: absolute; top: 100%; left: 0; z-index: 100;
+    background: #12122a; border: 1px solid #2a2a55; border-radius: 4px;
+    min-width: 180px; max-height: 200px; overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-top: 2px;
+  }
+  .cam-slot-dropdown input {
+    width: 100%; padding: 5px 8px; border: none; border-bottom: 1px solid #2a2a44;
+    background: #0a0a1c; color: #ccccdd; font-size: 11px; outline: none;
+    box-sizing: border-box;
+  }
+  .cam-slot-dropdown .slot-option {
+    padding: 4px 8px; font-size: 10px; color: #8888aa; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cam-slot-dropdown .slot-option:hover { background: #1e1e3a; color: #ccccee; }
   .tour-menu-wrap { position: relative; margin-left: auto; }
   .tour-btn {
     padding: 5px 14px; border: 1px solid #3a4a2a; background: #1a2a16;
@@ -1152,6 +1176,7 @@ var tourDefs = {
     desc: "Earth to the Great Attractor and back",
     steps: [
       { vr: 0.00004, title: "This Is Home", body: "Earth orbits the Sun at 1 AU -- about 8 light-minutes away. A beam of sunlight you see right now left the Sun before you started reading this sentence. This tiny gap is where we begin.", scale: "~2.5 AU across", dwell: 10000 },
+      { sky3d: { viewFrom: "Moon", lookAt: "earth" }, title: "From the Moon", body: "Step onto the Moon and look back. Earth hangs in the sky, spanning about 2 degrees \u2014 four times the size of the Moon as seen from Earth. Every human who has ever lived, every civilization, every war and wonder, is on that blue marble. Only 24 people have ever seen this view.", scale: "384,400 km away", dwell: 14000 },
       { vr: 3, title: "The Sun's Domain", body: "Zoom out 75,000x. The Oort Cloud marks the outermost reach of the Sun's gravity -- a shell of icy bodies extending ~1.6 light-years out. Beyond this boundary, we belong to the galaxy. Voyager 1, launched in 1977, won't reach the Oort Cloud for another 300 years.", scale: "~6 ly across  |  75,000x wider", dwell: 12000 },
       { vr: 18, target: "Sirius", title: "The Nearest Stars", body: "Proxima Centauri, the closest star, is 4.24 light-years away -- at Voyager 1's speed, a 73,000-year journey. Sirius, the brightest star in our sky, is 8.6 ly out. Notice: most of our neighbors are dim red dwarfs, invisible to the naked eye.", scale: "~36 ly across  |  6x wider", dwell: 12000 },
       { vr: 90000, title: "The Milky Way", body: "Zoom out 5,000x. Our stellar neighborhood is an invisible speck in the Orion Arm. The galactic center lies 26,000 light-years away, harboring Sagittarius A* -- a black hole 4 million times the Sun's mass. The full disk spans 105,000 light-years.", scale: "~180,000 ly across  |  5,000x wider", dwell: 12000 },
@@ -1226,13 +1251,16 @@ var tourDefs = {
     desc: "Flat patterns from a 3D universe",
     steps: [
       { vr: 600, title: "Patterns in the Sky", body: "Constellations are the oldest maps. For millennia, humans connected stars into pictures \u2014 hunters, animals, gods. But these patterns are illusions of perspective. Stars that appear side by side can be separated by hundreds of light-years in depth. Let's visit each constellation and see how deep the illusion goes.", scale: "Constellation scale", dwell: 12000 },
+      { sky3d: { viewFrom: "earth", lookAt: "orion" }, title: "Orion from Earth", body: "Switch to 3D sky view. This is Orion as you see it on a clear night \u2014 the Hunter's familiar shape traced across the sky. From here, the stars look flat, as if painted on a dome. But this is an illusion of perspective.", scale: "3D Sky View", dwell: 12000 },
       { vr: 350, target: "Betelgeuse", title: "Orion \u2014 The Hunter", body: "Orion's bright stars span a 10x range in distance: Bellatrix at 250 ly, Betelgeuse at 700 ly, Rigel at 863 ly, and the belt stars at 1,200\u20132,000 ly. The 'aligned' belt is pure coincidence \u2014 Alnilam (center) is twice as far as its companions. From another star system, Orion would be unrecognizable.", scale: "700 ly from Earth", dwell: 14000 },
       { vr: 450, target: "Rigel", title: "Orion's Depth", body: "Zoom past Betelgeuse to Rigel, Orion's blue foot at 863 ly. Despite being farther, Rigel blazes at 120,000 times the Sun's luminosity. Beyond Rigel, the belt stars continue to 1,200+ ly. Orion is not a structure \u2014 it's a corridor of unrelated stars stretching 1,800 light-years deep.", scale: "863 ly from Earth", dwell: 12000 },
       { vr: 550, target: "Betelgeuse", title: "Orion from TRAPPIST-1", body: "Now travel 39 light-years to the TRAPPIST-1 system and look back at Orion. Watch what happens. Bellatrix, the Hunter's nearest bright star at just 250 light-years, lurches sideways \u2014 shifting 9 degrees. But the distant belt at 1,200\u20132,000 light-years barely flickers. The proud symmetry of the Hunter dissolves. One shoulder flings wide while the other holds fast. A TRAPPIST-1 astronomer might trace these warped stars and see not a hunter but a great wing, sweeping across an alien sky.", scale: "View from 39 ly away", dwell: 18000, parallax: { constellation: "orion", shiftK: 28000, shiftAngle: 0, delay: 2500, duration: 4000, label: "FROM TRAPPIST-1 \u2022 39 ly" } },
+      { sky3d: { viewFrom: "trappist", lookAt: "orion" }, title: "Orion from TRAPPIST-1 (3D)", body: "Now see it in 3D sky view from TRAPPIST-1. The constellation lines are still drawn, but notice how the shape has warped \u2014 Bellatrix has shifted dramatically while the distant belt stars barely moved. This is real geometric parallax, not simulation.", scale: "3D Sky View from 39 ly", dwell: 14000 },
       { vr: 300, target: "Antares", title: "Scorpius \u2014 The Scorpion", body: "The red heart of Scorpius, Antares at 550 ly, anchors a sinuous chain. But nearby Sargas (300 ly) and distant Shaula (570 ly) reveal the constellation's depth. The Scorpion's body twists through space, with stars scattered across a 300 light-year range.", scale: "550 ly from Earth", dwell: 12000 },
       { vr: 250, target: "Dubhe", title: "Big Dipper \u2014 A Moving Group", body: "Five of the Big Dipper's seven stars are part of the Ursa Major Moving Group \u2014 born from the same gas cloud, traveling through space together at ~54\u201379 ly. But Dubhe (124 ly) and Alkaid (104 ly) are outsiders, drifting away. In 50,000 years, the Dipper will be unrecognizable as these two orphan stars diverge.", scale: "124 ly from Earth", dwell: 14000 },
       { vr: 200, target: "Gacrux", title: "Southern Cross \u2014 The Nearby Outsider", body: "Gacrux, the red star at the top of the Cross, is just 88 ly away \u2014 less than a third the distance of the other three main stars (280\u2013321 ly). Its warm orange color against their blue-white betrays its different nature and distance. Used for navigation across the Southern Hemisphere for centuries.", scale: "88 ly from Earth", dwell: 12000 },
       { vr: 300, target: "Gamma Cassiopeiae", title: "Cassiopeia \u2014 The W's Depth", body: "Cassiopeia's five W-shaped stars span a 10x range: Caph at just 54 ly, and Gamma Cas at 550 ly. The nearest and farthest stars of this small constellation are separated by the same distance as Earth to the Orion Nebula. What looks like five stars on a flat surface is really a tunnel half a thousand light-years deep.", scale: "550 ly from Earth", dwell: 14000 },
+      { sky3d: { viewFrom: "earth", lookAt: "cassiopeia" }, title: "Cassiopeia from Earth", body: "Return to Earth's sky and find Cassiopeia's W. Five stars that look evenly spaced \u2014 but Caph is only 54 light-years away while Gamma Cas is 550. A tunnel 500 light-years deep that looks like a flat letter.", scale: "3D Sky View", dwell: 12000 },
       { vr: 600, title: "Accidents of Perspective", body: "Every constellation tells the same story: patterns that feel fixed and eternal are really snapshots of stars at wildly different distances, each moving through the galaxy on its own trajectory. In a few hundred thousand years, every constellation will dissolve. Future civilizations will connect different stars into different pictures, and wonder if they, too, are permanent.", scale: "Constellation scale", dwell: 12000 }
     ]
   },
@@ -4380,61 +4408,46 @@ function draw3D(ts) {
   }
   drawLabels();
 
-  // Draw apparent size brackets for objects with physical radii
+  // Draw apparent size brackets — only on selected or hovered object
   for (var bi = 0; bi < visible.length; bi++) {
     var bObj = visible[bi];
     if (!bObj.physRadius || !bObj._sp3d) continue;
+    var isSelected = state.selected === bObj;
+    var isHovered = state.hoverObj === bObj;
+    if (!isSelected && !isHovered) continue;
     var bSp = bObj._sp3d;
-    // Angular diameter = 2 * arctan(physRadius / distance)
     var angRad = 2 * Math.atan(bObj.physRadius / bSp.depth);
-    // Only show if angular size >= 0.5 arcsecond and has meaningful screen extent
-    if (angRad < 0.5 / 3600 * DEG2RAD) continue;
-    // Convert angular size to screen pixels
-    var focalLen = 1 / Math.tan(cam3d.fov * DEG2RAD / 2);
-    var halfW = sw / 2;
-    var angPx = angRad * focalLen * halfW;
-    // Only draw brackets if they'd be at least 12px and at most 600px
-    if (angPx < 12 || angPx > 600) continue;
+    if (angRad < 0.1 / 3600 * DEG2RAD) continue;
+    var focalLen3 = 1 / Math.tan(cam3d.fov * DEG2RAD / 2);
+    var halfW3 = sw / 2;
+    var angPx = angRad * focalLen3 * halfW3;
+    if (angPx < 8 || angPx > 800) continue;
     var half = angPx / 2;
-    var cx = bSp.x, cy = bSp.y;
-    var corner = Math.min(half * 0.3, 12);
+    var bcx = bSp.x, bcy = bSp.y;
+    var corner = Math.min(half * 0.3, 14);
     ctx.save();
     ctx.strokeStyle = bObj.color;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1;
+    ctx.globalAlpha = isSelected ? 0.7 : 0.4;
+    ctx.lineWidth = isSelected ? 1.5 : 1;
+    ctx.setLineDash([]);
     // Four L-shaped corner brackets
-    // Top-left
     ctx.beginPath();
-    ctx.moveTo(cx - half, cy - half + corner);
-    ctx.lineTo(cx - half, cy - half);
-    ctx.lineTo(cx - half + corner, cy - half);
+    ctx.moveTo(bcx - half, bcy - half + corner); ctx.lineTo(bcx - half, bcy - half); ctx.lineTo(bcx - half + corner, bcy - half);
+    ctx.moveTo(bcx + half - corner, bcy - half); ctx.lineTo(bcx + half, bcy - half); ctx.lineTo(bcx + half, bcy - half + corner);
+    ctx.moveTo(bcx - half, bcy + half - corner); ctx.lineTo(bcx - half, bcy + half); ctx.lineTo(bcx - half + corner, bcy + half);
+    ctx.moveTo(bcx + half - corner, bcy + half); ctx.lineTo(bcx + half, bcy + half); ctx.lineTo(bcx + half, bcy + half - corner);
     ctx.stroke();
-    // Top-right
-    ctx.beginPath();
-    ctx.moveTo(cx + half - corner, cy - half);
-    ctx.lineTo(cx + half, cy - half);
-    ctx.lineTo(cx + half, cy - half + corner);
-    ctx.stroke();
-    // Bottom-left
-    ctx.beginPath();
-    ctx.moveTo(cx - half, cy + half - corner);
-    ctx.lineTo(cx - half, cy + half);
-    ctx.lineTo(cx - half + corner, cy + half);
-    ctx.stroke();
-    // Bottom-right
-    ctx.beginPath();
-    ctx.moveTo(cx + half - corner, cy + half);
-    ctx.lineTo(cx + half, cy + half);
-    ctx.lineTo(cx + half, cy + half - corner);
-    ctx.stroke();
-    // Angular size label below brackets
-    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    // Label
+    ctx.font = '10px -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = bObj.color;
-    ctx.globalAlpha = 0.6;
-    ctx.fillText(formatAngularSize(angRad), cx, cy + half + 12);
+    ctx.globalAlpha = isSelected ? 0.8 : 0.5;
+    ctx.fillText('Apparent size: ' + formatAngularSize(angRad), bcx, bcy + half + 14);
     ctx.restore();
   }
+
+  // Light pulse in 3D
+  drawLightPulse3D(ts);
 
   // Draw 3D HUD
   draw3DHUD(sw, sh);
@@ -4601,6 +4614,19 @@ var lightPulse = {
 function startLightPulse(obj) {
   if (!obj || obj.dist <= 0) return;
 
+  // In 3D mode, skip zoom-to-fit (camera handles it)
+  if (state.mode3d) {
+    lightPulse.active = true;
+    lightPulse.targetObj = obj;
+    lightPulse.startTime = performance.now() + 200;
+    lightPulse.travelTimeLy = obj.dist;
+    lightPulse.arrived = false;
+    var logD = Math.log10(Math.max(obj.dist, 0.0001));
+    lightPulse.duration = Math.max(3000, Math.min(8000, 3000 + logD * 600));
+    state.dirty = true;
+    return;
+  }
+
   // Zoom to a level where both Sun and target are visible on screen
   var vr = getViewRadius();
   var neededVR = obj.dist * 1.5;
@@ -4719,6 +4745,102 @@ function drawLightPulse(ts) {
   }
 
   // Auto-stop after arrival + 2s
+  if (progress >= 1 && elapsed > lightPulse.duration + 2000) {
+    lightPulse.active = false;
+  }
+
+  ctx.restore();
+  state.dirty = true;
+}
+
+function drawLightPulse3D(ts) {
+  if (!lightPulse.active) return;
+  var elapsed = ts - lightPulse.startTime;
+  var progress = Math.min(1, elapsed / lightPulse.duration);
+  var obj = lightPulse.targetObj;
+  if (!obj) { lightPulse.active = false; return; }
+
+  // Project Sun (origin) and target
+  var sunSp = worldToScreen3D(0, 0, 0);
+  var objSp = worldToScreen3D(obj.wx3d, obj.wy3d, obj.wz3d);
+
+  var ease = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+  // Interpolate pulse position in 3D world space, then project
+  var pw = {
+    x: (1 - ease) * 0 + ease * obj.wx3d,
+    y: (1 - ease) * 0 + ease * obj.wy3d,
+    z: (1 - ease) * 0 + ease * obj.wz3d
+  };
+  var pulseSp = worldToScreen3D(pw.x, pw.y, pw.z);
+
+  ctx.save();
+
+  // Draw trail from Sun to pulse if both visible
+  if (sunSp && pulseSp) {
+    var trailGrad = ctx.createLinearGradient(sunSp.x, sunSp.y, pulseSp.x, pulseSp.y);
+    trailGrad.addColorStop(0, 'rgba(255, 221, 68, 0)');
+    trailGrad.addColorStop(Math.max(0, ease - 0.3), 'rgba(255, 221, 68, 0.05)');
+    trailGrad.addColorStop(1, 'rgba(255, 221, 68, 0.2)');
+    ctx.strokeStyle = trailGrad;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sunSp.x, sunSp.y);
+    ctx.lineTo(pulseSp.x, pulseSp.y);
+    ctx.stroke();
+  }
+
+  // Draw pulse dot
+  if (pulseSp) {
+    var pulseR = 4 + Math.sin(elapsed * 0.008) * 1.5;
+    var pg = ctx.createRadialGradient(pulseSp.x, pulseSp.y, 0, pulseSp.x, pulseSp.y, pulseR * 3);
+    pg.addColorStop(0, 'rgba(255, 238, 100, 0.9)');
+    pg.addColorStop(0.3, 'rgba(255, 221, 68, 0.4)');
+    pg.addColorStop(1, 'rgba(255, 221, 68, 0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.arc(pulseSp.x, pulseSp.y, pulseR * 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffee66';
+    ctx.beginPath();
+    ctx.arc(pulseSp.x, pulseSp.y, pulseR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Info box
+  var sw = W / devicePixelRatio;
+  var travelYears = lightPulse.travelTimeLy * ease;
+  var timeStr = formatLightTravelElapsed(travelYears);
+  var labelText = 'Light travel time to ' + obj.name;
+  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  var timeW = ctx.measureText(timeStr).width;
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  var nameW = ctx.measureText(labelText).width;
+  var boxW = Math.max(timeW, nameW) + 24;
+  var boxH = 36;
+  var boxX = sw / 2 - boxW / 2;
+  var boxY = 52;
+  ctx.fillStyle = 'rgba(10, 10, 18, 0.85)';
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 221, 68, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+  ctx.stroke();
+  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffdd44';
+  ctx.fillText(timeStr, sw / 2, boxY + 15);
+  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = '#8888aa';
+  ctx.fillText(labelText, sw / 2, boxY + 29);
+
+  // Arrival
+  if (progress >= 1 && !lightPulse.arrived) {
+    lightPulse.arrived = true;
+  }
   if (progress >= 1 && elapsed > lightPulse.duration + 2000) {
     lightPulse.active = false;
   }
@@ -4886,6 +5008,7 @@ var tourEngine = {
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     var tf = document.getElementById('tour-timer-fill'); tf.style.width = '0%'; tf.classList.remove('sparking');
     resetParallax();
+    if (state.mode3d) toggle3D();
     state.warpIntensity = 0;
     var tourBtn = document.getElementById('tour-btn');
     tourBtn.textContent = 'Tours \u25be';
@@ -4984,6 +5107,62 @@ var tourEngine = {
     var wp = steps[this.stepIndex];
     var narrationEl = document.getElementById('narration');
     narrationEl.classList.remove('visible');
+
+    // Handle 3D sky view steps
+    if (wp.sky3d) {
+      var self = this;
+      // Switch to 3D mode if not already
+      if (!state.mode3d) toggle3D();
+      // Fly to viewpoint
+      var vpKey = wp.sky3d.viewFrom || 'earth';
+      if (!cam3dPresets[vpKey]) {
+        // Dynamic viewpoint from object name
+        var vpObj = this.resolveTarget(wp.sky3d.viewFrom);
+        if (vpObj) {
+          cam3dPresets[vpKey] = { px: vpObj.wx3d, py: vpObj.wy3d, pz: vpObj.wz3d,
+            yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: vpObj.name };
+        }
+      }
+      var lookKey = wp.sky3d.lookAt || null;
+      // Ensure look target exists
+      if (lookKey && lookKey.indexOf(':') < 0) {
+        var ltExists = false;
+        for (var lti = 0; lti < cam3dLookTargets.length; lti++) {
+          if (cam3dLookTargets[lti].key === lookKey) { ltExists = true; break; }
+        }
+        if (!ltExists) {
+          // Try as object name
+          var ltObj = this.resolveTarget(lookKey);
+          if (ltObj) {
+            cam3dLookTargets.push({ key: lookKey, label: ltObj.name, type: 'object', obj: ltObj.name });
+          }
+        }
+      }
+
+      self.transitTimeout = setTimeout(function() {
+        self.transitTimeout = null;
+        if (!self.active) return;
+        flyCamera(vpKey, 1500, lookKey);
+        setTimeout(function() {
+          if (!self.active) return;
+          self.showNarration(wp);
+          self.dwellDuration = self.userDwellMs > 0 ? self.userDwellMs : wp.dwell;
+          self.dwellElapsed = 0;
+          self.dwellStart = performance.now();
+          self.startTimerBar();
+          if (!self.paused) {
+            self.dwellTimeout = setTimeout(function() {
+              self.dwellTimeout = null;
+              self.nextStep();
+            }, self.dwellDuration);
+          }
+        }, 1800);
+      }, 300);
+      return;
+    }
+
+    // Exit 3D if we were in it for a previous step
+    if (state.mode3d) toggle3D();
 
     // Resolve target object for panning
     var tObj = this.resolveTarget(wp.target);
@@ -6093,6 +6272,7 @@ var cam3dViewpoints = [
   { key: 'polaris', label: 'Polaris', obj: 'Polaris' },
   { key: 'betelgeuse', label: 'Betelgeuse', obj: 'Betelgeuse' },
   { key: 'deneb', label: 'Deneb', obj: 'Deneb' },
+  { key: 'andromeda', label: 'Andromeda (V1)', obj: "V1 (Hubble's Cepheid)" },
   { key: 'greatattractor', label: 'Great Attractor', obj: 'Great Attractor' }
 ];
 
@@ -6140,11 +6320,11 @@ function initCam3dPresets() {
           break;
         }
       }
-    } else if (vp.key === 'greatattractor') {
-      // Look toward the Milky Way from the Great Attractor
-      var gaAngles = computeLookAngles(px, py, pz, 0, 0, 0);
-      defYaw = gaAngles.yaw;
-      defPitch = gaAngles.pitch;
+    } else if (vp.key === 'greatattractor' || vp.key === 'andromeda') {
+      // Look toward the Milky Way
+      var mwAngles = computeLookAngles(px, py, pz, 0, 0, 0);
+      defYaw = mwAngles.yaw;
+      defPitch = mwAngles.pitch;
     }
     cam3dPresets[vp.key] = { px: px, py: py, pz: pz, yaw: defYaw, pitch: defPitch, fov: 60, label: vp.label };
   }
@@ -6528,48 +6708,194 @@ buildEffectsPanel();
 // 3D mode button
 document.getElementById('mode3d-btn').addEventListener('click', toggle3D);
 
-// Build 3D camera presets bar
+// Build 3D camera presets bar with editable slots
+var activeSlotDropdown = null;
+
+function closeSlotDropdown() {
+  if (activeSlotDropdown) {
+    if (activeSlotDropdown.parentNode) activeSlotDropdown.parentNode.removeChild(activeSlotDropdown);
+    activeSlotDropdown = null;
+  }
+}
+
+function openSlotDropdown(btn, type) {
+  closeSlotDropdown();
+  var dd = document.createElement('div');
+  dd.className = 'cam-slot-dropdown';
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = type === 'viewfrom' ? 'Search objects...' : 'Search objects/constellations...';
+  dd.appendChild(inp);
+  var listEl = document.createElement('div');
+  dd.appendChild(listEl);
+
+  // Build candidate list
+  var candidates = [];
+  if (type === 'viewfrom') {
+    for (var i = 0; i < objects.length; i++) {
+      if (objects[i].wx3d !== undefined) {
+        candidates.push({ key: objects[i].name, label: objects[i].name, objName: objects[i].name });
+      }
+    }
+  } else {
+    // Objects
+    for (var j = 0; j < objects.length; j++) {
+      if (objects[j].wx3d !== undefined) {
+        candidates.push({ key: 'obj:' + objects[j].name, label: objects[j].name, type: 'object', obj: objects[j].name });
+      }
+    }
+    // Constellations
+    var cKeys = Object.keys(constellationDefs);
+    for (var k = 0; k < cKeys.length; k++) {
+      candidates.push({ key: 'con:' + cKeys[k], label: constellationDefs[cKeys[k]].name, type: 'constellation', id: cKeys[k] });
+    }
+  }
+
+  function renderList(filter) {
+    while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+    var f = (filter || '').toLowerCase();
+    var shown = 0;
+    for (var ci = 0; ci < candidates.length; ci++) {
+      if (f && candidates[ci].label.toLowerCase().indexOf(f) < 0) continue;
+      if (shown >= 20) break;
+      shown++;
+      var opt = document.createElement('div');
+      opt.className = 'slot-option';
+      opt.textContent = candidates[ci].label;
+      (function(c) {
+        opt.addEventListener('click', function(ev) {
+          ev.stopPropagation();
+          if (type === 'viewfrom') {
+            // Find or create viewpoint preset
+            var vpKey = c.objName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            // Add to cam3dPresets if needed
+            var obj = null;
+            for (var oi = 0; oi < objects.length; oi++) {
+              if (objects[oi].name === c.objName) { obj = objects[oi]; break; }
+            }
+            if (obj) {
+              var lookAngles2 = computeLookAngles(obj.wx3d, obj.wy3d, obj.wz3d, 0, 0, 0);
+              cam3dPresets[vpKey] = { px: obj.wx3d, py: obj.wy3d, pz: obj.wz3d,
+                yaw: lookAngles2.yaw, pitch: lookAngles2.pitch, fov: 60, label: c.label };
+              btn.textContent = c.label;
+              btn.setAttribute('data-cam-preset', vpKey);
+              flyCamera(vpKey, 2000);
+            }
+          } else {
+            // Look-at: resolve position and look
+            var lookPos = null;
+            if (c.type === 'constellation') {
+              // Add dynamic look target
+              var ltKey = 'dyn_' + c.id;
+              var found = false;
+              for (var li = 0; li < cam3dLookTargets.length; li++) {
+                if (cam3dLookTargets[li].key === ltKey) { found = true; break; }
+              }
+              if (!found) {
+                cam3dLookTargets.push({ key: ltKey, label: c.label, type: 'constellation', id: c.id });
+              }
+              btn.textContent = c.label;
+              btn.setAttribute('data-look-target', ltKey);
+              lookAtTarget(ltKey, 1200);
+            } else {
+              var ltKey2 = 'dyn_' + c.obj.toLowerCase().replace(/[^a-z0-9]/g, '');
+              var found2 = false;
+              for (var li2 = 0; li2 < cam3dLookTargets.length; li2++) {
+                if (cam3dLookTargets[li2].key === ltKey2) { found2 = true; break; }
+              }
+              if (!found2) {
+                cam3dLookTargets.push({ key: ltKey2, label: c.label, type: 'object', obj: c.obj });
+              }
+              btn.textContent = c.label;
+              btn.setAttribute('data-look-target', ltKey2);
+              lookAtTarget(ltKey2, 1200);
+            }
+          }
+          closeSlotDropdown();
+        });
+      })(candidates[ci]);
+      listEl.appendChild(opt);
+    }
+    if (shown === 0) {
+      var noR = document.createElement('div');
+      noR.className = 'slot-option';
+      noR.textContent = 'No matches';
+      noR.style.color = '#555';
+      listEl.appendChild(noR);
+    }
+  }
+
+  renderList('');
+  inp.addEventListener('input', function() { renderList(this.value); });
+  inp.addEventListener('click', function(ev) { ev.stopPropagation(); });
+
+  btn.style.position = 'relative';
+  btn.appendChild(dd);
+  activeSlotDropdown = dd;
+  setTimeout(function() { inp.focus(); }, 50);
+
+  // Close on outside click
+  function onOutside(ev) {
+    if (!dd.contains(ev.target) && ev.target !== btn) {
+      closeSlotDropdown();
+      document.removeEventListener('click', onOutside, true);
+    }
+  }
+  setTimeout(function() { document.addEventListener('click', onOutside, true); }, 10);
+}
+
+function makeSlotBtn(label, type, actionAttr, actionValue) {
+  var btn = document.createElement('button');
+  btn.className = 'cam-preset-btn' + (type === 'lookat' ? ' cam-look-btn' : '');
+  btn.textContent = label;
+  btn.setAttribute(actionAttr, actionValue);
+
+  var editCorner = document.createElement('span');
+  editCorner.className = 'slot-edit';
+  editCorner.textContent = '\u25bf';
+  btn.appendChild(editCorner);
+
+  editCorner.addEventListener('click', function(ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+    openSlotDropdown(btn, type === 'lookat' ? 'lookat' : 'viewfrom');
+  });
+
+  btn.addEventListener('click', function(ev) {
+    if (ev.target === editCorner) return;
+    if (type === 'lookat') {
+      lookAtTarget(this.getAttribute('data-look-target'), 1200);
+    } else {
+      flyCamera(this.getAttribute('data-cam-preset'), 2000);
+    }
+  });
+  return btn;
+}
+
 (function() {
   var bar = document.getElementById('cam3d-presets');
 
-  // Viewpoints row
   var vpLabel = document.createElement('span');
   vpLabel.className = 'cam-label';
   vpLabel.textContent = 'View from:';
   bar.appendChild(vpLabel);
 
   for (var i = 0; i < cam3dViewpoints.length; i++) {
-    var btn = document.createElement('button');
-    btn.className = 'cam-preset-btn';
-    btn.textContent = cam3dViewpoints[i].label;
-    btn.setAttribute('data-cam-preset', cam3dViewpoints[i].key);
-    btn.addEventListener('click', function() {
-      flyCamera(this.getAttribute('data-cam-preset'), 2000);
-    });
-    bar.appendChild(btn);
+    bar.appendChild(makeSlotBtn(cam3dViewpoints[i].label, 'viewfrom', 'data-cam-preset', cam3dViewpoints[i].key));
   }
 
-  // Separator
   var sep = document.createElement('span');
   sep.className = 'cam-sep';
   sep.textContent = '\u2502';
   bar.appendChild(sep);
 
-  // Look-at row
   var laLabel = document.createElement('span');
   laLabel.className = 'cam-label';
   laLabel.textContent = 'Look at:';
   bar.appendChild(laLabel);
 
   for (var j = 0; j < cam3dLookTargets.length; j++) {
-    var laBtn = document.createElement('button');
-    laBtn.className = 'cam-preset-btn cam-look-btn';
-    laBtn.textContent = cam3dLookTargets[j].label;
-    laBtn.setAttribute('data-look-target', cam3dLookTargets[j].key);
-    laBtn.addEventListener('click', function() {
-      lookAtTarget(this.getAttribute('data-look-target'), 1200);
-    });
-    bar.appendChild(laBtn);
+    bar.appendChild(makeSlotBtn(cam3dLookTargets[j].label, 'lookat', 'data-look-target', cam3dLookTargets[j].key));
   }
 })();
 
