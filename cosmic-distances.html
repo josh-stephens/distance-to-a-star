@@ -35,6 +35,25 @@
   }
   .glossary-btn:hover { background: #1e3838; color: #aaccdd; }
   .glossary-btn.active { background: #1a3a4a; border-color: #4a7a8a; color: #88ccdd; }
+  .mode3d-btn {
+    padding: 5px 14px; border: 1px solid #3a2a4a; background: #1a162a;
+    color: #aa88bb; border-radius: 4px; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .mode3d-btn:hover { background: #261e38; color: #ccaadd; }
+  .mode3d-btn.active { background: #2a1a4a; border-color: #6a4a8a; color: #bb88ee; }
+  .cam3d-presets {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 16px; background: #10101c;
+    border-bottom: 1px solid #1a1a2c; flex-shrink: 0; z-index: 19;
+  }
+  .cam3d-presets .cam-preset-btn {
+    padding: 4px 10px; border: 1px solid #2a2a44; background: #14142a;
+    color: #8888aa; border-radius: 4px; font-size: 10px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .cam3d-presets .cam-preset-btn:hover { background: #1e1e38; color: #bbbbdd; }
+  .cam3d-presets .cam-label { font-size: 10px; color: #5a5a7a; }
   .tour-menu-wrap { position: relative; margin-left: auto; }
   .tour-btn {
     padding: 5px 14px; border: 1px solid #3a4a2a; background: #1a2a16;
@@ -101,13 +120,56 @@
   .narration {
     position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
     z-index: 20; max-width: 620px; width: 90%; pointer-events: none;
-    opacity: 0; transition: opacity 0.8s;
+    opacity: 0; transition: opacity 0.8s; perspective: 800px;
   }
   .narration.visible { opacity: 1; pointer-events: auto; }
-  .narration-inner {
+  .narration-flipper {
+    position: relative; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+  .narration.flipped .narration-flipper { transform: rotateX(180deg); }
+  .narration-inner, .narration-back {
     background: rgba(8, 8, 18, 0.88); border: 1px solid rgba(100, 100, 160, 0.15);
     border-radius: 10px; padding: 20px 28px; backdrop-filter: blur(12px); text-align: center;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
   }
+  .narration-back {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; box-sizing: border-box;
+    transform: rotateX(180deg); text-align: left;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .narr-settings-btn {
+    position: absolute; top: 10px; right: 12px; width: 22px; height: 22px;
+    border: none; background: none; color: #4a5a78; font-size: 14px;
+    cursor: pointer; z-index: 2; border-radius: 50%; transition: all 0.3s;
+    text-shadow: 0 0 6px rgba(122, 170, 238, 0.3);
+    line-height: 22px; text-align: center; padding: 0;
+  }
+  .narr-settings-btn:hover { color: #7aaaee; text-shadow: 0 0 10px rgba(122, 170, 238, 0.6); }
+  .narration.flipped .narr-settings-btn { color: #7aaaee; text-shadow: 0 0 8px rgba(122, 170, 238, 0.5); }
+  .narr-back-title { font-size: 13px; font-weight: 600; color: #8898b8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 1.5px; }
+  .narr-setting-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .narr-setting-label { font-size: 12px; color: #7a7a98; min-width: 80px; }
+  .narr-setting-slider {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 3px;
+    background: #2a2a44; border-radius: 2px; outline: none;
+  }
+  .narr-setting-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #7aaaee; cursor: pointer;
+    box-shadow: 0 0 6px rgba(122, 170, 238, 0.5);
+  }
+  .narr-setting-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; border: none;
+    background: #7aaaee; cursor: pointer;
+  }
+  .narr-setting-input {
+    width: 48px; background: #0c0c1a; border: 1px solid #2a2a44; border-radius: 4px;
+    color: #c8c8e0; font-size: 12px; padding: 3px 6px; text-align: center;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+  .narr-setting-input:focus { outline: none; border-color: #3a5a8a; }
+  .narr-setting-unit { font-size: 11px; color: #5a5a78; }
   .narration-step { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #5a5a78; margin-bottom: 8px; }
   .narration-title { font-size: 18px; font-weight: 600; color: #e0e0f0; margin-bottom: 8px; }
   .narration-body { font-size: 13px; line-height: 1.7; color: #9898b8; }
@@ -291,12 +353,15 @@
   <button class="preset-btn" data-preset="local">Local Group <span class="key-hint">5</span></button>
   <button class="preset-btn" data-preset="cosmic">Great Attractor <span class="key-hint">6</span></button>
   <button class="glossary-btn" id="glossary-toggle-btn">Glossary <span class="key-hint">/</span></button>
+  <button class="mode3d-btn" id="mode3d-btn">3D Sky <span class="key-hint">V</span></button>
   <div class="tour-menu-wrap">
     <button class="tour-btn" id="tour-btn">Tours <span class="key-hint">T</span> &#x25be;</button>
     <div class="tour-dropdown" id="tour-dropdown"></div>
   </div>
   <button class="feedback-btn" id="feedback-btn" title="Send feedback">Feedback &#x2709;</button>
 </div>
+
+<div class="cam3d-presets" id="cam3d-presets" style="display:none"></div>
 
 <div class="feedback-overlay" id="feedback-overlay"></div>
 <div class="feedback-popover" id="feedback-popover">
@@ -330,19 +395,31 @@
   </div>
 
   <div class="narration" id="narration">
-    <div class="narration-inner">
-      <div class="narration-step" id="narr-step"></div>
-      <div class="narration-title" id="narr-title"></div>
-      <div class="narration-body" id="narr-body"></div>
-      <div class="narration-scale" id="narr-scale"></div>
-      <div class="narration-controls">
-        <button class="narr-ctrl-btn" id="narr-prev">&larr; Prev</button>
-        <button class="narr-ctrl-btn" id="narr-pause">Pause</button>
-        <button class="narr-ctrl-btn" id="narr-next">Next &rarr;</button>
+    <button class="narr-settings-btn" id="narr-settings-btn" title="Tour settings">&#x2699;</button>
+    <div class="narration-flipper" id="narration-flipper">
+      <div class="narration-inner">
+        <div class="narration-step" id="narr-step"></div>
+        <div class="narration-title" id="narr-title"></div>
+        <div class="narration-body" id="narr-body"></div>
+        <div class="narration-scale" id="narr-scale"></div>
+        <div class="narration-controls">
+          <button class="narr-ctrl-btn" id="narr-prev">&larr; Prev</button>
+          <button class="narr-ctrl-btn" id="narr-pause">Pause</button>
+          <button class="narr-ctrl-btn" id="narr-next">Next &rarr;</button>
+        </div>
+        <div class="tour-progress" id="tour-progress"></div>
+        <div class="tour-timer-track">
+          <div class="tour-timer-fill" id="tour-timer-fill"></div>
+        </div>
       </div>
-      <div class="tour-progress" id="tour-progress"></div>
-      <div class="tour-timer-track">
-        <div class="tour-timer-fill" id="tour-timer-fill"></div>
+      <div class="narration-back">
+        <div class="narr-back-title">Tour Settings</div>
+        <div class="narr-setting-row">
+          <span class="narr-setting-label">Dwell time</span>
+          <input type="range" class="narr-setting-slider" id="narr-dwell-slider" min="3" max="30" step="1" value="10">
+          <input type="number" class="narr-setting-input" id="narr-dwell-input" min="3" max="30" step="1" value="10">
+          <span class="narr-setting-unit">sec</span>
+        </div>
       </div>
     </div>
   </div>
@@ -520,15 +597,15 @@ var objects = [
     desc: "The only spacecraft to visit all four giant planets. Voyager 2 crossed the heliopause in 2018. Despite being launched 16 days before Voyager 1, its Jupiter gravity assist sent it on a slower trajectory to also visit Uranus and Neptune." },
 
   // Stellar
-  { name: "Proxima Centauri", x: -3.5, y: -2.3, dist: 4.24, radius: 2, color: "#ff6644", glow: "#ff664433",
+  { name: "Proxima Centauri", x: -3.5, y: -2.3, dist: 4.24, ra: 217.43, dec: -62.68, radius: 2, color: "#ff6644", glow: "#ff664433",
     type: "Red dwarf (M5.5Ve)", category: "stellar",
     facts: [["Distance", "4.24 light-years"], ["Planets", "Proxima b (habitable zone)"], ["Travel time (Voyager 1)", "~73,000 years"]],
     desc: "The closest star to the Sun. At Voyager 1's speed it would take over 73,000 years to reach." },
-  { name: "\u03b1 Centauri A", x: -3.7, y: -2.1, dist: 4.37, radius: 2.5, color: "#ffee66", glow: "#ffee6633",
+  { name: "\u03b1 Centauri A", x: -3.7, y: -2.1, dist: 4.37, ra: 219.90, dec: -60.83, radius: 2.5, color: "#ffee66", glow: "#ffee6633",
     type: "Star (G2V, Sun-like)", category: "stellar",
     facts: [["Distance", "4.37 light-years"], ["Mass", "1.1 M\u2609"]],
     desc: "Nearly identical to our Sun. The brighter half of the closest binary star system." },
-  { name: "\u03b1 Centauri B", x: -3.8, y: -2.0, dist: 4.37, radius: 2, color: "#ffaa44", glow: "#ffaa4433",
+  { name: "\u03b1 Centauri B", x: -3.8, y: -2.0, dist: 4.37, ra: 219.90, dec: -60.83, radius: 2, color: "#ffaa44", glow: "#ffaa4433",
     type: "Star (K1V)", category: "stellar",
     facts: [["Distance", "4.37 light-years"]],
     desc: "The smaller companion to Alpha Centauri A. An orange dwarf." },
@@ -537,7 +614,7 @@ var objects = [
     type: "Exoplanet (rocky, habitable zone)", category: "stellar", visRange: [0.5, 20],
     facts: [["Distance", "4.24 light-years"], ["Mass", "~1.17 Earth masses"], ["Orbital period", "11.2 days"], ["Star", "Proxima Centauri (red dwarf)"]],
     desc: "The nearest known exoplanet. An Earth-mass world orbiting in the habitable zone of Proxima Centauri, just 4.24 light-years away. Whether it retains an atmosphere under its star's intense flares remains one of astrobiology's biggest open questions." },
-  { name: "TRAPPIST-1 System", x: -30, y: -25, dist: 39.46, radius: 2, color: "#cc8866", glow: "#cc886644",
+  { name: "TRAPPIST-1 System", x: -30, y: -25, dist: 39.46, ra: 346.62, dec: -5.04, radius: 2, color: "#cc8866", glow: "#cc886644",
     type: "7-planet system (3 in habitable zone)", category: "stellar", visRange: [8, 200],
     facts: [["Distance", "39.46 light-years"], ["Planets", "7 rocky (b through h)"], ["Habitable zone", "e, f, g"], ["Star", "Ultra-cool red dwarf"]],
     desc: "Seven Earth-sized rocky planets orbiting a dim red dwarf, three in the habitable zone. The most promising system for finding habitable worlds beyond our own. JWST is actively studying their atmospheres." },
@@ -558,7 +635,7 @@ var objects = [
     facts: [["Distance", "1,410 light-years"], ["Surface temp", "~2,600\u00b0C"], ["Orbital period", "1.09 days"], ["Fate", "Being consumed by its star"]],
     desc: "One of the hottest and most extreme planets known. Orbiting so close that tidal forces stretch it into an egg shape, WASP-12b is being slowly devoured by its star. It reflects almost no light -- darker than asphalt. It will be consumed entirely within 10 million years." },
 
-  { name: "Barnard's Star", x: 3.0, y: 4.5, dist: 5.96, radius: 1.5, color: "#dd5533", glow: "#dd553322",
+  { name: "Barnard's Star", x: 3.0, y: 4.5, dist: 5.96, ra: 269.45, dec: 4.69, radius: 1.5, color: "#dd5533", glow: "#dd553322",
     type: "Red dwarf (M4Ve)", category: "stellar",
     facts: [["Distance", "5.96 light-years"], ["Age", "~10 billion years"]],
     desc: "The fastest-moving star in our sky. An ancient red dwarf, twice the age of our solar system." },
@@ -566,7 +643,7 @@ var objects = [
     type: "Red dwarf (M6.5Ve)", category: "stellar",
     facts: [["Distance", "7.86 light-years"], ["Luminosity", "0.001 L\u2609"]],
     desc: "One of the faintest stars known. Invisible to the naked eye despite being a close neighbor." },
-  { name: "Sirius", x: 5.0, y: -7.0, dist: 8.6, radius: 4, color: "#aaccff", glow: "#aaccff55",
+  { name: "Sirius", x: 5.0, y: -7.0, dist: 8.6, ra: 101.29, dec: -16.72, radius: 4, color: "#aaccff", glow: "#aaccff55",
     type: "Star (A1V)", category: "stellar",
     facts: [["Distance", "8.6 light-years"], ["Luminosity", "25.4 L\u2609"], ["Apparent mag", "-1.46 (brightest)"]],
     desc: "The brightest star in Earth's night sky. 25 times more luminous than the Sun." },
@@ -578,149 +655,149 @@ var objects = [
     type: "Star (G8.5V, Sun-like)", category: "stellar",
     facts: [["Distance", "11.9 light-years"], ["Planets", "5 candidates"]],
     desc: "A Sun-like star with possibly 5 planets." },
-  { name: "Procyon", x: 8, y: -8, dist: 11.5, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Procyon", x: 8, y: -8, dist: 11.5, ra: 114.83, dec: 5.22, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
     type: "Star (F5IV)", category: "stellar",
     facts: [["Distance", "11.5 light-years"], ["Luminosity", "6.9 L\u2609"], ["Companion", "White dwarf Procyon B"]],
     desc: "The 8th brightest star. Like Sirius, it has a white dwarf companion." },
-  { name: "Vega", x: -15, y: 20, dist: 25, radius: 3, color: "#aabbff", glow: "#aabbff44",
+  { name: "Vega", x: -15, y: 20, dist: 25, ra: 279.23, dec: 38.78, radius: 3, color: "#aabbff", glow: "#aabbff44",
     type: "Star (A0V)", category: "stellar", visRange: [10, 80],
     facts: [["Distance", "25 light-years"], ["Luminosity", "40 L\u2609"], ["First photographed star", "1850"]],
     desc: "In 12,000 years, axial precession will make Vega our North Star." },
-  { name: "Arcturus", x: 25, y: 30, dist: 37, radius: 3, color: "#ffbb66", glow: "#ffbb6644",
+  { name: "Arcturus", x: 25, y: 30, dist: 37, ra: 213.92, dec: 19.18, radius: 3, color: "#ffbb66", glow: "#ffbb6644",
     type: "Red giant (K1.5III)", category: "stellar", visRange: [10, 100],
     facts: [["Distance", "37 light-years"], ["Diameter", "25x Sun"], ["1933 World's Fair", "Its light opened the fair"]],
     desc: "Brightest star in the northern hemisphere. Its light opened the 1933 Chicago World's Fair." },
-  { name: "Aldebaran", x: 40, y: -50, dist: 65, radius: 3, color: "#ff8844", glow: "#ff884433",
+  { name: "Aldebaran", x: 40, y: -50, dist: 65, ra: 68.98, dec: 16.51, radius: 3, color: "#ff8844", glow: "#ff884433",
     type: "Red giant (K5III)", category: "stellar", visRange: [20, 300],
     facts: [["Distance", "65 light-years"], ["Diameter", "44x Sun"], ["Constellation", "Taurus (the eye)"]],
     desc: "The red eye of Taurus. Appears embedded in the Hyades but is only half as far." },
-  { name: "Canopus", x: 150, y: -270, dist: 310, radius: 3.5, color: "#ffffcc", glow: "#ffffcc44",
+  { name: "Canopus", x: 150, y: -270, dist: 310, ra: 95.99, dec: -52.70, radius: 3.5, color: "#ffffcc", glow: "#ffffcc44",
     type: "Supergiant (A9II)", category: "stellar", visRange: [50, 1500],
     facts: [["Distance", "310 light-years"], ["Luminosity", "10,700 L\u2609"], ["Rank", "2nd brightest star"]],
     desc: "The 2nd brightest star in Earth's sky. Used for spacecraft navigation." },
-  { name: "Polaris", x: 200, y: 380, dist: 433, radius: 3, color: "#ffeedd", glow: "#ffeedd44",
+  { name: "Polaris", x: 200, y: 380, dist: 433, ra: 37.95, dec: 89.26, radius: 3, color: "#ffeedd", glow: "#ffeedd44",
     type: "Supergiant (F7Ib)", category: "stellar", visRange: [80, 2000],
     facts: [["Distance", "433 light-years"], ["Type", "Cepheid variable (triple system)"], ["Role", "Current North Star"]],
     desc: "Earth's North Star. A Cepheid variable -- a standard candle for measuring cosmic distances." },
   // ── Orion ──
-  { name: "Antares", x: -300, y: 420, dist: 550, radius: 4, color: "#ff4422", glow: "#ff442244",
+  { name: "Antares", x: -300, y: 420, dist: 550, ra: 247.35, dec: -26.43, radius: 4, color: "#ff4422", glow: "#ff442244",
     type: "Red supergiant (M1Iab)", category: "stellar", visRange: [80, 2500], constellation: "scorpius",
     facts: [["Distance", "550 light-years"], ["Diameter", "680x Sun"], ["Constellation", "Scorpius (the heart)"]],
     desc: "Heart of the Scorpion. So large that if placed at the Sun, Mars would orbit inside it." },
-  { name: "Betelgeuse", x: 20, y: -380, dist: 700, radius: 5, color: "#ff6633", glow: "#ff663355",
+  { name: "Betelgeuse", x: 20, y: -380, dist: 700, ra: 88.79, dec: 7.41, radius: 5, color: "#ff6633", glow: "#ff663355",
     type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 3000], constellation: "orion",
     facts: [["Distance", "700 light-years"], ["Diameter", "700-1000x Sun"], ["Fate", "Supernova within 100,000 yr"]],
     desc: "A red supergiant so immense it would engulf Jupiter. Will explode as a supernova." },
-  { name: "Bellatrix", x: 230, y: -400, dist: 250, radius: 3, color: "#99aaff", glow: "#99aaff44",
+  { name: "Bellatrix", x: 230, y: -400, dist: 250, ra: 81.28, dec: 6.35, radius: 3, color: "#99aaff", glow: "#99aaff44",
     type: "Blue giant (B2III)", category: "stellar", visRange: [50, 2000], constellation: "orion",
     facts: [["Distance", "250 light-years"], ["Luminosity", "9,200 L\u2609"], ["Name meaning", "'Female warrior' in Latin"]],
     desc: "Orion's right shoulder. At 250 ly, Bellatrix is much closer than the other Orion stars -- the constellation is an illusion of perspective." },
-  { name: "Alnitak", x: 60, y: -540, dist: 1200, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
+  { name: "Alnitak", x: 60, y: -540, dist: 1200, ra: 85.19, dec: -1.94, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
     type: "Triple star system (O9.7Ib)", category: "stellar", visRange: [50, 4000], constellation: "orion",
     facts: [["Distance", "~1,200 light-years"], ["System", "Triple star system"], ["Nearby", "Illuminates Flame and Horsehead Nebulae"]],
     desc: "The leftmost belt star. Its UV radiation illuminates the nearby Flame Nebula and sculpts the iconic Horsehead Nebula." },
-  { name: "Alnilam", x: 120, y: -555, dist: 2000, radius: 3, color: "#bbccff", glow: "#bbccff55",
+  { name: "Alnilam", x: 120, y: -555, dist: 2000, ra: 84.05, dec: -1.20, radius: 3, color: "#bbccff", glow: "#bbccff55",
     type: "Blue supergiant (B0Ia)", category: "stellar", visRange: [50, 6000], constellation: "orion",
     facts: [["Distance", "~2,000 light-years"], ["Luminosity", "275,000 L\u2609"], ["Belt position", "Center belt star (brightest)"]],
     desc: "The center jewel of Orion's Belt and the most distant of the three. At 2,000 ly, it is nearly twice as far as its belt companions -- proof that constellations are illusions of projection." },
-  { name: "Mintaka", x: 180, y: -570, dist: 1200, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
+  { name: "Mintaka", x: 180, y: -570, dist: 1200, ra: 83.00, dec: -0.30, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
     type: "Multiple star system (O9.5II)", category: "stellar", visRange: [50, 4000], constellation: "orion",
     facts: [["Distance", "~1,200 light-years"], ["System", "Eclipsing binary + 2 companions"], ["Belt position", "Westernmost (right) belt star"]],
     desc: "The rightmost star of Orion's Belt. Actually a complex system of at least four stars, nearly on the celestial equator." },
-  { name: "Saiph", x: 40, y: -720, dist: 650, radius: 3, color: "#88aaff", glow: "#88aaff44",
+  { name: "Saiph", x: 40, y: -720, dist: 650, ra: 86.94, dec: -9.67, radius: 3, color: "#88aaff", glow: "#88aaff44",
     type: "Blue supergiant (B0.5Ia)", category: "stellar", visRange: [50, 3000], constellation: "orion",
     facts: [["Distance", "~650 light-years"], ["Luminosity", "56,000 L\u2609"], ["Name meaning", "'Sword of the Giant' in Arabic"]],
     desc: "Orion's left foot. Despite similar luminosity to Rigel, it appears dimmer because more of its light is in the ultraviolet." },
-  { name: "Rigel", x: 210, y: -700, dist: 863, radius: 4.5, color: "#99bbff", glow: "#99bbff55",
+  { name: "Rigel", x: 210, y: -700, dist: 863, ra: 78.63, dec: -8.20, radius: 4.5, color: "#99bbff", glow: "#99bbff55",
     type: "Blue supergiant (B8Ia)", category: "stellar", visRange: [50, 4000], constellation: "orion",
     facts: [["Distance", "863 light-years"], ["Luminosity", "120,000 L\u2609"], ["Role", "Illuminates Witch Head Nebula"]],
     desc: "A blue supergiant blazing at 120,000x the Sun's luminosity. The 7th brightest star." },
 
   // ── Scorpius (tail curves down from Antares) ──
-  { name: "Dschubba", x: -220, y: 280, dist: 490, radius: 2.5, color: "#aabbff", glow: "#aabbff33",
+  { name: "Dschubba", x: -220, y: 280, dist: 490, ra: 240.08, dec: -22.62, radius: 2.5, color: "#aabbff", glow: "#aabbff33",
     type: "Subgiant (B0.3IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
     facts: [["Distance", "~490 light-years"], ["Name", "\u03b4 Scorpii"], ["Feature", "Be star with episodic brightening"]],
     desc: "The forehead of the Scorpion. A Be star that occasionally ejects disks of gas, causing dramatic brightness changes." },
-  { name: "Sargas", x: -380, y: 540, dist: 300, radius: 2.5, color: "#ffddaa", glow: "#ffddaa33",
+  { name: "Sargas", x: -380, y: 540, dist: 300, ra: 264.33, dec: -42.99, radius: 2.5, color: "#ffddaa", glow: "#ffddaa33",
     type: "Giant (F1II)", category: "stellar", visRange: [50, 2000], constellation: "scorpius",
     facts: [["Distance", "~300 light-years"], ["Name", "\u03b8 Scorpii"], ["Luminosity", "~1,800 L\u2609"]],
     desc: "A bright giant in the Scorpion's tail. At 300 ly, Sargas is much closer than the heart star Antares at 550 ly." },
-  { name: "Shaula", x: -440, y: 640, dist: 570, radius: 3, color: "#99bbff", glow: "#99bbff44",
+  { name: "Shaula", x: -440, y: 640, dist: 570, ra: 263.40, dec: -37.10, radius: 3, color: "#99bbff", glow: "#99bbff44",
     type: "Triple star system (B2IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
     facts: [["Distance", "~570 light-years"], ["Name", "\u03bb Scorpii (the stinger)"], ["System", "Triple star"]],
     desc: "The stinger at the tip of the Scorpion's tail. The second brightest star in Scorpius after Antares." },
 
   // ── Big Dipper / Ursa Major ──
-  { name: "Dubhe", x: 320, y: 380, dist: 124, radius: 2.5, color: "#ffcc66", glow: "#ffcc6633",
+  { name: "Dubhe", x: 320, y: 380, dist: 124, ra: 165.93, dec: 61.75, radius: 2.5, color: "#ffcc66", glow: "#ffcc6633",
     type: "Giant (K0III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "124 light-years"], ["Name", "\u03b1 Ursae Majoris"], ["Note", "NOT part of the Ursa Major Moving Group"]],
     desc: "The front lip of the Big Dipper's bowl. Unlike 5 of the other Dipper stars, Dubhe is not part of the Ursa Major Moving Group -- the pattern is slowly dissolving." },
-  { name: "Merak", x: 340, y: 300, dist: 79, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Merak", x: 340, y: 300, dist: 79, ra: 165.46, dec: 56.38, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
     type: "Star (A1V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "79 light-years"], ["Name", "\u03b2 Ursae Majoris"], ["Use", "Pointer star toward Polaris"]],
     desc: "The bottom of the Dipper's bowl, and a pointer star: the line from Merak through Dubhe leads to Polaris." },
-  { name: "Phecda", x: 400, y: 270, dist: 84, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Phecda", x: 400, y: 270, dist: 84, ra: 178.46, dec: 53.69, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
     type: "Star (A0V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "84 light-years"], ["Name", "\u03b3 Ursae Majoris"], ["Group", "Ursa Major Moving Group"]],
     desc: "The inner bottom corner of the Big Dipper's bowl. Part of the Ursa Major Moving Group, a loose cluster of stars sharing a common motion through space." },
-  { name: "Megrez", x: 410, y: 340, dist: 58, radius: 1.8, color: "#ddeeff", glow: "#ddeeff22",
+  { name: "Megrez", x: 410, y: 340, dist: 58, ra: 183.86, dec: 57.03, radius: 1.8, color: "#ddeeff", glow: "#ddeeff22",
     type: "Star (A3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "58 light-years"], ["Name", "\u03b4 Ursae Majoris"], ["Note", "Faintest Dipper star"]],
     desc: "The faintest star in the Big Dipper, where the bowl meets the handle. Also the closest Dipper star at just 58 ly." },
-  { name: "Alioth", x: 470, y: 310, dist: 81, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Alioth", x: 470, y: 310, dist: 81, ra: 193.51, dec: 55.96, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
     type: "Star (A1III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "81 light-years"], ["Name", "\u03b5 Ursae Majoris"], ["Rank", "Brightest star in Ursa Major"]],
     desc: "The brightest star in Ursa Major and the first star of the Dipper's handle." },
-  { name: "Mizar", x: 530, y: 270, dist: 78, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Mizar", x: 530, y: 270, dist: 78, ra: 200.98, dec: 54.93, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
     type: "Sextuple star system (A2V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "78 light-years"], ["Companion", "Alcor (visual double)"], ["System", "Actually 6 stars"]],
     desc: "The famous double star at the bend of the Dipper's handle. Paired with Alcor as an ancient eye test. Mizar itself is actually a sextuple system -- six stars masquerading as one." },
-  { name: "Alkaid", x: 590, y: 220, dist: 104, radius: 2.5, color: "#bbccff", glow: "#bbccff33",
+  { name: "Alkaid", x: 590, y: 220, dist: 104, ra: 206.89, dec: 49.31, radius: 2.5, color: "#bbccff", glow: "#bbccff33",
     type: "Star (B3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
     facts: [["Distance", "104 light-years"], ["Name", "\u03b7 Ursae Majoris"], ["Note", "NOT part of the Moving Group"]],
     desc: "The tip of the Dipper's handle. Like Dubhe at the bowl's front, Alkaid is NOT part of the Ursa Major Moving Group -- in millions of years, the Dipper will lose its shape." },
 
   // ── Crux / Southern Cross ──
-  { name: "Acrux", x: -420, y: -310, dist: 321, radius: 3, color: "#aabbff", glow: "#aabbff44",
+  { name: "Acrux", x: -420, y: -310, dist: 321, ra: 186.65, dec: -63.10, radius: 3, color: "#aabbff", glow: "#aabbff44",
     type: "Triple star system (B0.5IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
     facts: [["Distance", "321 light-years"], ["Name", "\u03b1 Crucis"], ["System", "Triple star"], ["Use", "Points toward south celestial pole"]],
     desc: "The brightest star in the Southern Cross and the southernmost first-magnitude star. A triple system used for centuries to find south." },
-  { name: "Mimosa", x: -490, y: -220, dist: 280, radius: 3, color: "#99bbff", glow: "#99bbff44",
+  { name: "Mimosa", x: -490, y: -220, dist: 280, ra: 191.93, dec: -59.69, radius: 3, color: "#99bbff", glow: "#99bbff44",
     type: "Giant (B1III)", category: "stellar", visRange: [50, 2000], constellation: "crux",
     facts: [["Distance", "280 light-years"], ["Name", "\u03b2 Crucis"], ["Feature", "Pulsating variable (Beta Cephei type)"]],
     desc: "The left arm of the Southern Cross. A pulsating variable that subtly changes brightness every few hours." },
-  { name: "Gacrux", x: -420, y: -130, dist: 88, radius: 2.5, color: "#ff9966", glow: "#ff996644",
+  { name: "Gacrux", x: -420, y: -130, dist: 88, ra: 187.79, dec: -57.11, radius: 2.5, color: "#ff9966", glow: "#ff996644",
     type: "Red giant (M3.5III)", category: "stellar", visRange: [30, 1500], constellation: "crux",
     facts: [["Distance", "88 light-years"], ["Name", "\u03b3 Crucis"], ["Color", "Distinctly red/orange"]],
     desc: "The top of the Southern Cross -- and by far the closest of its stars at just 88 ly. Its warm orange color contrasts with the blue-white of the other three, a visual clue to its very different distance." },
-  { name: "Delta Crucis", x: -350, y: -220, dist: 345, radius: 2, color: "#aabbff", glow: "#aabbff33",
+  { name: "Delta Crucis", x: -350, y: -220, dist: 345, ra: 183.79, dec: -58.75, radius: 2, color: "#aabbff", glow: "#aabbff33",
     type: "Subgiant (B2IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
     facts: [["Distance", "345 light-years"], ["Name", "\u03b4 Crucis"], ["Feature", "Pulsating variable"]],
     desc: "The right arm of the Southern Cross. The faintest of the four main stars." },
 
   // ── Cassiopeia (W-shape) ──
-  { name: "Caph", x: 400, y: -110, dist: 54, radius: 2, color: "#ffeedd", glow: "#ffeedd33",
+  { name: "Caph", x: 400, y: -110, dist: 54, ra: 2.29, dec: 59.15, radius: 2, color: "#ffeedd", glow: "#ffeedd33",
     type: "Giant (F2III)", category: "stellar", visRange: [20, 1000], constellation: "cassiopeia",
     facts: [["Distance", "54 light-years"], ["Name", "\u03b2 Cassiopeiae"], ["Feature", "Delta Scuti variable"]],
     desc: "The leftmost peak of Cassiopeia's W and the closest of its stars at just 54 ly. A rapidly oscillating star used to study stellar interiors." },
-  { name: "Schedar", x: 440, y: -220, dist: 228, radius: 2.5, color: "#ffaa66", glow: "#ffaa6633",
+  { name: "Schedar", x: 440, y: -220, dist: 228, ra: 10.13, dec: 56.54, radius: 2.5, color: "#ffaa66", glow: "#ffaa6633",
     type: "Giant (K0IIIa)", category: "stellar", visRange: [40, 1500], constellation: "cassiopeia",
     facts: [["Distance", "228 light-years"], ["Name", "\u03b1 Cassiopeiae"], ["Color", "Distinctly orange"]],
     desc: "The brightest star in Cassiopeia and the left valley of the W. Its warm orange glow marks it among its bluer neighbors." },
-  { name: "Gamma Cassiopeiae", x: 510, y: -100, dist: 550, radius: 3, color: "#aaccff", glow: "#aaccff44",
+  { name: "Gamma Cassiopeiae", x: 510, y: -100, dist: 550, ra: 14.18, dec: 60.72, radius: 3, color: "#aaccff", glow: "#aaccff44",
     type: "Be star (B0.5IVe)", category: "stellar", visRange: [50, 2500], constellation: "cassiopeia",
     facts: [["Distance", "~550 light-years"], ["Feature", "Eruptive variable, spins near breakup speed"], ["X-ray", "Anomalously strong X-ray source"]],
     desc: "The center peak of Cassiopeia's W. A Be star spinning so fast it flings off disks of gas, causing unpredictable brightness changes. A mysteriously strong X-ray source." },
-  { name: "Ruchbah", x: 570, y: -240, dist: 99, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
+  { name: "Ruchbah", x: 570, y: -240, dist: 99, ra: 21.45, dec: 60.24, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
     type: "Eclipsing binary (A5III-IV)", category: "stellar", visRange: [30, 1000], constellation: "cassiopeia",
     facts: [["Distance", "99 light-years"], ["Name", "\u03b4 Cassiopeiae"], ["Feature", "Algol-type eclipsing binary"]],
     desc: "The right valley of Cassiopeia's W. An eclipsing binary where the companion star periodically passes in front, dimming its light." },
-  { name: "Segin", x: 630, y: -130, dist: 410, radius: 2, color: "#bbccff", glow: "#bbccff33",
+  { name: "Segin", x: 630, y: -130, dist: 410, ra: 28.60, dec: 63.67, radius: 2, color: "#bbccff", glow: "#bbccff33",
     type: "Subgiant (B3III)", category: "stellar", visRange: [50, 2000], constellation: "cassiopeia",
     facts: [["Distance", "410 light-years"], ["Name", "\u03b5 Cassiopeiae"], ["Cluster", "Near open cluster NGC 146"]],
     desc: "The rightmost peak of Cassiopeia's W. The depth story is vivid here: Caph (54 ly) and Ruchbah (99 ly) are nearby, while Segin (410 ly) and Gamma Cas (550 ly) are 5-10x farther." },
 
-  { name: "Deneb", x: 700, y: 80, dist: 2615, radius: 4, color: "#bbccff", glow: "#bbccff44",
+  { name: "Deneb", x: 700, y: 80, dist: 2615, ra: 310.36, dec: 45.28, radius: 4, color: "#bbccff", glow: "#bbccff44",
     type: "Supergiant (A2Ia)", category: "stellar", visRange: [300, 8000],
     facts: [["Distance", "2,615 light-years"], ["Luminosity", "200,000 L\u2609"], ["Light departed", "~400 BC"]],
     desc: "200,000x the Sun's luminosity. Its light left when Socrates walked Athens." },
@@ -1142,6 +1219,7 @@ var tourDefs = {
       { vr: 600, title: "Patterns in the Sky", body: "Constellations are the oldest maps. For millennia, humans connected stars into pictures \u2014 hunters, animals, gods. But these patterns are illusions of perspective. Stars that appear side by side can be separated by hundreds of light-years in depth. Let's visit each constellation and see how deep the illusion goes.", scale: "Constellation scale", dwell: 12000 },
       { vr: 350, target: "Betelgeuse", title: "Orion \u2014 The Hunter", body: "Orion's bright stars span a 10x range in distance: Bellatrix at 250 ly, Betelgeuse at 700 ly, Rigel at 863 ly, and the belt stars at 1,200\u20132,000 ly. The 'aligned' belt is pure coincidence \u2014 Alnilam (center) is twice as far as its companions. From another star system, Orion would be unrecognizable.", scale: "700 ly from Earth", dwell: 14000 },
       { vr: 450, target: "Rigel", title: "Orion's Depth", body: "Zoom past Betelgeuse to Rigel, Orion's blue foot at 863 ly. Despite being farther, Rigel blazes at 120,000 times the Sun's luminosity. Beyond Rigel, the belt stars continue to 1,200+ ly. Orion is not a structure \u2014 it's a corridor of unrelated stars stretching 1,800 light-years deep.", scale: "863 ly from Earth", dwell: 12000 },
+      { vr: 550, target: "Betelgeuse", title: "Orion from TRAPPIST-1", body: "Now travel 39 light-years to the TRAPPIST-1 system and look back at Orion. Watch what happens. Bellatrix, the Hunter's nearest bright star at just 250 light-years, lurches sideways \u2014 shifting 9 degrees. But the distant belt at 1,200\u20132,000 light-years barely flickers. The proud symmetry of the Hunter dissolves. One shoulder flings wide while the other holds fast. A TRAPPIST-1 astronomer might trace these warped stars and see not a hunter but a great wing, sweeping across an alien sky.", scale: "View from 39 ly away", dwell: 18000, parallax: { constellation: "orion", shiftK: 28000, shiftAngle: 0, delay: 2500, duration: 4000, label: "FROM TRAPPIST-1 \u2022 39 ly" } },
       { vr: 300, target: "Antares", title: "Scorpius \u2014 The Scorpion", body: "The red heart of Scorpius, Antares at 550 ly, anchors a sinuous chain. But nearby Sargas (300 ly) and distant Shaula (570 ly) reveal the constellation's depth. The Scorpion's body twists through space, with stars scattered across a 300 light-year range.", scale: "550 ly from Earth", dwell: 12000 },
       { vr: 250, target: "Dubhe", title: "Big Dipper \u2014 A Moving Group", body: "Five of the Big Dipper's seven stars are part of the Ursa Major Moving Group \u2014 born from the same gas cloud, traveling through space together at ~54\u201379 ly. But Dubhe (124 ly) and Alkaid (104 ly) are outsiders, drifting away. In 50,000 years, the Dipper will be unrecognizable as these two orphan stars diverge.", scale: "124 ly from Earth", dwell: 14000 },
       { vr: 200, target: "Gacrux", title: "Southern Cross \u2014 The Nearby Outsider", body: "Gacrux, the red star at the top of the Cross, is just 88 ly away \u2014 less than a third the distance of the other three main stars (280\u2013321 ly). Its warm orange color against their blue-white betrays its different nature and distance. Used for navigation across the Southern Hemisphere for centuries.", scale: "88 ly from Earth", dwell: 12000 },
@@ -1187,11 +1265,24 @@ var state = {
   warpIntensity: 0,
   dirty: true,
   hoverObj: null,
-  hoverIconPos: null
+  hoverIconPos: null,
+  mode3d: false,
+  lastPanX: 0, lastPanY: 0, lastZoom: 0  // saved 2D state when entering 3D
 };
+
+// ─── 3D Camera ──────────────────────────────────────────────────────────
+
+var cam3d = {
+  px: 0, py: 0, pz: 0,    // position in light-years (0,0,0 = Sun/Earth)
+  yaw: 0, pitch: 0,       // look direction in radians
+  fov: 60                  // field of view in degrees
+};
+
+var cam3dAnim = { active: false, startTime: 0, duration: 0, from: null, to: null };
 
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
 var pendingLabels = [];
+var parallaxState = { active: false, progress: 0, constellation: null, shiftK: 0, shiftAngle: 0, animId: null, label: '', flashAlpha: 0 };
 
 // ─── Particle systems ──────────────────────────────────────────────────
 
@@ -1320,6 +1411,148 @@ function lightTravelTime(ly) {
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ─── 3D Coordinate Conversion ─────────────────────────────────────────
+
+var DEG2RAD = Math.PI / 180;
+
+function raDecToXYZ(raDeg, decDeg, dist) {
+  var ra = raDeg * DEG2RAD;
+  var dec = decDeg * DEG2RAD;
+  return {
+    x: dist * Math.cos(dec) * Math.cos(ra),
+    y: dist * Math.cos(dec) * Math.sin(ra),
+    z: dist * Math.sin(dec)
+  };
+}
+
+function initObjects3D() {
+  for (var i = 0; i < objects.length; i++) {
+    var o = objects[i];
+    if (o.ra !== undefined && o.dec !== undefined) {
+      var c = raDecToXYZ(o.ra, o.dec, o.dist || 0.0001);
+      o.wx3d = c.x;
+      o.wy3d = c.y;
+      o.wz3d = c.z;
+    } else {
+      // Fallback: place on XY plane using 2D map coords
+      o.wx3d = o.x;
+      o.wy3d = o.y;
+      o.wz3d = 0;
+    }
+  }
+}
+
+function worldToScreen3D(wx, wy, wz) {
+  var dx = wx - cam3d.px;
+  var dy = wy - cam3d.py;
+  var dz = wz - cam3d.pz;
+
+  var cosY = Math.cos(cam3d.yaw), sinY = Math.sin(cam3d.yaw);
+  var cosP = Math.cos(cam3d.pitch), sinP = Math.sin(cam3d.pitch);
+
+  // Right vector: (-sinY, cosY, 0)
+  var viewX = dx * (-sinY) + dy * cosY;
+  // Up vector: (-sinP*cosY, -sinP*sinY, cosP)
+  var viewY = dx * (-sinP * cosY) + dy * (-sinP * sinY) + dz * cosP;
+  // Forward vector: (cosP*cosY, cosP*sinY, sinP)
+  var viewZ = dx * (cosP * cosY) + dy * (cosP * sinY) + dz * sinP;
+
+  if (viewZ <= 0.0001) return null; // behind camera
+
+  var sw = W / devicePixelRatio;
+  var sh = H / devicePixelRatio;
+  var focalLen = 1 / Math.tan(cam3d.fov * DEG2RAD / 2);
+  var halfW = sw / 2;
+
+  return {
+    x: halfW + (viewX / viewZ) * focalLen * halfW,
+    y: sh / 2 - (viewY / viewZ) * focalLen * halfW,
+    depth: viewZ,
+    scale: focalLen / viewZ  // for sizing objects
+  };
+}
+
+function getVisibleObjects3D() {
+  var sw = W / devicePixelRatio;
+  var sh = H / devicePixelRatio;
+  var m = 80;
+  var result = [];
+  for (var i = 0; i < objects.length; i++) {
+    var o = objects[i];
+    // Skip solar system objects in 3D (too close, not meaningful)
+    if (o.category === 'solar') continue;
+    var sp = worldToScreen3D(o.wx3d, o.wy3d, o.wz3d);
+    if (!sp) continue;
+    if (sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m) {
+      o._sp3d = sp; // cache for draw pass
+      result.push(o);
+    }
+  }
+  // Depth sort: far to near
+  result.sort(function(a, b) { return b._sp3d.depth - a._sp3d.depth; });
+  return result;
+}
+
+// ─── Parallax ─────────────────────────────────────────────────────────
+
+function getParallaxOffset(obj) {
+  if (!parallaxState.active || !obj.constellation || obj.constellation !== parallaxState.constellation) return null;
+  var shift = parallaxState.shiftK / obj.dist * parallaxState.progress;
+  return { dx: shift * Math.cos(parallaxState.shiftAngle), dy: shift * Math.sin(parallaxState.shiftAngle) };
+}
+
+function startParallax(opts) {
+  resetParallax();
+  var delay = opts.delay || 2000;
+  var duration = opts.duration || 4000;
+  parallaxState.constellation = opts.constellation;
+  parallaxState.shiftK = opts.shiftK || 28000;
+  parallaxState.shiftAngle = opts.shiftAngle || 0;
+  parallaxState.label = opts.label || '';
+  parallaxState.progress = 0;
+  parallaxState.active = true;
+  parallaxState.flashAlpha = 0;
+
+  var delayTimer = setTimeout(function() {
+    // Flash effect when shift begins
+    parallaxState.flashAlpha = 1;
+    var accumulated = 0;
+    var lastTime = performance.now();
+    function tick() {
+      if (!parallaxState.active) return;
+      var now = performance.now();
+      if (!tourEngine.paused) {
+        accumulated += now - lastTime;
+      }
+      lastTime = now;
+      var t = Math.min(1, accumulated / duration);
+      parallaxState.progress = easeInOutCubic(t);
+      parallaxState.flashAlpha = Math.max(0, 1 - accumulated / 800);
+      state.dirty = true;
+      if (t < 1) {
+        parallaxState.animId = requestAnimationFrame(tick);
+      } else {
+        parallaxState.animId = null;
+      }
+    }
+    parallaxState.animId = requestAnimationFrame(tick);
+  }, delay);
+  parallaxState.animId = delayTimer;
+}
+
+function resetParallax() {
+  if (parallaxState.animId) {
+    cancelAnimationFrame(parallaxState.animId);
+    clearTimeout(parallaxState.animId);
+    parallaxState.animId = null;
+  }
+  if (parallaxState.active) {
+    parallaxState.active = false;
+    parallaxState.progress = 0;
+    state.dirty = true;
+  }
 }
 
 // ─── Visibility ───────────────────────────────────────────────────────
@@ -3264,6 +3497,7 @@ function drawHoverIcon() {
 // ─── Draw: reference distances ────────────────────────────────────────
 
 function drawReferenceDistances() {
+  if (state.mode3d) return;
   var vr = getViewRadius();
   var scale = getScale();
   var sw = W / devicePixelRatio;
@@ -3601,8 +3835,95 @@ function drawConstellationLines() {
   for (var cId in constellationDefs) {
     var cDef = constellationDefs[cId];
     var lines = cDef.lines;
+    var isParallax = parallaxState.active && parallaxState.constellation === cId && parallaxState.progress > 0.005;
 
-    // Draw lines
+    // During parallax: draw ghost lines, motion trails, flash effect
+    if (isParallax) {
+      var pp = parallaxState.progress;
+      var fa = parallaxState.flashAlpha || 0;
+
+      // Flash pulse when parallax begins
+      if (fa > 0.01) {
+        for (var fi = 0; fi < objects.length; fi++) {
+          var fo = objects[fi];
+          if (!fo.constellation || fo.constellation !== cId) continue;
+          var fsp = worldToScreen(fo.x, fo.y);
+          var fr = fo.radius * (3 + fa * 8);
+          var fg = ctx.createRadialGradient(fsp.x, fsp.y, 0, fsp.x, fsp.y, fr);
+          fg.addColorStop(0, 'rgba(122, 170, 238, ' + (0.4 * fa * alpha).toFixed(3) + ')');
+          fg.addColorStop(1, 'rgba(122, 170, 238, 0)');
+          ctx.fillStyle = fg;
+          ctx.beginPath();
+          ctx.arc(fsp.x, fsp.y, fr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Ghost constellation lines at original positions
+      ctx.strokeStyle = cDef.color.replace('ALPHA', (0.2 * alpha).toFixed(3));
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 5]);
+      for (var gli = 0; gli < lines.length; gli++) {
+        var ga = objByName[lines[gli][0]];
+        var gb = objByName[lines[gli][1]];
+        if (!ga || !gb) continue;
+        var gsa = worldToScreen(ga.x, ga.y);
+        var gsb = worldToScreen(gb.x, gb.y);
+        ctx.beginPath();
+        ctx.moveTo(gsa.x, gsa.y);
+        ctx.lineTo(gsb.x, gsb.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Ghost star dots + motion trail arrows
+      for (var gi = 0; gi < objects.length; gi++) {
+        var go = objects[gi];
+        if (!go.constellation || go.constellation !== cId) continue;
+        var gsp = worldToScreen(go.x, go.y);
+        var gpx = getParallaxOffset(go);
+        // Ghost dot at original position
+        ctx.fillStyle = 'rgba(150, 170, 220, ' + (0.3 * pp * alpha).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(gsp.x, gsp.y, go.radius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+        // Ring around ghost
+        ctx.strokeStyle = 'rgba(150, 170, 220, ' + (0.15 * pp * alpha).toFixed(3) + ')';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(gsp.x, gsp.y, go.radius * 2, 0, Math.PI * 2);
+        ctx.stroke();
+        // Motion trail with arrowhead
+        if (gpx) {
+          var gspS = worldToScreen(go.x + gpx.dx, go.y + gpx.dy);
+          var dx = gspS.x - gsp.x;
+          var dy = gspS.y - gsp.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 3) {
+            // Trail line — thicker for closer stars (bigger shift)
+            var trailW = Math.min(2.5, dist / 30);
+            ctx.strokeStyle = 'rgba(122, 170, 238, ' + (0.25 * pp * alpha).toFixed(3) + ')';
+            ctx.lineWidth = trailW;
+            ctx.beginPath();
+            ctx.moveTo(gsp.x, gsp.y);
+            ctx.lineTo(gspS.x, gspS.y);
+            ctx.stroke();
+            // Arrowhead
+            var angle = Math.atan2(dy, dx);
+            var aLen = Math.min(8, dist * 0.2);
+            ctx.fillStyle = 'rgba(122, 170, 238, ' + (0.3 * pp * alpha).toFixed(3) + ')';
+            ctx.beginPath();
+            ctx.moveTo(gspS.x, gspS.y);
+            ctx.lineTo(gspS.x - aLen * Math.cos(angle - 0.4), gspS.y - aLen * Math.sin(angle - 0.4));
+            ctx.lineTo(gspS.x - aLen * Math.cos(angle + 0.4), gspS.y - aLen * Math.sin(angle + 0.4));
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // Draw constellation lines (shifted if parallax active)
     ctx.strokeStyle = cDef.color.replace('ALPHA', (0.18 * alpha).toFixed(3));
     ctx.lineWidth = 1;
     ctx.setLineDash([6, 4]);
@@ -3611,8 +3932,10 @@ function drawConstellationLines() {
       var a = objByName[lines[li][0]];
       var b = objByName[lines[li][1]];
       if (!a || !b) continue;
-      var sa = worldToScreen(a.x, a.y);
-      var sb = worldToScreen(b.x, b.y);
+      var pxA = isParallax ? getParallaxOffset(a) : null;
+      var pxB = isParallax ? getParallaxOffset(b) : null;
+      var sa = worldToScreen(pxA ? a.x + pxA.dx : a.x, pxA ? a.y + pxA.dy : a.y);
+      var sb = worldToScreen(pxB ? b.x + pxB.dx : b.x, pxB ? b.y + pxB.dy : b.y);
       ctx.beginPath();
       ctx.moveTo(sa.x, sa.y);
       ctx.lineTo(sb.x, sb.y);
@@ -3626,7 +3949,8 @@ function drawConstellationLines() {
       var anchor = cDef.labelAnchor ? objByName[cDef.labelAnchor] : null;
       var lx, ly;
       if (anchor) {
-        var anchorSp = worldToScreen(anchor.x, anchor.y);
+        var aPx = isParallax ? getParallaxOffset(anchor) : null;
+        var anchorSp = worldToScreen(aPx ? anchor.x + aPx.dx : anchor.x, aPx ? anchor.y + aPx.dy : anchor.y);
         lx = anchorSp.x + (cDef.labelDx || 0);
         ly = anchorSp.y + (cDef.labelDy || 0);
       } else {
@@ -3649,10 +3973,16 @@ function drawConstellationLines() {
       }
       var labelBottom = ly + (nameLines.length - 1) * 14;
 
-      if (cDef.depthLabel) {
+      if (cDef.depthLabel && !isParallax) {
         ctx.font = '9px SF Mono, Menlo, monospace';
         ctx.fillStyle = cDef.color.replace('ALPHA', (0.2 * alpha).toFixed(3));
         ctx.fillText(cDef.depthLabel, lx, labelBottom + 14);
+      }
+      // Parallax viewpoint label
+      if (isParallax && parallaxState.label) {
+        ctx.font = '10px SF Mono, Menlo, monospace';
+        ctx.fillStyle = 'rgba(122, 170, 238, ' + (0.5 * parallaxState.progress * alpha).toFixed(3) + ')';
+        ctx.fillText(parallaxState.label, lx, labelBottom + 14);
       }
     }
   }
@@ -3764,6 +4094,11 @@ function drawDarkMatterHalos() {
 // ─── Main draw ────────────────────────────────────────────────────────
 
 function draw(ts) {
+  if (state.mode3d) { draw3D(ts); return; }
+  draw2D(ts);
+}
+
+function draw2D(ts) {
   var sw = W / devicePixelRatio;
   var sh = H / devicePixelRatio;
 
@@ -3803,7 +4138,10 @@ function draw(ts) {
   }
 
   pendingLabels = [];
-  visible.forEach(function(o) { drawObject(o, worldToScreen(o.x, o.y), ts); });
+  visible.forEach(function(o) {
+    var px = getParallaxOffset(o);
+    drawObject(o, worldToScreen(px ? o.x + px.dx : o.x, px ? o.y + px.dy : o.y), ts);
+  });
   drawLabels();
 
   drawSunIndicator();
@@ -3854,6 +4192,206 @@ function draw(ts) {
   updateUI();
 }
 
+// ─── 3D Draw ──────────────────────────────────────────────────────────
+
+function drawConstellationLines3D(projected) {
+  // projected: { name: screenPos } map
+  var objByName = {};
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].constellation) objByName[objects[i].name] = objects[i];
+  }
+
+  ctx.save();
+  for (var cId in constellationDefs) {
+    var cDef = constellationDefs[cId];
+    var lines = cDef.lines;
+
+    // Check if any stars are visible
+    var anyVisible = false;
+    for (var ci = 0; ci < lines.length; ci++) {
+      if (projected[lines[ci][0]] && projected[lines[ci][1]]) { anyVisible = true; break; }
+    }
+    if (!anyVisible) continue;
+
+    ctx.strokeStyle = cDef.color.replace('ALPHA', '0.25');
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+
+    for (var li = 0; li < lines.length; li++) {
+      var spA = projected[lines[li][0]];
+      var spB = projected[lines[li][1]];
+      if (!spA || !spB) continue;
+      ctx.beginPath();
+      ctx.moveTo(spA.x, spA.y);
+      ctx.lineTo(spB.x, spB.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Label — find centroid of visible stars
+    var cx = 0, cy = 0, count = 0;
+    for (var ni = 0; ni < lines.length; ni++) {
+      var sa = projected[lines[ni][0]];
+      var sb = projected[lines[ni][1]];
+      if (sa) { cx += sa.x; cy += sa.y; count++; }
+      if (sb) { cx += sb.x; cy += sb.y; count++; }
+    }
+    if (count > 0) {
+      cx /= count; cy /= count;
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = cDef.color.replace('ALPHA', '0.35');
+      ctx.textAlign = 'center';
+      var nameLines = cDef.name.split('\n');
+      for (var nl = 0; nl < nameLines.length; nl++) {
+        ctx.fillText(nameLines[nl], cx, cy - 20 + nl * 14);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function draw3D(ts) {
+  var sw = W / devicePixelRatio;
+  var sh = H / devicePixelRatio;
+
+  // Animate camera if flying
+  if (cam3dAnim.active) {
+    var elapsed = ts - cam3dAnim.startTime;
+    var t = Math.min(1, elapsed / cam3dAnim.duration);
+    var e = easeInOutCubic(t);
+    var from = cam3dAnim.from, to = cam3dAnim.to;
+    cam3d.px = from.px + (to.px - from.px) * e;
+    cam3d.py = from.py + (to.py - from.py) * e;
+    cam3d.pz = from.pz + (to.pz - from.pz) * e;
+    cam3d.fov = from.fov + (to.fov - from.fov) * e;
+    // Interpolate yaw with shortest path
+    var dyaw = to.yaw - from.yaw;
+    while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
+    while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+    cam3d.yaw = from.yaw + dyaw * e;
+    cam3d.pitch = from.pitch + (to.pitch - from.pitch) * e;
+    if (t >= 1) cam3dAnim.active = false;
+    state.dirty = true;
+  }
+
+  ctx.clearRect(0, 0, sw, sh);
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, sw, sh);
+
+  // Background starfield (reuse 2D)
+  drawStarfield(ts);
+
+  // Get visible objects and their projections
+  var visible = getVisibleObjects3D();
+  var projected = {}; // name -> screen pos, for constellation lines
+
+  for (var i = 0; i < visible.length; i++) {
+    var o = visible[i];
+    if (o.constellation && o._sp3d) {
+      projected[o.name] = o._sp3d;
+    }
+  }
+
+  // Draw constellation lines behind objects
+  drawConstellationLines3D(projected);
+
+  // Draw objects (already depth sorted far→near)
+  pendingLabels = [];
+  for (var j = 0; j < visible.length; j++) {
+    var obj = visible[j];
+    var sp = obj._sp3d;
+    if (!sp) continue;
+
+    // Scale radius by perspective
+    // Apparent brightness scaling: use inverse-distance with log damping
+    var appMag = Math.max(0.5, Math.min(4, 1 + Math.log10(Math.max(1, 50 / sp.depth))));
+    var r3d = Math.max(1.5, obj.radius * appMag);
+
+    // Draw glow
+    var gi = effects.glowIntensity;
+    var glowR = r3d * 3 * gi;
+    var g = ctx.createRadialGradient(sp.x, sp.y, r3d * 0.3, sp.x, sp.y, glowR);
+    g.addColorStop(0, obj.glow);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw core
+    ctx.fillStyle = obj.color;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r3d, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Selection ring
+    if (state.selected === obj) {
+      ctx.strokeStyle = obj.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, r3d + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Label
+    pendingLabels.push({
+      name: obj.name,
+      dist: obj.dist,
+      x: sp.x,
+      y: sp.y + r3d + 16,
+      sel: state.selected === obj,
+      priority: (state.selected === obj ? 10000 : 0) + obj.radius
+    });
+  }
+  drawLabels();
+
+  // Draw 3D HUD
+  draw3DHUD(sw, sh);
+
+  drawVignette();
+}
+
+function draw3DHUD(sw, sh) {
+  ctx.save();
+
+  // Camera position label
+  var posLabel = 'Earth';
+  if (Math.abs(cam3d.px) > 0.1 || Math.abs(cam3d.py) > 0.1 || Math.abs(cam3d.pz) > 0.1) {
+    // Check if near a known object
+    var nearest = null, nearDist = Infinity;
+    for (var i = 0; i < objects.length; i++) {
+      var o = objects[i];
+      if (o.ra === undefined) continue;
+      var dx = cam3d.px - o.wx3d, dy = cam3d.py - o.wy3d, dz = cam3d.pz - o.wz3d;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d < nearDist) { nearDist = d; nearest = o; }
+    }
+    posLabel = nearest && nearDist < nearest.dist * 0.1 ? nearest.name : 'Custom';
+  }
+
+  ctx.font = '11px -apple-system, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5a5a7a';
+  ctx.fillText('Viewing from ' + posLabel, 52, sh - 42);
+
+  // FOV indicator
+  ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, sh - 26);
+
+  // Look direction in RA/Dec
+  var lookRA = cam3d.yaw / DEG2RAD;
+  while (lookRA < 0) lookRA += 360;
+  while (lookRA >= 360) lookRA -= 360;
+  var lookDec = cam3d.pitch / DEG2RAD;
+  ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 52, sh - 10);
+
+  // Mode label
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#3a3a55';
+  ctx.fillText('3D Sky View', sw - 16, 20);
+
+  ctx.restore();
+}
+
 // ─── Animation loop ───────────────────────────────────────────────────
 
 var lastFrameTime = 0;
@@ -3879,6 +4417,9 @@ function animationLoop(ts) {
 
   // Light pulse animation
   if (lightPulse.active) state.dirty = true;
+
+  // 3D camera animation
+  if (cam3dAnim.active) state.dirty = true;
 
   if (state.dirty) {
     state.dirty = false;
@@ -4199,6 +4740,7 @@ var tourEngine = {
   dwellDuration: 0,
   dwellElapsed: 0,
   startedAt: 0,
+  userDwellMs: 0,
 
   start: function(id) {
     dismissWelcome();
@@ -4227,11 +4769,14 @@ var tourEngine = {
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     var tf = document.getElementById('tour-timer-fill'); tf.style.width = '0%'; tf.classList.remove('sparking');
+    resetParallax();
     state.warpIntensity = 0;
     var tourBtn = document.getElementById('tour-btn');
     tourBtn.textContent = 'Tours \u25be';
     tourBtn.classList.remove('running');
-    document.getElementById('narration').classList.remove('visible');
+    var narrEl = document.getElementById('narration');
+    narrEl.classList.remove('visible');
+    narrEl.classList.remove('flipped');
     document.getElementById('narr-pause').textContent = 'Pause';
     state.dirty = true;
   },
@@ -4314,6 +4859,7 @@ var tourEngine = {
     if (this.zoomAnimId) { cancelAnimationFrame(this.zoomAnimId); this.zoomAnimId = null; }
     if (this.timerAnimId) { cancelAnimationFrame(this.timerAnimId); this.timerAnimId = null; }
     var tf = document.getElementById('tour-timer-fill'); tf.style.width = '0%'; tf.classList.remove('sparking');
+    resetParallax();
 
     this.stepIndex++;
     var steps = tourDefs[this.tourId].steps;
@@ -4421,15 +4967,16 @@ var tourEngine = {
       } else {
         self.zoomAnimId = null;
         self.showNarration(wp);
-        self.dwellDuration = wp.dwell;
+        self.dwellDuration = self.userDwellMs > 0 ? self.userDwellMs : wp.dwell;
         self.dwellElapsed = 0;
         self.dwellStart = performance.now();
         self.startTimerBar();
+        if (wp.parallax) startParallax(wp.parallax);
         if (!self.paused) {
           self.dwellTimeout = setTimeout(function() {
             self.dwellTimeout = null;
             self.nextStep();
-          }, wp.dwell);
+          }, self.dwellDuration);
         }
       }
     }
@@ -4473,7 +5020,12 @@ var tourEngine = {
       dotsEl.appendChild(dot);
     }
 
-    document.getElementById('narration').classList.add('visible');
+    var narrEl = document.getElementById('narration');
+    narrEl.classList.remove('flipped');
+    narrEl.classList.add('visible');
+    var dwellSec = Math.round((this.userDwellMs > 0 ? this.userDwellMs : wp.dwell) / 1000);
+    document.getElementById('narr-dwell-slider').value = dwellSec;
+    document.getElementById('narr-dwell-input').value = dwellSec;
   }
 };
 
@@ -4527,6 +5079,50 @@ document.addEventListener('click', function() { closeTourDropdown(); });
 document.getElementById('narr-prev').addEventListener('click', function() { tourEngine.prevStep(); });
 document.getElementById('narr-pause').addEventListener('click', function() { tourEngine.togglePause(); });
 document.getElementById('narr-next').addEventListener('click', function() { tourEngine.nextStep(); });
+
+// ─── Narration card flip & dwell settings ─────────────────────────────
+
+(function() {
+  var narration = document.getElementById('narration');
+  var settingsBtn = document.getElementById('narr-settings-btn');
+  var dwellSlider = document.getElementById('narr-dwell-slider');
+  var dwellInput = document.getElementById('narr-dwell-input');
+
+  settingsBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    narration.classList.toggle('flipped');
+  });
+
+  function syncDwell(seconds) {
+    seconds = Math.max(3, Math.min(30, Math.round(seconds)));
+    dwellSlider.value = seconds;
+    dwellInput.value = seconds;
+    tourEngine.userDwellMs = seconds * 1000;
+    if (tourEngine.active && !tourEngine.paused && tourEngine.dwellDuration > 0) {
+      var elapsed = tourEngine.dwellElapsed + (performance.now() - tourEngine.dwellStart);
+      var newDwell = seconds * 1000;
+      tourEngine.dwellDuration = newDwell;
+      if (tourEngine.dwellTimeout) {
+        clearTimeout(tourEngine.dwellTimeout);
+        tourEngine.dwellTimeout = null;
+      }
+      var remaining = Math.max(0, newDwell - elapsed);
+      if (remaining > 0) {
+        tourEngine.dwellTimeout = setTimeout(function() {
+          tourEngine.dwellTimeout = null;
+          tourEngine.nextStep();
+        }, remaining);
+      } else {
+        tourEngine.nextStep();
+      }
+    }
+  }
+
+  dwellSlider.addEventListener('input', function() { syncDwell(Number(this.value)); });
+  dwellInput.addEventListener('change', function() { syncDwell(Number(this.value)); });
+  dwellInput.addEventListener('click', function(e) { e.stopPropagation(); });
+  dwellSlider.addEventListener('click', function(e) { e.stopPropagation(); });
+})();
 
 // ─── Glossary panel ───────────────────────────────────────────────────
 
@@ -4935,6 +5531,12 @@ slider.addEventListener('input', function() {
 canvas.addEventListener('wheel', function(e) {
   e.preventDefault();
   dismissWelcome();
+  if (state.mode3d) {
+    // 3D: scroll changes FOV
+    cam3d.fov = Math.max(5, Math.min(120, cam3d.fov + e.deltaY * 0.05));
+    state.dirty = true;
+    return;
+  }
   if (tourEngine.active) tourEngine.stop();
   var prevZoom = state.zoom;
   state.zoom = Math.max(0, Math.min(1000, state.zoom - e.deltaY * 0.5));
@@ -4961,7 +5563,8 @@ function hasGlossaryEntry(name) {
 
 // ─── Mouse drag panning ─────────────────────────────────────────────
 
-var dragState = { dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false };
+var dragState = { dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false,
+  startYaw: 0, startPitch: 0 };
 
 canvas.addEventListener('mousedown', function(e) {
   if (e.button !== 0) return;
@@ -4970,8 +5573,13 @@ canvas.addEventListener('mousedown', function(e) {
   dragState.moved = false;
   dragState.startX = e.clientX;
   dragState.startY = e.clientY;
-  dragState.startPanX = state.panX;
-  dragState.startPanY = state.panY;
+  if (state.mode3d) {
+    dragState.startYaw = cam3d.yaw;
+    dragState.startPitch = cam3d.pitch;
+  } else {
+    dragState.startPanX = state.panX;
+    dragState.startPanY = state.panY;
+  }
   canvas.classList.add('grabbing');
 });
 
@@ -4981,11 +5589,20 @@ window.addEventListener('mousemove', function(e) {
     var dy = e.clientY - dragState.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
     if (dragState.moved) {
-      var scale = getScale();
-      state.panX = dragState.startPanX - dx / scale;
-      state.panY = dragState.startPanY - dy / scale;
-      state.dirty = true;
-      updateRecenterBtn();
+      if (state.mode3d) {
+        // Sensitivity scales with FOV
+        var sens = cam3d.fov / 1000;
+        cam3d.yaw = dragState.startYaw - dx * sens * DEG2RAD;
+        cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
+          dragState.startPitch + dy * sens * DEG2RAD));
+        state.dirty = true;
+      } else {
+        var scale = getScale();
+        state.panX = dragState.startPanX - dx / scale;
+        state.panY = dragState.startPanY - dy / scale;
+        state.dirty = true;
+        updateRecenterBtn();
+      }
     }
     return;
   }
@@ -4995,7 +5612,7 @@ window.addEventListener('mouseup', function() {
   if (dragState.dragging) {
     dragState.dragging = false;
     canvas.classList.remove('grabbing');
-    if (dragState.moved) updateHash();
+    if (dragState.moved && !state.mode3d) updateHash();
   }
 });
 
@@ -5005,12 +5622,13 @@ canvas.addEventListener('mousemove', function(e) {
   var rect = canvas.getBoundingClientRect();
   var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
 
-  var visible = getVisibleObjects();
+  var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
   var hover = null, minD = 25;
   state.hoverIconPos = null;
 
   visible.forEach(function(o) {
-    var sp = worldToScreen(o.x, o.y);
+    var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
+    if (!sp) return;
     var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
     if (d < minD) { minD = d; hover = o; }
   });
@@ -5020,9 +5638,11 @@ canvas.addEventListener('mousemove', function(e) {
   if (hover) {
     var gName = hasGlossaryEntry(hover.name);
     if (gName) {
-      var hsp = worldToScreen(hover.x, hover.y);
-      state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
-      state.dirty = true;
+      var hsp = state.mode3d ? hover._sp3d : worldToScreen(hover.x, hover.y);
+      if (hsp) {
+        state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
+        state.dirty = true;
+      }
     }
   }
 
@@ -5054,10 +5674,11 @@ canvas.addEventListener('click', function(e) {
     tourEngine.stop(); return;
   }
 
-  var visible = getVisibleObjects();
+  var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
   var hit = null, minD = 25;
   visible.forEach(function(o) {
-    var sp = worldToScreen(o.x, o.y);
+    var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
+    if (!sp) return;
     var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
     if (d < minD) { minD = d; hit = o; }
   });
@@ -5097,6 +5718,7 @@ canvas.addEventListener('click', function(e) {
 canvas.addEventListener('dblclick', function(e) {
   e.preventDefault();
   if (tourEngine.active) return;
+  if (state.mode3d) return;
 
   var rect = canvas.getBoundingClientRect();
   var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
@@ -5299,6 +5921,79 @@ document.getElementById('info-close').addEventListener('click', function() {
 });
 
 
+// ─── 3D Mode Toggle ─────────────────────────────────────────────────
+
+var cam3dPresets = {
+  earth: { px: 0, py: 0, pz: 0, yaw: 83 * DEG2RAD, pitch: -1 * DEG2RAD, fov: 60, label: 'Earth' },
+  trappist: { px: 0, py: 0, pz: 0, yaw: 346.62 * DEG2RAD, pitch: -5.04 * DEG2RAD, fov: 60, label: 'TRAPPIST-1' }
+};
+
+// Compute TRAPPIST-1 position for its preset
+(function() {
+  var t1 = null;
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].name === 'TRAPPIST-1 System') { t1 = objects[i]; break; }
+  }
+  if (t1 && t1.ra !== undefined) {
+    var c = raDecToXYZ(t1.ra, t1.dec, t1.dist);
+    cam3dPresets.trappist.px = c.x;
+    cam3dPresets.trappist.py = c.y;
+    cam3dPresets.trappist.pz = c.z;
+    // Look toward Orion from TRAPPIST-1
+    cam3dPresets.trappist.yaw = 83 * DEG2RAD;
+    cam3dPresets.trappist.pitch = -1 * DEG2RAD;
+  }
+})();
+
+function toggle3D() {
+  state.mode3d = !state.mode3d;
+  var btn3d = document.getElementById('mode3d-btn');
+  var presetBar = document.getElementById('cam3d-presets');
+
+  if (state.mode3d) {
+    // Save 2D state
+    state.lastPanX = state.panX;
+    state.lastPanY = state.panY;
+    state.lastZoom = state.zoom;
+    // Initialize camera at Earth looking toward Orion
+    var preset = cam3dPresets.earth;
+    cam3d.px = preset.px; cam3d.py = preset.py; cam3d.pz = preset.pz;
+    cam3d.yaw = preset.yaw; cam3d.pitch = preset.pitch; cam3d.fov = preset.fov;
+    btn3d.classList.add('active');
+    presetBar.style.display = 'flex';
+    // Hide 2D-only controls
+    document.querySelector('.zoom-control').style.display = 'none';
+    document.getElementById('hint').style.display = 'none';
+    document.querySelector('.scale-bar').style.display = 'none';
+  } else {
+    // Restore 2D state
+    state.panX = state.lastPanX;
+    state.panY = state.lastPanY;
+    state.zoom = state.lastZoom;
+    slider.value = Math.round(state.zoom);
+    btn3d.classList.remove('active');
+    presetBar.style.display = 'none';
+    cam3dAnim.active = false;
+    document.querySelector('.zoom-control').style.display = '';
+    document.getElementById('hint').style.display = '';
+    document.querySelector('.scale-bar').style.display = '';
+  }
+  state.dirty = true;
+}
+
+function flyCamera(presetName, duration) {
+  var preset = cam3dPresets[presetName];
+  if (!preset) return;
+  cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
+    yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
+  cam3dAnim.to = { px: preset.px, py: preset.py, pz: preset.pz,
+    yaw: preset.yaw, pitch: preset.pitch, fov: preset.fov };
+  cam3dAnim.duration = duration || 2000;
+  cam3dAnim.startTime = performance.now();
+  cam3dAnim.active = true;
+  state.dirty = true;
+}
+
 // ─── Keyboard shortcuts ─────────────────────────────────────────────
 
 var presetKeys = { '1': 'solar', '2': 'stellar', '3': 'constellations', '4': 'galaxy', '5': 'local', '6': 'cosmic' };
@@ -5381,6 +6076,7 @@ document.addEventListener('keydown', function(e) {
   }
 
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
+  if (e.key === 'v' || e.key === 'V') { toggle3D(); return; }
   if (e.key === 'l' || e.key === 'L') {
     if (state.selected && state.selected.dist > 0) startLightPulse(state.selected);
     return;
@@ -5451,7 +6147,7 @@ document.addEventListener('keydown', function(e) {
 
 // ─── Mobile touch ───────────────────────────────────────────────────
 
-var touchState = { startDist: 0, startZoom: 0, pinching: false, panning: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false };
+var touchState = { startDist: 0, startZoom: 0, pinching: false, panning: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false, startYaw: 0, startPitch: 0 };
 
 function getTouchDist(touches) {
   var dx = touches[0].clientX - touches[1].clientX;
@@ -5464,7 +6160,7 @@ canvas.addEventListener('touchstart', function(e) {
   dismissWelcome();
   if (e.touches.length === 2) {
     touchState.startDist = getTouchDist(e.touches);
-    touchState.startZoom = state.zoom;
+    touchState.startZoom = state.mode3d ? cam3d.fov : state.zoom;
     touchState.pinching = true;
     touchState.panning = false;
   } else if (e.touches.length === 1) {
@@ -5473,8 +6169,13 @@ canvas.addEventListener('touchstart', function(e) {
     touchState.moved = false;
     touchState.startX = e.touches[0].clientX;
     touchState.startY = e.touches[0].clientY;
-    touchState.startPanX = state.panX;
-    touchState.startPanY = state.panY;
+    if (state.mode3d) {
+      touchState.startYaw = cam3d.yaw;
+      touchState.startPitch = cam3d.pitch;
+    } else {
+      touchState.startPanX = state.panX;
+      touchState.startPanY = state.panY;
+    }
   }
 }, { passive: false });
 
@@ -5483,25 +6184,38 @@ canvas.addEventListener('touchmove', function(e) {
   if (e.touches.length === 2 && touchState.pinching) {
     var dist = getTouchDist(e.touches);
     var ratio = touchState.startDist / dist;
-    var logRatio = Math.log(ratio) / Math.log(2);
-    var newZoom = touchState.startZoom + logRatio * 100;
-    var prevZoom = state.zoom;
-    state.zoom = Math.max(0, Math.min(1000, newZoom));
-    panTowardSolOnZoomIn(prevZoom, state.zoom);
-    slider.value = Math.round(state.zoom);
-    state.activePreset = null;
-    state.dirty = true;
-    if (tourEngine.active) tourEngine.stop();
+    if (state.mode3d) {
+      cam3d.fov = Math.max(5, Math.min(120, touchState.startZoom * ratio));
+      state.dirty = true;
+    } else {
+      var logRatio = Math.log(ratio) / Math.log(2);
+      var newZoom = touchState.startZoom + logRatio * 100;
+      var prevZoom = state.zoom;
+      state.zoom = Math.max(0, Math.min(1000, newZoom));
+      panTowardSolOnZoomIn(prevZoom, state.zoom);
+      slider.value = Math.round(state.zoom);
+      state.activePreset = null;
+      state.dirty = true;
+      if (tourEngine.active) tourEngine.stop();
+    }
   } else if (e.touches.length === 1 && touchState.panning) {
     var dx = e.touches[0].clientX - touchState.startX;
     var dy = e.touches[0].clientY - touchState.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchState.moved = true;
     if (touchState.moved) {
-      var scale = getScale();
-      state.panX = touchState.startPanX - dx / scale;
-      state.panY = touchState.startPanY - dy / scale;
-      state.dirty = true;
-      updateRecenterBtn();
+      if (state.mode3d) {
+        var sens = cam3d.fov / 1000;
+        cam3d.yaw = touchState.startYaw - dx * sens * DEG2RAD;
+        cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
+          touchState.startPitch + dy * sens * DEG2RAD));
+        state.dirty = true;
+      } else {
+        var scale = getScale();
+        state.panX = touchState.startPanX - dx / scale;
+        state.panY = touchState.startPanY - dy / scale;
+        state.dirty = true;
+        updateRecenterBtn();
+      }
     }
   }
 }, { passive: false });
@@ -5527,9 +6241,37 @@ canvas.addEventListener('touchend', function(e) {
 // ─── Init ──────────────────────────────────────────────────────────────
 
 initParticles();
+initObjects3D();
 buildTourDropdown();
 buildGlossary();
 buildEffectsPanel();
+
+// 3D mode button
+document.getElementById('mode3d-btn').addEventListener('click', toggle3D);
+
+// Build 3D camera presets bar
+(function() {
+  var bar = document.getElementById('cam3d-presets');
+  var label = document.createElement('span');
+  label.className = 'cam-label';
+  label.textContent = 'Fly to:';
+  bar.appendChild(label);
+
+  var presetList = [
+    { key: 'earth', text: 'Earth Sky' },
+    { key: 'trappist', text: 'TRAPPIST-1 Sky' }
+  ];
+  for (var i = 0; i < presetList.length; i++) {
+    var btn = document.createElement('button');
+    btn.className = 'cam-preset-btn';
+    btn.textContent = presetList[i].text;
+    btn.setAttribute('data-cam-preset', presetList[i].key);
+    btn.addEventListener('click', function() {
+      flyCamera(this.getAttribute('data-cam-preset'), 2000);
+    });
+    bar.appendChild(btn);
+  }
+})();
 
 // Set initial welcome content
 var welcomeShowing = true;
