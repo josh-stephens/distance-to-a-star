@@ -68,22 +68,74 @@ var objectLayers = {
     { ratio: 0.2, color: '#666655', label: 'Core' },
     { ratio: 0.7, color: '#888877', label: 'Mantle' },
     { ratio: 1.0, color: '#aaaaaa', label: 'Crust' }
+  ],
+  'Uranus': [
+    { ratio: 0.2, color: '#556677', label: 'Rocky core' },
+    { ratio: 0.5, color: '#668899', label: 'Water/ammonia ice' },
+    { ratio: 0.8, color: '#77aabb', label: 'Hydrogen/helium' },
+    { ratio: 1.0, color: '#88ccdd', label: 'Atmosphere' }
+  ],
+  'Neptune': [
+    { ratio: 0.2, color: '#334466', label: 'Rocky core' },
+    { ratio: 0.5, color: '#446688', label: 'Water/ammonia ice' },
+    { ratio: 0.8, color: '#5588aa', label: 'Hydrogen/helium' },
+    { ratio: 1.0, color: '#4466cc', label: 'Atmosphere' }
+  ],
+  'Mercury': [
+    { ratio: 0.4, color: '#cc6633', label: 'Iron core' },
+    { ratio: 0.85, color: '#aa8866', label: 'Silicate mantle' },
+    { ratio: 1.0, color: '#b5a08a', label: 'Crust' }
+  ],
+  'Pluto': [
+    { ratio: 0.3, color: '#887766', label: 'Rocky core' },
+    { ratio: 0.7, color: '#998877', label: 'Water ice mantle' },
+    { ratio: 1.0, color: '#ccbbaa', label: 'Nitrogen ice crust' }
   ]
 };
 
-// ─── Orbital plane data ───────────────────────────────────────────────
-// sma = semi-major axis in AU, inc = inclination in degrees, lan = longitude of ascending node
+// ─── Orbital elements (J2000 epoch) ──────────────────────────────────
+// sma = semi-major axis (AU), ecc = eccentricity, inc = inclination (deg),
+// lan = longitude of ascending node (deg), aop = argument of perihelion (deg),
+// M0 = mean anomaly at J2000 (deg), period = orbital period (days)
 
 var orbitalPlaneData = {
-  'Mercury':  { sma: 0.39,  inc: 7.0,   lan: 48.3 },
-  'Venus':    { sma: 0.72,  inc: 3.4,   lan: 76.7 },
-  'Earth':    { sma: 1.0,   inc: 0.0,   lan: 0.0 },
-  'Mars':     { sma: 1.52,  inc: 1.85,  lan: 49.6 },
-  'Jupiter':  { sma: 5.20,  inc: 1.30,  lan: 100.5 },
-  'Saturn':   { sma: 9.58,  inc: 2.49,  lan: 113.7 },
-  'Uranus':   { sma: 19.2,  inc: 0.77,  lan: 74.0 },
-  'Neptune':  { sma: 30.07, inc: 1.77,  lan: 131.8 },
-  'Pluto':    { sma: 39.5,  inc: 17.14, lan: 110.3 }
+  'Mercury':  { sma: 0.387,  ecc: 0.2056, inc: 7.00,  lan: 48.33,  aop: 29.12,  M0: 174.79, period: 87.97 },
+  'Venus':    { sma: 0.723,  ecc: 0.0068, inc: 3.39,  lan: 76.68,  aop: 54.85,  M0: 50.42,  period: 224.70 },
+  'Earth':    { sma: 1.000,  ecc: 0.0167, inc: 0.00,  lan: 0.0,    aop: 102.94, M0: 357.53, period: 365.256 },
+  'Mars':     { sma: 1.524,  ecc: 0.0934, inc: 1.85,  lan: 49.56,  aop: 286.50, M0: 19.37,  period: 686.97 },
+  'Jupiter':  { sma: 5.203,  ecc: 0.0484, inc: 1.30,  lan: 100.46, aop: 273.87, M0: 20.02,  period: 4332.59 },
+  'Saturn':   { sma: 9.537,  ecc: 0.0539, inc: 2.49,  lan: 113.72, aop: 339.39, M0: 317.02, period: 10759.22 },
+  'Uranus':   { sma: 19.19,  ecc: 0.0473, inc: 0.77,  lan: 74.00,  aop: 96.73,  M0: 142.24, period: 30688.5 },
+  'Neptune':  { sma: 30.07,  ecc: 0.0086, inc: 1.77,  lan: 131.78, aop: 273.19, M0: 256.23, period: 60182.0 },
+  'Pluto':    { sma: 39.48,  ecc: 0.2488, inc: 17.14, lan: 110.30, aop: 113.76, M0: 14.53,  period: 90560.0 }
+};
+
+// ─── Rotation data ───────────────────────────────────────────────────
+// rotPeriod = sidereal rotation period (hours), tilt = axial tilt (deg)
+// Negative rotPeriod = retrograde rotation (Venus, Uranus)
+
+var rotationData = {
+  'Sun (You Are Here)': { rotPeriod: 609.12,   tilt: 7.25 },
+  'Mercury':            { rotPeriod: 1407.6,   tilt: 0.034 },
+  'Venus':              { rotPeriod: -5832.5,  tilt: 177.4 },
+  'Earth':              { rotPeriod: 23.934,   tilt: 23.44 },
+  'Moon':               { rotPeriod: 655.7,    tilt: 6.68 },
+  'Mars':               { rotPeriod: 24.623,   tilt: 25.19 },
+  'Jupiter':            { rotPeriod: 9.925,    tilt: 3.13 },
+  'Saturn':             { rotPeriod: 10.656,   tilt: 26.73 },
+  'Uranus':             { rotPeriod: -17.24,   tilt: 97.77 },
+  'Neptune':            { rotPeriod: 16.11,    tilt: 28.32 },
+  'Pluto':              { rotPeriod: -153.29,  tilt: 122.53 },
+  'Charon':             { rotPeriod: 153.29,   tilt: 0.0 }
+};
+
+// ─── Time state ──────────────────────────────────────────────────────
+
+var simTime = {
+  epoch: Date.now(),         // real-world epoch when sim started
+  multiplier: 1,             // 1 = real-time, 3600 = 1 hr/sec, etc.
+  paused: false,
+  J2000: Date.UTC(2000, 0, 1, 12, 0, 0) // J2000.0 epoch in ms
 };
 
 // ─── Category visibility ranges ────────────────────────────────────────
@@ -196,6 +248,10 @@ var objects = [
     type: "Dwarf planet", category: "solar", physRadius: 1.256e-10,
     facts: [["Distance from Sun", "39.5 AU (5.5 light-hr)"], ["Orbital period", "248 years"], ["Heart feature", "Tombaugh Regio"]],
     desc: "Once the 9th planet, now classified as a dwarf planet. New Horizons revealed its heart-shaped nitrogen ice plain in 2015." },
+  { name: "Charon", x: 25.0 * AU_IN_LY + 1.31e-9, y: 30.0 * AU_IN_LY + 0.8e-9, dist: 39.5 * AU_IN_LY, radius: 0.7, color: "#aa9988", glow: "#aa998822",
+    type: "Natural satellite", category: "solar", physRadius: 6.39e-11,
+    facts: [["Distance from Pluto", "19,571 km"], ["Orbital period", "6.39 days"], ["Diameter", "1,212 km"]],
+    desc: "Pluto's largest moon, so big relative to Pluto that they orbit a common center of gravity above Pluto's surface. The pair are sometimes called a double dwarf planet. New Horizons revealed canyons, mountains, and a dark polar cap nicknamed Mordor." },
 
   // Spacecraft
   { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
@@ -719,6 +775,7 @@ var glossaryData = [
   { name: "Uranus", cat: "Solar System", color: "#88ccdd", short: "Sideways ice giant", long: "Unique among the planets for its extreme 98-degree axial tilt, likely caused by a massive ancient collision. Uranus essentially rolls around the Sun on its side, giving it the most extreme seasons in the solar system. Discovered by William Herschel in 1781, it was the first planet found with a telescope." },
   { name: "Neptune", cat: "Solar System", color: "#4466cc", short: "The windiest world", long: "The farthest planet from the Sun, Neptune hosts the fastest winds in the solar system at up to 2,100 km/h. Its largest moon Triton orbits backward, suggesting it was captured from the Kuiper Belt. Neptune was the first planet found by mathematical prediction rather than direct observation, discovered in 1846." },
   { name: "Pluto", cat: "Solar System", color: "#ccbbaa", short: "The demoted world", long: "Once the ninth planet, Pluto was reclassified as a dwarf planet in 2006 when the International Astronomical Union redefined what constitutes a planet. Orbiting in the Kuiper Belt at an average of 39.5 AU, it was visited by NASA's New Horizons spacecraft in 2015, revealing a world of nitrogen ice plains, mountains of water ice, and a thin atmosphere." },
+  { name: "Charon", cat: "Solar System", color: "#aa9988", short: "Pluto's giant companion", long: "At 1,212 km across, Charon is more than half Pluto's diameter, making it the largest moon relative to its parent body in the solar system. The pair orbit each other around a point in space above Pluto's surface, leading some to call them a double dwarf planet. New Horizons revealed a surprisingly complex world with canyons, mountains, and a dark reddish polar cap informally named Mordor Macula." },
 
   // Spacecraft
   { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
@@ -1062,4 +1119,66 @@ var cam3dLookTargets = [
   { key: 'cassiopeia', label: 'Cassiopeia', type: 'constellation', id: 'cassiopeia' },
   { key: 'milkyway', label: 'Milky Way', type: 'object', obj: 'Milky Way (You Are Here)' },
   { key: 'greatattractor', label: 'Great Attractor', type: 'object', obj: 'Great Attractor' }
+];
+
+// ─── Scene presets ────────────────────────────────────────────────────
+// Each scene captures a complete viewing experience: camera, time, effects, HUD
+
+var scenePresets = [
+  { key: 'inner-planets',
+    label: 'Inner Planets',
+    desc: 'Watch Mercury, Venus, Earth and Mars orbit the Sun',
+    orbitObj: 'Earth', orbitDistAU: 0.3,
+    orbitYawDeg: 175.6, orbitPitchDeg: -17,
+    timeSpeed: 604800, hudStyle: 'cinematic',
+    effects: { orbitalPlanes: true, orbits: true } },
+  { key: 'solar-system',
+    label: 'Solar System',
+    desc: 'All planets from above — a year every second',
+    orbitObj: 'Sun (You Are Here)', orbitDistAU: 60,
+    orbitYawDeg: 0, orbitPitchDeg: 80,
+    timeSpeed: 31557600, hudStyle: 'cinematic',
+    effects: { orbitalPlanes: true, orbits: true } },
+  { key: 'jupiter-system',
+    label: 'Jupiter System',
+    desc: 'The king of planets up close',
+    orbitObj: 'Jupiter', orbitDistAU: 0.02,
+    orbitYawDeg: 45, orbitPitchDeg: 20,
+    timeSpeed: 86400, hudStyle: 'cinematic',
+    effects: { orbitalPlanes: true } },
+  { key: 'pluto-charon',
+    label: 'Pluto & Charon',
+    desc: 'The binary dwarf planet dance',
+    orbitObj: 'Pluto', orbitDistAU: 0.002,
+    orbitYawDeg: 30, orbitPitchDeg: 35,
+    timeSpeed: 86400, hudStyle: 'minimal',
+    effects: { orbitalPlanes: true } },
+  { key: 'mercury-sprint',
+    label: 'Mercury Sprint',
+    desc: 'The fastest planet — one orbit in 88 days',
+    orbitObj: 'Mercury', orbitDistAU: 0.15,
+    orbitYawDeg: 0, orbitPitchDeg: 10,
+    timeSpeed: 604800, hudStyle: 'bold',
+    effects: { orbitalPlanes: true, orbits: true } },
+  { key: 'earth-moon',
+    label: 'Earth & Moon',
+    desc: 'Watch the Moon orbit — one cycle per month',
+    orbitObj: 'Earth', orbitDistAU: 0.01,
+    orbitYawDeg: 90, orbitPitchDeg: 25,
+    timeSpeed: 86400, hudStyle: 'cinematic',
+    effects: { orbitalPlanes: false } },
+  { key: 'starfield',
+    label: 'Starfield',
+    desc: 'Drift among the stars from Earth',
+    orbitObj: 'Earth', orbitDistAU: 0.0001,
+    orbitYawDeg: 83, orbitPitchDeg: -1,
+    timeSpeed: 1, hudStyle: 'retro',
+    effects: { orbitalPlanes: false, orbits: false } },
+  { key: 'deep-space',
+    label: 'Deep Space',
+    desc: 'View the cosmic web from the Great Attractor',
+    orbitObj: 'Great Attractor', orbitDistAU: 1e9,
+    orbitYawDeg: 0, orbitPitchDeg: 30,
+    timeSpeed: 1, hudStyle: 'minimal',
+    effects: { orbitalPlanes: false } }
 ];

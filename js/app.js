@@ -44,25 +44,25 @@ var orbitMode = {
 
 var hudStyle = 'cinematic';
 var hudStyles = {
-  cinematic: { nameFont: '600 88px -apple-system, system-ui, sans-serif',
+  cinematic: { nameFont: '600 88px Orbitron, -apple-system, system-ui, sans-serif',
                nameColor: 'rgba(200, 210, 230, 0.85)',
-               distFont: '12px SF Mono, Menlo, monospace',
+               distFont: '12px Space Mono, Space Mono, SF Mono, Menlo, monospace',
                distColor: 'rgba(140, 170, 140, 0.7)' },
-  minimal: { nameFont: '300 64px -apple-system, system-ui, sans-serif',
+  minimal: { nameFont: '300 64px Rajdhani, -apple-system, system-ui, sans-serif',
              nameColor: 'rgba(180, 190, 200, 0.5)',
-             distFont: '10px SF Mono, Menlo, monospace',
+             distFont: '10px Space Mono, Space Mono, SF Mono, Menlo, monospace',
              distColor: 'rgba(120, 140, 120, 0.4)' },
-  bold: { nameFont: '800 112px -apple-system, system-ui, sans-serif',
+  bold: { nameFont: '800 112px Orbitron, -apple-system, system-ui, sans-serif',
           nameColor: 'rgba(255, 255, 255, 0.95)',
-          distFont: '14px SF Mono, Menlo, monospace',
+          distFont: '14px Space Mono, Space Mono, SF Mono, Menlo, monospace',
           distColor: 'rgba(100, 200, 255, 0.8)' },
-  retro: { nameFont: '56px SF Mono, Menlo, Courier, monospace',
+  retro: { nameFont: '56px Space Mono, SF Mono, Menlo, Courier, monospace',
            nameColor: 'rgba(0, 255, 100, 0.8)',
-           distFont: '12px SF Mono, Menlo, Courier, monospace',
+           distFont: '12px Space Mono, SF Mono, Menlo, Courier, monospace',
            distColor: 'rgba(0, 200, 80, 0.6)' },
-  'retro-sm': { nameFont: '14px SF Mono, Menlo, Courier, monospace',
+  'retro-sm': { nameFont: '14px Space Mono, SF Mono, Menlo, Courier, monospace',
                 nameColor: 'rgba(0, 255, 100, 0.8)',
-                distFont: '12px SF Mono, Menlo, Courier, monospace',
+                distFont: '12px Space Mono, SF Mono, Menlo, Courier, monospace',
                 distColor: 'rgba(0, 200, 80, 0.6)' }
 };
 
@@ -228,6 +228,127 @@ function lightenHex(hex, factor) {
              + ('0' + b.toString(16)).slice(-2);
 }
 
+// ─── Keplerian orbital mechanics ─────────────────────────────────────
+
+// Returns simulation time in days since J2000
+function getSimDaysJ2000() {
+  var now = Date.now();
+  var elapsed = (now - simTime.epoch) * simTime.multiplier;
+  var simMs = simTime.epoch + elapsed;
+  return (simMs - simTime.J2000) / 86400000;
+}
+
+// Solve Kepler's equation M = E - e*sin(E) via Newton-Raphson
+function solveKepler(M, e) {
+  var E = M;
+  for (var i = 0; i < 15; i++) {
+    var dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= dE;
+    if (Math.abs(dE) < 1e-10) break;
+  }
+  return E;
+}
+
+// Compute planet position in ecliptic coordinates (AU), returns {x, y, z}
+function keplerPosition(elem, daysJ2000) {
+  var DEG = Math.PI / 180;
+  var M = (elem.M0 + 360 * daysJ2000 / elem.period) % 360;
+  if (M < 0) M += 360;
+  var Mrad = M * DEG;
+  var E = solveKepler(Mrad, elem.ecc);
+  // True anomaly
+  var cosE = Math.cos(E);
+  var sinE = Math.sin(E);
+  var nu = Math.atan2(Math.sqrt(1 - elem.ecc * elem.ecc) * sinE, cosE - elem.ecc);
+  // Distance from focus
+  var rDist = elem.sma * (1 - elem.ecc * cosE);
+  // Position in orbital plane
+  var xOrb = rDist * Math.cos(nu);
+  var yOrb = rDist * Math.sin(nu);
+  // Rotate by argument of perihelion, inclination, longitude of ascending node
+  var w = elem.aop * DEG;
+  var I = elem.inc * DEG;
+  var O = elem.lan * DEG;
+  var cosW = Math.cos(w), sinW = Math.sin(w);
+  var cosI = Math.cos(I), sinI = Math.sin(I);
+  var cosO = Math.cos(O), sinO = Math.sin(O);
+  var xEcl = (cosO * cosW - sinO * sinW * cosI) * xOrb +
+             (-cosO * sinW - sinO * cosW * cosI) * yOrb;
+  var yEcl = (sinO * cosW + cosO * sinW * cosI) * xOrb +
+             (-sinO * sinW + cosO * cosW * cosI) * yOrb;
+  var zEcl = (sinW * sinI) * xOrb + (cosW * sinI) * yOrb;
+  return { x: xEcl, y: yEcl, z: zEcl };
+}
+
+// Update planet positions in-place based on current sim time
+function updatePlanetPositions() {
+  var days = getSimDaysJ2000();
+  var earthX = 0, earthY = 0, earthZ = 0;
+  // First pass: compute planet positions
+  for (var i = 0; i < objects.length; i++) {
+    var obj = objects[i];
+    var elem = orbitalPlaneData[obj.name];
+    if (!elem) continue;
+    var pos = keplerPosition(elem, days);
+    // Convert AU to light-years and store for 2D map
+    obj.x = pos.x * AU_IN_LY;
+    obj.y = pos.y * AU_IN_LY;
+    obj.orbZ = pos.z * AU_IN_LY;
+    obj.dist = Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z) * AU_IN_LY;
+    // Also update 3D world coords
+    obj.wx3d = obj.x;
+    obj.wy3d = obj.y;
+    obj.wz3d = obj.orbZ;
+    if (obj.name === 'Earth') {
+      earthX = obj.x; earthY = obj.y; earthZ = obj.orbZ;
+    }
+  }
+  // Second pass: place satellites relative to their parent
+  var plutoX = 0, plutoY = 0, plutoZ = 0;
+  for (var j = 0; j < objects.length; j++) {
+    if (objects[j].name === 'Pluto') {
+      plutoX = objects[j].x; plutoY = objects[j].y; plutoZ = objects[j].orbZ || 0;
+    }
+  }
+  for (var j = 0; j < objects.length; j++) {
+    var sat = objects[j];
+    if (sat.name === 'Moon') {
+      // Moon: ~384,400 km = ~4.06e-8 ly from Earth
+      var moonPeriod = 27.322;
+      var moonAngle = (days / moonPeriod) * Math.PI * 2;
+      var moonDist = 4.06e-8;
+      sat.x = earthX + moonDist * Math.cos(moonAngle);
+      sat.y = earthY + moonDist * Math.sin(moonAngle);
+      sat.orbZ = earthZ + moonDist * Math.sin(moonAngle) * Math.sin(5.145 * Math.PI / 180);
+    } else if (sat.name === 'Charon') {
+      // Charon: ~19,571 km = ~2.07e-9 ly from Pluto
+      var charonPeriod = 6.387;
+      var charonAngle = (days / charonPeriod) * Math.PI * 2;
+      var charonDist = 2.07e-9;
+      sat.x = plutoX + charonDist * Math.cos(charonAngle);
+      sat.y = plutoY + charonDist * Math.sin(charonAngle);
+      sat.orbZ = plutoZ;
+    } else {
+      continue;
+    }
+    sat.wx3d = sat.x;
+    sat.wy3d = sat.y;
+    sat.wz3d = sat.orbZ || 0;
+    sat.dist = Math.sqrt(sat.x * sat.x + sat.y * sat.y);
+  }
+}
+
+// Get current rotation angle (radians) for an object
+function getRotationAngle(name) {
+  var rd = rotationData[name];
+  if (!rd) return 0;
+  var days = getSimDaysJ2000();
+  var hours = days * 24;
+  var rotations = hours / Math.abs(rd.rotPeriod);
+  var sign = rd.rotPeriod < 0 ? -1 : 1;
+  return (sign * rotations * Math.PI * 2) % (Math.PI * 2);
+}
+
 // ─── Object overlay styles ───────────────────────────────────────────
 // Each receives: { ctx, x, y, r, color, lightOffX, lightOffY, alpha, obj, isPhysical }
 
@@ -275,7 +396,23 @@ function drawOverlay_albedo(d) {
   }
 
   // --- Reflective bodies (planets, moons) ---
-  var lightAngle = Math.atan2(d.lightOffY, d.lightOffX);
+  // Compute 3D-aware light direction for proper terminator placement
+  var lx3 = -(d.obj.wx3d || 0), ly3 = -(d.obj.wy3d || 0), lz3 = -(d.obj.wz3d || 0);
+  var lLen3 = Math.sqrt(lx3 * lx3 + ly3 * ly3 + lz3 * lz3);
+  if (lLen3 > 1e-12) { lx3 /= lLen3; ly3 /= lLen3; lz3 /= lLen3; }
+
+  var cosY3 = Math.cos(cam3d.yaw), sinY3 = Math.sin(cam3d.yaw);
+  var cosP3 = Math.cos(cam3d.pitch), sinP3 = Math.sin(cam3d.pitch);
+  var lightRight = lx3 * (-sinY3) + ly3 * cosY3;
+  var lightUp = -(lx3 * (-sinP3 * cosY3) + ly3 * (-sinP3 * sinY3) + lz3 * cosP3);
+  var lightFwd = lx3 * (cosP3 * cosY3) + ly3 * (cosP3 * sinY3) + lz3 * sinP3;
+
+  var lateralMag = Math.sqrt(lightRight * lightRight + lightUp * lightUp);
+  var lightAngle = lateralMag > 0.001 ? Math.atan2(lightUp, lightRight) : 0;
+  // lightFwd > 0: Sun behind camera → mostly lit face visible
+  // lightFwd < 0: Sun in front → mostly dark face visible
+  var termOffset = lightFwd * r;
+
   var cosL = Math.cos(lightAngle);
   var sinL = Math.sin(lightAngle);
 
@@ -293,7 +430,7 @@ function drawOverlay_albedo(d) {
   ctx.arc(x, y, r, 0, TWO_PI);
   ctx.fill();
 
-  // 2) Gas giant horizontal banding (drawn before shadow for realism)
+  // 2) Gas giant horizontal banding
   if (isGasGiant && r > 3) {
     ctx.save();
     ctx.beginPath();
@@ -313,7 +450,7 @@ function drawOverlay_albedo(d) {
     ctx.restore();
   }
 
-  // 3) Lit-side radial gradient (soft illumination from light direction)
+  // 3) Lit-side radial gradient
   var litCX = x + cosL * r * 0.35;
   var litCY = y + sinL * r * 0.35;
   var litGrad = ctx.createRadialGradient(litCX, litCY, 0, litCX, litCY, r * 1.1);
@@ -330,38 +467,39 @@ function drawOverlay_albedo(d) {
   ctx.fill();
   ctx.restore();
 
-  // 4) Terminator shadow using clip path — dark side is very dark but not pure black
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TWO_PI);
-  ctx.clip();
+  // 4) Terminator shadow — 3D-aware: offset based on forward light component
+  if (termOffset < r * 0.92) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TWO_PI);
+    ctx.clip();
+    ctx.translate(x, y);
+    ctx.rotate(lightAngle);
 
-  // Rotate so the shadow edge is perpendicular to the light direction
-  ctx.translate(x, y);
-  ctx.rotate(lightAngle);
+    // Shadow from terminator to dark limb
+    var shadowEdge = termOffset;
+    ctx.beginPath();
+    ctx.rect(-r * 1.5, -r * 1.5, r * 1.5 + shadowEdge, r * 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fill();
 
-  // Shadow hemisphere: the half facing away from the light
-  ctx.beginPath();
-  ctx.rect(-r * 1.1, -r * 1.1, r * 1.1, r * 2.2);
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fill();
+    // Soft terminator gradient
+    var gradW = r * 0.3;
+    var termGrad = ctx.createLinearGradient(shadowEdge - gradW, 0, shadowEdge + gradW, 0);
+    termGrad.addColorStop(0, 'rgba(0,0,0,0.4)');
+    termGrad.addColorStop(0.5, 'rgba(0,0,0,0.15)');
+    termGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = termGrad;
+    ctx.fillRect(shadowEdge - gradW, -r * 1.5, gradW * 2, r * 3);
 
-  // Soften the terminator with a gradient across the boundary
-  var termGrad = ctx.createLinearGradient(-r * 0.35, 0, r * 0.25, 0);
-  termGrad.addColorStop(0, 'rgba(0,0,0,0.5)');
-  termGrad.addColorStop(0.4, 'rgba(0,0,0,0.25)');
-  termGrad.addColorStop(0.7, 'rgba(0,0,0,0.05)');
-  termGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = termGrad;
-  ctx.fillRect(-r * 0.35, -r * 1.1, r * 0.6, r * 2.2);
+    // Ambient on dark side
+    ctx.fillStyle = 'rgba(40,50,70,0.12)';
+    ctx.fillRect(-r * 1.5, -r * 1.5, r * 1.5 + shadowEdge, r * 3);
 
-  // Slight ambient light on the dark side so it is not pure black
-  ctx.fillStyle = 'rgba(40,50,70,0.12)';
-  ctx.fillRect(-r * 1.1, -r * 1.1, r * 1.1, r * 2.2);
+    ctx.restore();
+  }
 
-  ctx.restore();
-
-  // 5) Specular highlight — small bright spot on the lit side
+  // 5) Specular highlight
   if (r > 2) {
     var specDist = r * 0.38;
     var specX = x + cosL * specDist;
@@ -382,25 +520,18 @@ function drawOverlay_albedo(d) {
     ctx.restore();
   }
 
-  // 6) Atmospheric limb glow for bodies with atmospheres
+  // 6) Atmospheric limb glow
   if (hasAtmosphere && r > 3) {
     var limbColor;
-    if (name === 'Earth') {
-      limbColor = '100,180,255';
-    } else if (name === 'Venus') {
-      limbColor = '240,220,160';
-    } else if (name === 'Jupiter') {
-      limbColor = '220,180,120';
-    } else {
-      limbColor = '230,210,150';
-    }
+    if (name === 'Earth') limbColor = '100,180,255';
+    else if (name === 'Venus') limbColor = '240,220,160';
+    else if (name === 'Jupiter') limbColor = '220,180,120';
+    else limbColor = '230,210,150';
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r + r * 0.06, 0, TWO_PI);
     ctx.arc(x, y, r * 0.92, 0, TWO_PI, true);
     ctx.clip();
-
-    // Brighter on the lit side, faint on the dark side
     var limbGrad = ctx.createRadialGradient(
       x + cosL * r * 0.3, y + sinL * r * 0.3, r * 0.7,
       x, y, r + r * 0.06
@@ -420,9 +551,17 @@ function drawOverlay_albedo(d) {
 }
 
 function drawOverlay_wireframe(d) {
-  drawOverlay_flat(d);
   var ctx = d.ctx;
   var x = d.x, y = d.y, r = d.r;
+
+  // Subtle dark fill so wireframe reads as a shape against space
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
   var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
                d.obj.name === 'Sun (You Are Here)';
@@ -447,12 +586,23 @@ function drawOverlay_wireframe(d) {
     gridR = 200; gridG = 220; gridB = 255;
   }
 
+  // Axial tilt angle (convert to screen tilt — foreshortened projection)
+  var tiltDeg = d.tilt || 0;
+  var tiltRad = tiltDeg * Math.PI / 180;
+  // Clamp to ±90° visual tilt for rendering
+  var visTilt = Math.sin(tiltRad) * (Math.PI / 4);
+
   ctx.save();
 
-  // Clip to sphere
+  // Clip to sphere (untilted — sphere shape doesn't change)
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.clip();
+
+  // Apply tilt rotation for grid lines
+  ctx.translate(x, y);
+  ctx.rotate(visTilt);
+  ctx.translate(-x, -y);
 
   // Normalized light direction for dot-product shading
   var lnx = hasLight ? d.lightOffX / lMag : 0;
@@ -472,10 +622,10 @@ function drawOverlay_wireframe(d) {
     if (hasLight) {
       // Dot product of line center direction with light direction
       var dot = lny * (yOff / r);
-      // Bias toward light side: bright = 0.35, dark = 0.06
-      lineAlpha = 0.06 + 0.29 * Math.max(0, 0.5 + 0.5 * dot);
+      // Bias toward light side: bright = 0.6, dark = 0.12
+      lineAlpha = 0.12 + 0.48 * Math.max(0, 0.5 + 0.5 * dot);
     } else {
-      lineAlpha = isStar ? 0.25 : 0.2;
+      lineAlpha = isStar ? 0.45 : 0.35;
     }
 
     if (isEquator) {
@@ -491,9 +641,10 @@ function drawOverlay_wireframe(d) {
     ctx.stroke();
   }
 
-  // --- Longitude lines (rotated by light direction) ---
+  // --- Longitude lines (rotated by light direction + rotation) ---
+  var rotOff = d.rotAngle || 0;
   for (var j = 0; j < lonCount; j++) {
-    var lonAngle = j * Math.PI / lonCount + lightAngle;
+    var lonAngle = j * Math.PI / lonCount + lightAngle + rotOff;
     var cosA = Math.cos(lonAngle);
     var sinA = Math.sin(lonAngle);
     var rX = r * Math.abs(cosA);
@@ -506,9 +657,9 @@ function drawOverlay_wireframe(d) {
       var nrmX = cosA;
       var nrmY = sinA;
       var dot2 = nrmX * lnx + nrmY * lny;
-      lineAlpha2 = 0.05 + 0.3 * Math.max(0, 0.5 + 0.5 * Math.abs(dot2));
+      lineAlpha2 = 0.1 + 0.5 * Math.max(0, 0.5 + 0.5 * Math.abs(dot2));
     } else {
-      lineAlpha2 = isStar ? 0.25 : 0.2;
+      lineAlpha2 = isStar ? 0.45 : 0.35;
     }
 
     ctx.lineWidth = baseWidth;
@@ -523,7 +674,7 @@ function drawOverlay_wireframe(d) {
     // Terminator is the great circle perpendicular to the light direction
     var termAngle = lightAngle + Math.PI / 2;
     ctx.lineWidth = baseWidth * 2.5;
-    ctx.strokeStyle = 'rgba(' + gridR + ',' + gridG + ',' + gridB + ',0.4)';
+    ctx.strokeStyle = 'rgba(' + gridR + ',' + gridG + ',' + gridB + ',0.65)';
     ctx.beginPath();
     // Draw as an ellipse: full height, narrow width to look like a great circle edge-on
     ctx.ellipse(x, y, r * 0.12, r, termAngle, 0, Math.PI * 2);
@@ -558,47 +709,18 @@ function drawOverlay_depth(d) {
                (d.obj && d.obj.category === 'stellar' && objType.indexOf('planet') === -1 && objType.indexOf('Planet') === -1) ||
                (d.obj && d.obj.name === 'Sun (You Are Here)');
 
+  // Detect gas giants for volumetric cloud rendering
+  var objName = d.obj ? d.obj.name : '';
+  var isGasGiant = (objName === 'Jupiter' || objName === 'Saturn' ||
+                    objName === 'Uranus' || objName === 'Neptune');
+
   // Ring count scales with screen radius, capped at 12
   var ringCount = Math.min(12, Math.max(4, Math.round(r / 8)));
 
-  // Build topo color palette: warm center to cool edge for stars,
-  // light-to-dark base color for planets/other
-  var topoColors = [];
-  var i, t, cr, cg, cb, s;
-  for (i = 0; i < ringCount; i++) {
-    t = i / (ringCount - 1); // 0 = center, 1 = edge
-    if (isStar) {
-      // Warm palette: white-yellow center -> gold -> orange -> deep red edge
-      if (t < 0.25) {
-        s = t / 0.25;
-        cr = 255;
-        cg = Math.round(255 - s * 30);
-        cb = Math.round(220 - s * 150);
-      } else if (t < 0.5) {
-        s = (t - 0.25) / 0.25;
-        cr = 255;
-        cg = Math.round(225 - s * 90);
-        cb = Math.round(70 - s * 50);
-      } else if (t < 0.75) {
-        s = (t - 0.5) / 0.25;
-        cr = Math.round(255 - s * 40);
-        cg = Math.round(135 - s * 85);
-        cb = Math.round(20 - s * 10);
-      } else {
-        s = (t - 0.75) / 0.25;
-        cr = Math.round(215 - s * 100);
-        cg = Math.round(50 - s * 40);
-        cb = Math.round(10 + s * 15);
-      }
-    } else {
-      // Planet/other: lighten center, darken edge, using base color
-      var lumFactor = 1.6 - t * 1.3; // 1.6 at center, 0.3 at edge
-      cr = Math.min(255, Math.round(bR * lumFactor));
-      cg = Math.min(255, Math.round(bG * lumFactor));
-      cb = Math.min(255, Math.round(bB * lumFactor));
-    }
-    topoColors.push({ r: cr, g: cg, b: cb });
-  }
+  // Axial tilt for depth view
+  var depthTiltDeg = d.tilt || 0;
+  var depthTiltRad = depthTiltDeg * Math.PI / 180;
+  var depthVisTilt = Math.sin(depthTiltRad) * (Math.PI / 4);
 
   ctx.save();
 
@@ -607,25 +729,172 @@ function drawOverlay_depth(d) {
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // Draw concentric topo rings from outer to inner
-  for (i = ringCount - 1; i >= 0; i--) {
-    var ringT = (i + 1) / ringCount; // 1 = outer, decreasing inward
-    var ringR = r * ringT;
-    var c = topoColors[i];
+  var i, t, cr, cg, cb, s;
 
-    ctx.fillStyle = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+  if (isGasGiant) {
+    // Apply axial tilt for cloud bands
+    ctx.translate(x, y);
+    ctx.rotate(depthVisTilt);
+    ctx.translate(-x, -y);
+    // --- Gas giant volumetric cloud bands ---
+    var bandCount = Math.min(20, Math.max(8, Math.round(r / 6)));
+    var bandPalettes = {
+      'Jupiter': [
+        [212, 165, 106], [190, 140, 85], [230, 200, 150], [180, 120, 70],
+        [220, 180, 130], [160, 110, 65], [240, 210, 170], [170, 125, 75],
+        [200, 150, 95], [225, 190, 140], [185, 130, 80], [210, 170, 120]
+      ],
+      'Saturn': [
+        [232, 208, 136], [220, 195, 120], [240, 220, 160], [210, 185, 110],
+        [225, 200, 140], [215, 190, 125], [235, 215, 150], [205, 180, 115],
+        [228, 205, 135], [218, 192, 128], [238, 218, 155], [208, 183, 118]
+      ],
+      'Uranus': [
+        [136, 204, 221], [120, 190, 210], [150, 215, 230], [110, 180, 200],
+        [140, 208, 225], [125, 195, 215], [145, 210, 228], [115, 185, 205],
+        [130, 200, 218], [138, 206, 222], [128, 196, 212], [142, 210, 226]
+      ],
+      'Neptune': [
+        [68, 102, 204], [55, 88, 190], [80, 115, 215], [48, 78, 175],
+        [72, 108, 210], [60, 95, 195], [85, 120, 220], [50, 82, 180],
+        [65, 100, 200], [75, 110, 212], [58, 90, 188], [78, 112, 208]
+      ]
+    };
+    var palette = bandPalettes[objName];
+
+    // Fill base color first
+    ctx.fillStyle = 'rgb(' + palette[0][0] + ',' + palette[0][1] + ',' + palette[0][2] + ')';
     ctx.beginPath();
-    ctx.arc(x, y, ringR, 0, Math.PI * 2);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Subtle ring border for definition (skip outermost)
-    if (i < ringCount - 1) {
-      var borderAlpha = Math.min(0.4, 0.15 + (ringCount - i) * 0.02);
-      ctx.strokeStyle = 'rgba(255,255,255,' + borderAlpha.toFixed(2) + ')';
-      ctx.lineWidth = Math.max(0.5, r / 150);
+    // Draw horizontal cloud bands with perspective (narrower at poles)
+    for (i = 0; i < bandCount; i++) {
+      var bandFrac = (i + 0.5) / bandCount; // 0 = top, 1 = bottom
+      var lat = bandFrac * 2 - 1; // -1 to +1
+      var bandY = y + lat * r;
+      // Band width varies: wider at equator, narrower at poles
+      var bandH = (r * 2 / bandCount) * Math.sqrt(1 - lat * lat) * 1.2 + 1;
+      var pIdx = i % palette.length;
+      var bc = palette[pIdx];
+
+      // Slight color variation for atmospheric turbulence (shifts with rotation)
+      var dRot = d.rotAngle || 0;
+      var turb = Math.sin(i * 3.7 + bandFrac * 12 + dRot * (1 + i * 0.15)) * 8;
+      var br2 = Math.min(255, Math.max(0, bc[0] + Math.round(turb)));
+      var bg2 = Math.min(255, Math.max(0, bc[1] + Math.round(turb * 0.7)));
+      var bb2 = Math.min(255, Math.max(0, bc[2] + Math.round(turb * 0.4)));
+
+      ctx.fillStyle = 'rgb(' + br2 + ',' + bg2 + ',' + bb2 + ')';
+      ctx.fillRect(x - r, bandY - bandH * 0.5, r * 2, bandH);
+    }
+
+    // Atmospheric haze layers — semi-transparent bands for depth
+    for (i = 0; i < 5; i++) {
+      var hazeFrac = (i + 1) / 6;
+      var hazeY = y + (hazeFrac * 2 - 1) * r * 0.8;
+      var hazeH = r * 0.15;
+      var hazeAlpha = 0.03 + Math.sin(i * 2.1) * 0.02;
+      ctx.fillStyle = 'rgba(255,255,255,' + Math.abs(hazeAlpha).toFixed(3) + ')';
+      ctx.fillRect(x - r, hazeY - hazeH * 0.5, r * 2, hazeH);
+    }
+
+    // Subtle swirl/storm spots for Jupiter and Neptune
+    var stormRot = d.rotAngle || 0;
+    if (objName === 'Jupiter' && r > 20) {
+      // Great Red Spot approximation — moves with rotation
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      var grsLon = Math.cos(stormRot + 1.2);
+      var spotX = x + grsLon * r * 0.3;
+      var spotY = y + r * 0.22;
+      var spotGrad = ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, r * 0.12);
+      spotGrad.addColorStop(0, 'rgb(180,80,40)');
+      spotGrad.addColorStop(0.6, 'rgb(200,100,50)');
+      spotGrad.addColorStop(1, 'rgba(200,120,60,0)');
+      ctx.fillStyle = spotGrad;
+      ctx.beginPath();
+      ctx.ellipse(spotX, spotY, r * 0.14, r * 0.08, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (objName === 'Neptune' && r > 20) {
+      // Great Dark Spot approximation — moves with rotation
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      var gdsLon = Math.cos(stormRot + 2.5);
+      var dspotX = x + gdsLon * r * 0.2;
+      var dspotY = y - r * 0.2;
+      var dspotGrad = ctx.createRadialGradient(dspotX, dspotY, 0, dspotX, dspotY, r * 0.1);
+      dspotGrad.addColorStop(0, 'rgb(30,50,120)');
+      dspotGrad.addColorStop(1, 'rgba(40,60,140,0)');
+      ctx.fillStyle = dspotGrad;
+      ctx.beginPath();
+      ctx.ellipse(dspotX, dspotY, r * 0.12, r * 0.07, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+  } else {
+    // --- Standard topo rings for stars and rocky bodies ---
+    // Build topo color palette: warm center to cool edge for stars,
+    // light-to-dark base color for planets/other
+    var topoColors = [];
+    for (i = 0; i < ringCount; i++) {
+      t = i / (ringCount - 1); // 0 = center, 1 = edge
+      if (isStar) {
+        // Warm palette: white-yellow center -> gold -> orange -> deep red edge
+        if (t < 0.25) {
+          s = t / 0.25;
+          cr = 255;
+          cg = Math.round(255 - s * 30);
+          cb = Math.round(220 - s * 150);
+        } else if (t < 0.5) {
+          s = (t - 0.25) / 0.25;
+          cr = 255;
+          cg = Math.round(225 - s * 90);
+          cb = Math.round(70 - s * 50);
+        } else if (t < 0.75) {
+          s = (t - 0.5) / 0.25;
+          cr = Math.round(255 - s * 40);
+          cg = Math.round(135 - s * 85);
+          cb = Math.round(20 - s * 10);
+        } else {
+          s = (t - 0.75) / 0.25;
+          cr = Math.round(215 - s * 100);
+          cg = Math.round(50 - s * 40);
+          cb = Math.round(10 + s * 15);
+        }
+      } else {
+        // Planet/other: lighten center, darken edge, using base color
+        var lumFactor = 1.6 - t * 1.3; // 1.6 at center, 0.3 at edge
+        cr = Math.min(255, Math.round(bR * lumFactor));
+        cg = Math.min(255, Math.round(bG * lumFactor));
+        cb = Math.min(255, Math.round(bB * lumFactor));
+      }
+      topoColors.push({ r: cr, g: cg, b: cb });
+    }
+
+    // Draw concentric topo rings from outer to inner
+    for (i = ringCount - 1; i >= 0; i--) {
+      var ringT = (i + 1) / ringCount;
+      var ringR = r * ringT;
+      var c = topoColors[i];
+
+      ctx.fillStyle = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
       ctx.beginPath();
       ctx.arc(x, y, ringR, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.fill();
+
+      // Subtle ring border for definition (skip outermost)
+      if (i < ringCount - 1) {
+        var borderAlpha = Math.min(0.4, 0.15 + (ringCount - i) * 0.02);
+        ctx.strokeStyle = 'rgba(255,255,255,' + borderAlpha.toFixed(2) + ')';
+        ctx.lineWidth = Math.max(0.5, r / 150);
+        ctx.beginPath();
+        ctx.arc(x, y, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
   }
 
@@ -907,11 +1176,23 @@ function drawOrbitalPlanes3D() {
     var cosI = Math.cos(incRad), sinI = Math.sin(incRad);
     var cosL = Math.cos(lanRad), sinL = Math.sin(lanRad);
 
+    var ecc = op.ecc || 0;
+    var aopRad = (op.aop || 0) * DEG2RAD;
+    var cosW = Math.cos(aopRad), sinW = Math.sin(aopRad);
+    var semiMinor = smaLy * Math.sqrt(1 - ecc * ecc);
+    // Focus offset from center
+    var focusOff = smaLy * ecc;
+
     var pts = [];
     for (var step = 0; step <= 72; step++) {
       var angle = step / 72 * Math.PI * 2;
-      var ox = smaLy * Math.cos(angle);
-      var oy = smaLy * Math.sin(angle);
+      // Ellipse in orbital plane (centered on focus)
+      var ex = smaLy * Math.cos(angle) - focusOff;
+      var ey = semiMinor * Math.sin(angle);
+      // Rotate by argument of perihelion
+      var ox = ex * cosW - ey * sinW;
+      var oy = ex * sinW + ey * cosW;
+      // Rotate by inclination and LAN into ecliptic
       var rx = ox * cosL - oy * sinL * cosI;
       var ry = ox * sinL + oy * cosL * cosI;
       var rz = oy * sinI;
@@ -1003,30 +1284,24 @@ function raDecToXYZ(raDeg, decDeg, dist) {
 }
 
 function initObjects3D() {
+  // Compute initial Keplerian positions for planets
+  updatePlanetPositions();
   for (var i = 0; i < objects.length; i++) {
     var o = objects[i];
+    // Skip objects already positioned by Keplerian mechanics
+    if (orbitalPlaneData[o.name] || o.name === 'Moon') continue;
     if (o.ra !== undefined && o.dec !== undefined) {
       var c = raDecToXYZ(o.ra, o.dec, o.dist || 0.0001);
       o.wx3d = c.x;
       o.wy3d = c.y;
       o.wz3d = c.z;
-    } else if (o.name === 'Moon') {
-      // Moon: ~384,400 km = ~4.06e-8 ly from Earth
-      // Earth is at ~(AU_IN_LY, 0, 0); place Moon offset from Earth
-      o.wx3d = AU_IN_LY + 3.5e-8;
-      o.wy3d = 1.8e-8;
-      o.wz3d = 0.9e-8;
-    } else if (o.name === 'Sun') {
+    } else if (o.name === 'Sun (You Are Here)') {
       o.wx3d = 0; o.wy3d = 0; o.wz3d = 0;
-    } else if (o.name === 'Earth') {
-      o.wx3d = AU_IN_LY; o.wy3d = 0; o.wz3d = 0;
     } else if (o.category === 'solar') {
-      // Other solar objects: place on XY plane scaled down
       o.wx3d = o.x;
       o.wy3d = o.y;
-      o.wz3d = 0;
+      o.wz3d = o.orbZ || 0;
     } else {
-      // Fallback: place on XY plane using 2D map coords
       o.wx3d = o.x;
       o.wy3d = o.y;
       o.wz3d = 0;
@@ -1198,7 +1473,8 @@ function cullOverlapping(visibleList) {
     for (var j = 0; j < kept.length; j++) {
       var dx = obj._sp3d.x - kept[j]._sp3d.x;
       var dy = obj._sp3d.y - kept[j]._sp3d.y;
-      if (dx * dx + dy * dy < 25) {
+      // Only cull if overlapping AND behind the dominator (closer objects stay visible)
+      if (dx * dx + dy * dy < 25 && obj._sp3d.depth >= kept[j]._sp3d.depth) {
         dominated = true;
         break;
       }
@@ -1496,12 +1772,12 @@ function drawRegions() {
     ctx.setLineDash([]);
 
     if (r.labelColor && rxPx > 25) {
-      ctx.font = '10px -apple-system, system-ui, sans-serif';
+      ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
       ctx.fillStyle = r.labelColor;
       ctx.textAlign = 'center';
       ctx.fillText(r.name, 0, -ryPx - 8);
       if (r.desc && rxPx > 60) {
-        ctx.font = '9px SF Mono, Menlo, monospace';
+        ctx.font = '9px Space Mono, SF Mono, Menlo, monospace';
         ctx.fillText(r.desc, 0, -ryPx + 6);
       }
     }
@@ -3023,7 +3299,7 @@ function drawLabels() {
   for (var i = 0; i < pendingLabels.length; i++) {
     var lb = pendingLabels[i];
     var fontSize = lb.sel ? 12 : 11;
-    var font = lb.sel ? 'bold 12px -apple-system, system-ui, sans-serif' : '11px -apple-system, system-ui, sans-serif';
+    var font = lb.sel ? 'bold 12px Rajdhani, -apple-system, system-ui, sans-serif' : '11px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.font = font;
     var nameW = ctx.measureText(lb.name).width;
     var labelH = 14;
@@ -3069,7 +3345,7 @@ function drawLabels() {
     ctx.fillText(lb.name, bestPos.x, bestPos.y);
 
     if (lb.dist > 0 && alpha > 0.3) {
-      ctx.font = '9px SF Mono, Menlo, monospace';
+      ctx.font = '9px Space Mono, SF Mono, Menlo, monospace';
       ctx.fillStyle = '#5a5a78';
       ctx.fillText(formatDistance(lb.dist), bestPos.x, bestPos.y + 12);
     }
@@ -3097,7 +3373,7 @@ function drawDistanceLine(o1, o2) {
   ctx.setLineDash([]);
 
   var wd = Math.sqrt(Math.pow(o2.x - o1.x, 2) + Math.pow(o2.y - o1.y, 2));
-  ctx.font = '9px SF Mono, Menlo, monospace';
+  ctx.font = '9px Space Mono, SF Mono, Menlo, monospace';
   ctx.fillStyle = 'rgba(120, 120, 170, 0.5)';
   ctx.textAlign = 'center';
   ctx.fillText(formatDistance(wd), (s1.x + s2.x) / 2, (s1.y + s2.y) / 2 - 4);
@@ -3137,7 +3413,7 @@ function drawSunIndicator() {
     ctx.setLineDash([]);
 
     ctx.fillStyle = 'rgba(255, 221, 68, 0.3)';
-    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('\u2609 Sun', sp.x, sp.y - 14);
     ctx.restore();
@@ -3184,10 +3460,10 @@ function drawSunIndicator() {
     // Sun symbol
     ctx.rotate(-angle); // undo rotation for upright text
     ctx.fillStyle = 'rgba(255, 221, 68, 0.6)';
-    ctx.font = '12px -apple-system, system-ui, sans-serif';
+    ctx.font = '12px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('\u2609', 0, -20);
-    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.font = '9px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255, 221, 68, 0.35)';
     ctx.fillText('Sun', 0, -10);
     ctx.restore();
@@ -3202,7 +3478,7 @@ function drawHoverIcon() {
   ctx.beginPath();
   ctx.arc(hp.x, hp.y, 8, 0, Math.PI * 2);
   ctx.fill();
-  ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+  ctx.font = 'bold 11px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.fillStyle = 'rgba(180, 200, 240, 0.8)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -3255,13 +3531,13 @@ function drawReferenceDistances() {
     displayStrs.push(ref.name + "  =  " + pxStr);
   });
 
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   var maxTextW = 0;
   displayStrs.forEach(function(str) {
     var tw = ctx.measureText(str).width;
     if (tw > maxTextW) maxTextW = tw;
   });
-  ctx.font = '9px -apple-system, system-ui, sans-serif';
+  ctx.font = '9px Rajdhani, -apple-system, system-ui, sans-serif';
   var headerW = ctx.measureText('REFERENCE DISTANCES AT THIS SCALE').width;
   maxTextW = Math.max(maxTextW, headerW);
 
@@ -3289,7 +3565,7 @@ function drawReferenceDistances() {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.font = '9px -apple-system, system-ui, sans-serif';
+  ctx.font = '9px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#4a4a66';
   ctx.textAlign = 'right';
   ctx.fillText('REFERENCE DISTANCES AT THIS SCALE', boxX, startY - 6);
@@ -3317,7 +3593,7 @@ function drawReferenceDistances() {
       ctx.globalAlpha = 1;
 
       ctx.fillStyle = '#8888a8';
-      ctx.font = '10px -apple-system, system-ui, sans-serif';
+      ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(ref.name + "  =  " + ref.px.toFixed(ref.px < 10 ? 1 : 0) + " px", barX - 6, y + 2);
     } else {
@@ -3345,7 +3621,7 @@ function drawReferenceDistances() {
       ctx.globalAlpha = 1;
 
       ctx.fillStyle = '#6a6a88';
-      ctx.font = '10px -apple-system, system-ui, sans-serif';
+      ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
       ctx.textAlign = 'right';
       ctx.fillText(ref.name + "  =  " + pxStr, boxX - 8, y + 2);
     }
@@ -3428,7 +3704,7 @@ function drawCosmicFilaments() {
   }
 
   // Draw void labels
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.textAlign = 'center';
   for (var v = 0; v < cosmicVoids.length; v++) {
     var voidInfo = cosmicVoids[v];
@@ -3439,7 +3715,7 @@ function drawCosmicFilaments() {
     ctx.font = '8px -apple-system, system-ui, sans-serif';
     ctx.fillStyle = "rgba(80, 70, 100, " + (0.15 * fade) + ")";
     ctx.fillText("(void)", vsp.x, vsp.y + 14);
-    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   }
 
   ctx.restore();
@@ -3598,7 +3874,7 @@ function drawConstellationLines() {
         }
         if (count > 0) { lx /= count; ly /= count; }
       }
-      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.font = '12px Rajdhani, -apple-system, system-ui, sans-serif';
       ctx.fillStyle = cDef.color.replace('ALPHA', (0.35 * alpha).toFixed(3));
       ctx.textAlign = 'center';
       var nameLines = cDef.name.split('\n');
@@ -3608,13 +3884,13 @@ function drawConstellationLines() {
       var labelBottom = ly + (nameLines.length - 1) * 14;
 
       if (cDef.depthLabel && !isParallax) {
-        ctx.font = '9px SF Mono, Menlo, monospace';
+        ctx.font = '9px Space Mono, SF Mono, Menlo, monospace';
         ctx.fillStyle = cDef.color.replace('ALPHA', (0.2 * alpha).toFixed(3));
         ctx.fillText(cDef.depthLabel, lx, labelBottom + 14);
       }
       // Parallax viewpoint label
       if (isParallax && parallaxState.label) {
-        ctx.font = '10px SF Mono, Menlo, monospace';
+        ctx.font = '10px Space Mono, SF Mono, Menlo, monospace';
         ctx.fillStyle = 'rgba(122, 170, 238, ' + (0.5 * parallaxState.progress * alpha).toFixed(3) + ')';
         ctx.fillText(parallaxState.label, lx, labelBottom + 14);
       }
@@ -3668,7 +3944,7 @@ function drawObservableUniverse() {
 
   // Label
   if (rPx > 60) {
-    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.fillStyle = "rgba(140, 120, 180, " + (0.3 * fade) + ")";
     ctx.textAlign = 'center';
     ctx.fillText("Observable Universe (46.5 Gly)", sp.x, sp.y - rPx - 12);
@@ -3733,6 +4009,11 @@ function draw(ts) {
 }
 
 function draw2D(ts) {
+  // Update planet positions from Keplerian elements
+  if (!simTime.paused && simTime.multiplier > 0) {
+    updatePlanetPositions();
+  }
+
   var sw = W / devicePixelRatio;
   var sh = H / devicePixelRatio;
 
@@ -3818,7 +4099,7 @@ function draw2D(ts) {
   // Scale label
   var vr = getViewRadius();
   var sd = vr < 0.001 ? 'Solar System' : vr < 50 ? 'Stellar Neighborhood' : vr < 3000 ? 'Constellations' : vr < 250000 ? 'Milky Way' : vr < 10 * MLY ? 'Local Group' : 'Cosmic Scale';
-  ctx.font = '11px -apple-system, system-ui, sans-serif';
+  ctx.font = '11px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#3a3a55';
   ctx.textAlign = 'right';
   ctx.fillText(sd, sw - 16, 20);
@@ -3872,7 +4153,7 @@ function drawConstellationLines3D(projected) {
     }
     if (count > 0) {
       cx /= count; cy /= count;
-      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.font = '12px Rajdhani, -apple-system, system-ui, sans-serif';
       ctx.fillStyle = cDef.color.replace('ALPHA', '0.35');
       ctx.textAlign = 'center';
       var nameLines = cDef.name.split('\n');
@@ -3985,6 +4266,24 @@ function draw3D(ts) {
     state.dirty = true;
   }
 
+  // Update planet positions from Keplerian elements
+  if (!simTime.paused && simTime.multiplier > 0) {
+    updatePlanetPositions();
+    // Track orbit focal point to moving object
+    if (orbitMode.active && !orbitMode.focalAnim.active) {
+      for (var pi = 0; pi < objects.length; pi++) {
+        if (displayName(objects[pi]) === orbitMode.focalName) {
+          orbitMode.focalX = objects[pi].wx3d;
+          orbitMode.focalY = objects[pi].wy3d;
+          orbitMode.focalZ = objects[pi].wz3d;
+          orbitToCamera();
+          break;
+        }
+      }
+    }
+    state.dirty = true;
+  }
+
   ctx.clearRect(0, 0, sw, sh);
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, sw, sh);
@@ -4015,6 +4314,8 @@ function draw3D(ts) {
   var tSec3d = ts / 1000;
   for (var j = 0; j < visible.length; j++) {
     var obj = visible[j];
+    // Skip solar-category "Sun" — "Sun (You Are Here)" handles it in 3D
+    if (obj.name === 'Sun' && obj.category === 'solar') continue;
     var sp = obj._sp3d;
     if (!sp) continue;
 
@@ -4120,10 +4421,13 @@ function draw3D(ts) {
 
     // Draw core — dispatch to active overlay style
     if (!isDiffuse || !isPhysical) {
+      var rotAngle = getRotationAngle(obj.name);
+      var rd = rotationData[obj.name];
       var overlayCtx = {
         ctx: ctx, x: sp.x, y: sp.y, r: r3d, color: obj.color,
         lightOffX: lightOffX, lightOffY: lightOffY,
-        alpha: ctx.globalAlpha, obj: obj, isPhysical: isPhysical
+        alpha: ctx.globalAlpha, obj: obj, isPhysical: isPhysical,
+        rotAngle: rotAngle, tilt: rd ? rd.tilt : 0
       };
       if (isPhysical && r3d > 4) {
         var styleFn = overlayRenderers[effects.overlayStyle] || drawOverlay_flat;
@@ -4215,7 +4519,7 @@ function draw3D(ts) {
     ctx.moveTo(bcx + half - corner, bcy + half); ctx.lineTo(bcx + half, bcy + half); ctx.lineTo(bcx + half, bcy + half - corner);
     ctx.stroke();
     // Label
-    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = isSolAnchor ? '#ffcc44' : bObj.color;
     ctx.globalAlpha = isSolAnchor ? 0.7 : (isSelected ? 0.8 : 0.5);
@@ -4259,26 +4563,26 @@ function draw3DHUD(sw, sh) {
     }
   }
 
-  // ── Bottom-left info (stack from bottom up) ──
-  ctx.font = '11px -apple-system, system-ui, sans-serif';
+  // ── Top-left camera info ──
+  ctx.font = '11px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#5a5a7a';
 
-  var blY = sh - 10;
+  var tlY = 20;
+  ctx.fillText('Viewing from ' + posLabel, 16, tlY);
+  tlY += 16;
+
   var lookRA = cam3d.yaw / DEG2RAD;
   while (lookRA < 0) lookRA += 360;
   while (lookRA >= 360) lookRA -= 360;
   var lookDec = cam3d.pitch / DEG2RAD;
-  ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 52, blY);
-  blY -= 16;
+  ctx.fillText('RA ' + lookRA.toFixed(1) + '\u00b0  Dec ' + (lookDec >= 0 ? '+' : '') + lookDec.toFixed(1) + '\u00b0', 16, tlY);
+  tlY += 16;
 
   if (!orbitMode.active) {
-    ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 52, blY);
-    blY -= 16;
+    ctx.fillText('FOV: ' + cam3d.fov.toFixed(0) + '\u00b0', 16, tlY);
+    tlY += 16;
   }
-
-  ctx.fillText('Viewing from ' + posLabel, 52, blY);
-  blY -= 16;
 
   // Facing direction
   var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
@@ -4295,7 +4599,7 @@ function draw3DHUD(sw, sh) {
   }
   if (bestDot > 0.85 && facingLabel) {
     ctx.fillStyle = '#6a6a8a';
-    ctx.fillText('Facing ' + facingLabel, 52, blY);
+    ctx.fillText('Facing ' + facingLabel, 16, tlY);
   }
 
   // ── Bottom-right cinematic HUD ──
@@ -4329,6 +4633,34 @@ function draw3DHUD(sw, sh) {
   ctx.fillStyle = '#3a3a55';
   ctx.fillText(orbitMode.active ? '3D Orbit Mode' : '3D Sky View', sw - 16, 20);
 
+  // Time speed indicator + sim date
+  var trY = 36;
+  var absMul = Math.abs(simTime.multiplier);
+  if (absMul > 1) {
+    var tsMul = absMul;
+    var tsLabel;
+    if (tsMul >= 31557600) tsLabel = (tsMul / 31557600).toFixed(0) + ' yr/s';
+    else if (tsMul >= 2592000) tsLabel = (tsMul / 2592000).toFixed(0) + ' mo/s';
+    else if (tsMul >= 604800) tsLabel = (tsMul / 604800).toFixed(0) + ' wk/s';
+    else if (tsMul >= 86400) tsLabel = (tsMul / 86400).toFixed(0) + ' day/s';
+    else if (tsMul >= 3600) tsLabel = (tsMul / 3600).toFixed(0) + ' hr/s';
+    else tsLabel = tsMul.toFixed(0) + 'x';
+    if (simTime.multiplier < 0) tsLabel = '\u25c0 ' + tsLabel;
+    ctx.fillStyle = simTime.multiplier < 0 ? '#7a4a3a' : '#7a6a3a';
+    ctx.fillText('Time: ' + tsLabel, sw - 16, trY);
+    trY += 14;
+  }
+  // Show current sim date
+  if (absMul > 1) {
+    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
+    var simDate = new Date(curSimMs);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var dateStr = simDate.getUTCFullYear() + ' ' + months[simDate.getUTCMonth()] + ' ' + simDate.getUTCDate();
+    ctx.fillStyle = '#5a5a6a';
+    ctx.fillText(dateStr, sw - 16, trY);
+    trY += 14;
+  }
+
   // Orbit info
   if (orbitMode.active) {
     var od = orbitMode.orbitDist;
@@ -4340,8 +4672,8 @@ function draw3DHUD(sw, sh) {
     else if (od < 1e6) odLabel = (od / 1000).toFixed(1) + ' kly';
     else odLabel = (od / 1e6).toFixed(1) + ' Mly';
     ctx.fillStyle = '#5a7a5a';
-    ctx.fillText('Orbiting: ' + orbitMode.focalName, sw - 16, 36);
-    ctx.fillText('Distance: ' + odLabel, sw - 16, 50);
+    ctx.fillText('Orbiting: ' + orbitMode.focalName, sw - 16, trY);
+    ctx.fillText('Distance: ' + odLabel, sw - 16, trY + 14);
   }
 
   ctx.restore();
@@ -4535,9 +4867,9 @@ function drawLightPulse(ts) {
   var timeStr = formatLightTravelElapsed(travelYears);
   var sw = W / devicePixelRatio;
   var labelText = 'Light travel time to ' + obj.name;
-  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.font = 'bold 12px Space Mono, SF Mono, Menlo, monospace';
   var timeW = ctx.measureText(timeStr).width;
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   var nameW = ctx.measureText(labelText).width;
   var boxW = Math.max(timeW, nameW) + 24;
   var boxH = 36;
@@ -4552,11 +4884,11 @@ function drawLightPulse(ts) {
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxW, boxH, 6);
   ctx.stroke();
-  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.font = 'bold 12px Space Mono, SF Mono, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffdd44';
   ctx.fillText(timeStr, sw / 2, boxY + 15);
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#8888aa';
   ctx.fillText(labelText, sw / 2, boxY + 29);
 
@@ -4638,9 +4970,9 @@ function drawLightPulse3D(ts) {
   var travelYears = lightPulse.travelTimeLy * ease;
   var timeStr = formatLightTravelElapsed(travelYears);
   var labelText = 'Light travel time to ' + obj.name;
-  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.font = 'bold 12px Space Mono, SF Mono, Menlo, monospace';
   var timeW = ctx.measureText(timeStr).width;
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   var nameW = ctx.measureText(labelText).width;
   var boxW = Math.max(timeW, nameW) + 24;
   var boxH = 36;
@@ -4655,11 +4987,11 @@ function drawLightPulse3D(ts) {
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxW, boxH, 6);
   ctx.stroke();
-  ctx.font = 'bold 12px SF Mono, Menlo, monospace';
+  ctx.font = 'bold 12px Space Mono, SF Mono, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffdd44';
   ctx.fillText(timeStr, sw / 2, boxY + 15);
-  ctx.font = '10px -apple-system, system-ui, sans-serif';
+  ctx.font = '10px Rajdhani, -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#8888aa';
   ctx.fillText(labelText, sw / 2, boxY + 29);
 
@@ -5370,119 +5702,165 @@ document.getElementById('narr-next').addEventListener('click', function() { tour
 
 // ─── Glossary panel ───────────────────────────────────────────────────
 
+var glossaryObjMap = {
+  "Magnetars": "SGR 1806-20", "Neutron Stars": "Vela Pulsar",
+  "Milky Way": "Sun (You Are Here)", "Laniakea": "Great Attractor",
+  "Spiral Arms": "Perseus Arm",
+  "Tycho's Supernova": "Tycho's SN Remnant",
+  "Kepler's Supernova": "Kepler's SN Remnant",
+  "Supernovae": "Tycho's SN Remnant",
+  "Exoplanets": "Proxima Centauri b",
+  "Dark Matter Halos": "Andromeda (M31)",
+  "Observable Universe": "Great Attractor",
+  "Constellations": "Betelgeuse"
+};
+
+function makeGotoButton(objName) {
+  var gotoBtn = document.createElement('button');
+  gotoBtn.className = 'glossary-goto';
+  gotoBtn.title = 'Take me there';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  var c1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c1.setAttribute('cx', '12'); c1.setAttribute('cy', '12'); c1.setAttribute('r', '10');
+  c1.setAttribute('fill', 'none'); c1.setAttribute('stroke', 'currentColor'); c1.setAttribute('stroke-width', '2');
+  var c2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c2.setAttribute('cx', '12'); c2.setAttribute('cy', '12'); c2.setAttribute('r', '6');
+  c2.setAttribute('fill', 'none'); c2.setAttribute('stroke', 'currentColor'); c2.setAttribute('stroke-width', '2');
+  var c3 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c3.setAttribute('cx', '12'); c3.setAttribute('cy', '12'); c3.setAttribute('r', '2');
+  c3.setAttribute('fill', 'currentColor');
+  svg.appendChild(c1); svg.appendChild(c2); svg.appendChild(c3);
+  gotoBtn.appendChild(svg);
+  gotoBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (state.mode3d) { navigateToObject3D(objName); }
+    else { navigateToObject(objName); }
+  });
+  return gotoBtn;
+}
+
+function makeEntryEl(entry, idx) {
+  var el = document.createElement('div');
+  el.className = 'glossary-entry';
+  el.dataset.glossaryIdx = idx;
+  el.dataset.cat = entry.cat;
+  el.dataset.searchName = entry.name.toLowerCase();
+  el.dataset.searchShort = entry.short.toLowerCase();
+  el.dataset.searchLong = entry.long.toLowerCase();
+
+  var header = document.createElement('div');
+  header.className = 'glossary-entry-header';
+
+  var accent = document.createElement('div');
+  accent.className = 'glossary-accent';
+  accent.style.backgroundColor = entry.color;
+
+  var info = document.createElement('div');
+  info.className = 'glossary-entry-info';
+
+  var nameEl = document.createElement('span');
+  nameEl.className = 'glossary-entry-name';
+  nameEl.textContent = entry.name;
+
+  var catTag = document.createElement('span');
+  catTag.className = 'glossary-entry-cat';
+  catTag.textContent = entry.cat;
+
+  var shortEl = document.createElement('div');
+  shortEl.className = 'glossary-entry-short';
+  shortEl.textContent = entry.short;
+
+  info.appendChild(nameEl);
+  info.appendChild(catTag);
+  info.appendChild(shortEl);
+  header.appendChild(accent);
+  header.appendChild(info);
+
+  var lookupName = glossaryObjMap[entry.name] || entry.name;
+  var matchObj = null;
+  for (var oi = 0; oi < objects.length; oi++) {
+    if (objects[oi].name === lookupName || objects[oi].name.indexOf(lookupName) === 0) {
+      matchObj = objects[oi]; break;
+    }
+  }
+  if (matchObj) {
+    header.appendChild(makeGotoButton(matchObj.name));
+  }
+
+  el.appendChild(header);
+
+  var longWrap = document.createElement('div');
+  longWrap.className = 'glossary-entry-long';
+  var longText = document.createElement('div');
+  longText.className = 'glossary-entry-long-text';
+  longText.textContent = entry.long;
+  longWrap.appendChild(longText);
+  el.appendChild(longWrap);
+
+  header.addEventListener('click', function() {
+    el.classList.toggle('expanded');
+  });
+
+  return el;
+}
+
+var glossaryMode = 'categories'; // 'categories' or 'single'
+
 function buildGlossary() {
   var body = document.getElementById('glossary-body');
   while (body.firstChild) body.removeChild(body.firstChild);
 
   var cats = ["Solar System", "Stars", "Nebulae", "Galaxies & Clusters", "Extreme Phenomena", "Concepts"];
   cats.forEach(function(cat) {
+    // Category header with collapse arrow
     var catLabel = document.createElement('div');
-    catLabel.className = 'glossary-cat-label';
-    catLabel.textContent = cat;
+    catLabel.className = 'glossary-cat-label collapsed';
+    catLabel.dataset.cat = cat;
+
+    var arrow = document.createElement('span');
+    arrow.className = 'glossary-cat-arrow';
+    arrow.textContent = '>';
+
+    var catText = document.createElement('span');
+    catText.textContent = cat;
+
+    // Count entries in this category
+    var count = 0;
+    for (var ci = 0; ci < glossaryData.length; ci++) {
+      if (glossaryData[ci].cat === cat) count++;
+    }
+    var countEl = document.createElement('span');
+    countEl.className = 'glossary-cat-count';
+    countEl.textContent = count;
+
+    catLabel.appendChild(arrow);
+    catLabel.appendChild(catText);
+    catLabel.appendChild(countEl);
     body.appendChild(catLabel);
+
+    // Toggle collapse on click (only when not filtering — filter handler takes over)
+    catLabel.addEventListener('click', (function(label, arrowEl) {
+      return function() {
+        var searchVal = document.getElementById('glossary-search-input').value.trim();
+        if (searchVal) return; // Filtered state handled by filter click handler
+        var wasCollapsed = label.classList.contains('collapsed');
+        label.classList.toggle('collapsed');
+        arrowEl.textContent = wasCollapsed ? 'v' : '>';
+        // Show/hide entries belonging to this category
+        var next = label.nextElementSibling;
+        while (next && !next.classList.contains('glossary-cat-label')) {
+          next.style.display = wasCollapsed ? '' : 'none';
+          next = next.nextElementSibling;
+        }
+      };
+    })(catLabel, arrow));
 
     glossaryData.forEach(function(entry, idx) {
       if (entry.cat !== cat) return;
-
-      var el = document.createElement('div');
-      el.className = 'glossary-entry';
-      el.dataset.glossaryIdx = idx;
-      el.dataset.searchName = entry.name.toLowerCase();
-      el.dataset.searchShort = entry.short.toLowerCase();
-      el.dataset.searchLong = entry.long.toLowerCase();
-
-      var header = document.createElement('div');
-      header.className = 'glossary-entry-header';
-
-      var accent = document.createElement('div');
-      accent.className = 'glossary-accent';
-      accent.style.backgroundColor = entry.color;
-
-      var info = document.createElement('div');
-      info.className = 'glossary-entry-info';
-
-      var nameEl = document.createElement('span');
-      nameEl.className = 'glossary-entry-name';
-      nameEl.textContent = entry.name;
-
-      var catTag = document.createElement('span');
-      catTag.className = 'glossary-entry-cat';
-      catTag.textContent = entry.cat;
-
-      var shortEl = document.createElement('div');
-      shortEl.className = 'glossary-entry-short';
-      shortEl.textContent = entry.short;
-
-      info.appendChild(nameEl);
-      info.appendChild(catTag);
-      info.appendChild(shortEl);
-      header.appendChild(accent);
-      header.appendChild(info);
-
-      // "Take me there" button in the header row if a matching object exists
-      var glossaryObjMap = {
-        "Magnetars": "SGR 1806-20", "Neutron Stars": "Vela Pulsar",
-        "Milky Way": "Sun (You Are Here)", "Laniakea": "Great Attractor",
-        "Spiral Arms": "Perseus Arm",
-        "Tycho's Supernova": "Tycho's SN Remnant",
-        "Kepler's Supernova": "Kepler's SN Remnant",
-        "Supernovae": "Tycho's SN Remnant",
-        "Exoplanets": "Proxima Centauri b",
-        "Dark Matter Halos": "Andromeda (M31)",
-        "Observable Universe": "Great Attractor",
-        "Constellations": "Betelgeuse"
-      };
-      var lookupName = glossaryObjMap[entry.name] || entry.name;
-      var matchObj = null;
-      for (var oi = 0; oi < objects.length; oi++) {
-        if (objects[oi].name === lookupName || objects[oi].name.indexOf(lookupName) === 0) {
-          matchObj = objects[oi]; break;
-        }
-      }
-      if (matchObj) {
-        var gotoBtn = document.createElement('button');
-        gotoBtn.className = 'glossary-goto';
-        gotoBtn.title = 'Take me there';
-        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        var c1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        c1.setAttribute('cx', '12'); c1.setAttribute('cy', '12'); c1.setAttribute('r', '10');
-        c1.setAttribute('fill', 'none'); c1.setAttribute('stroke', 'currentColor'); c1.setAttribute('stroke-width', '2');
-        var c2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        c2.setAttribute('cx', '12'); c2.setAttribute('cy', '12'); c2.setAttribute('r', '6');
-        c2.setAttribute('fill', 'none'); c2.setAttribute('stroke', 'currentColor'); c2.setAttribute('stroke-width', '2');
-        var c3 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        c3.setAttribute('cx', '12'); c3.setAttribute('cy', '12'); c3.setAttribute('r', '2');
-        c3.setAttribute('fill', 'currentColor');
-        svg.appendChild(c1); svg.appendChild(c2); svg.appendChild(c3);
-        gotoBtn.appendChild(svg);
-        gotoBtn.addEventListener('click', (function(name) {
-          return function(e) {
-            e.stopPropagation();
-            if (state.mode3d) {
-              navigateToObject3D(name);
-            } else {
-              navigateToObject(name);
-            }
-          };
-        })(matchObj.name));
-        header.appendChild(gotoBtn);
-      }
-
-      el.appendChild(header);
-
-      var longWrap = document.createElement('div');
-      longWrap.className = 'glossary-entry-long';
-      var longText = document.createElement('div');
-      longText.className = 'glossary-entry-long-text';
-      longText.textContent = entry.long;
-      longWrap.appendChild(longText);
-      el.appendChild(longWrap);
-
-      header.addEventListener('click', function() {
-        el.classList.toggle('expanded');
-      });
-
+      var el = makeEntryEl(entry, idx);
+      // Start collapsed — hide entries
+      el.style.display = 'none';
       body.appendChild(el);
     });
   });
@@ -5497,6 +5875,22 @@ function openGlossaryToEntry(name) {
   for (var i = 0; i < entries.length; i++) {
     var idx = parseInt(entries[i].dataset.glossaryIdx);
     if (glossaryData[idx] && glossaryData[idx].name === name) {
+      // Expand the parent category if collapsed
+      var catEl = entries[i].previousElementSibling;
+      while (catEl && !catEl.classList.contains('glossary-cat-label')) {
+        catEl = catEl.previousElementSibling;
+      }
+      if (catEl && catEl.classList.contains('collapsed')) {
+        catEl.classList.remove('collapsed');
+        var arrowEl = catEl.querySelector('.glossary-cat-arrow');
+        if (arrowEl) arrowEl.textContent = 'v';
+        // Show all entries in this category
+        var next = catEl.nextElementSibling;
+        while (next && !next.classList.contains('glossary-cat-label')) {
+          next.style.display = '';
+          next = next.nextElementSibling;
+        }
+      }
       entries[i].classList.add('expanded');
       entries[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
       break;
@@ -5538,42 +5932,309 @@ document.getElementById('glossary-close').addEventListener('click', function() {
     searchInput.focus();
   });
 
+  // Mode toggle buttons
+  var modeToggle = document.getElementById('glossary-mode-toggle');
+  var modeBtns = modeToggle.querySelectorAll('.glossary-mode-btn');
+  for (var mi = 0; mi < modeBtns.length; mi++) {
+    (function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        for (var mj = 0; mj < modeBtns.length; mj++) modeBtns[mj].classList.remove('active');
+        btn.classList.add('active');
+        glossaryMode = btn.dataset.mode;
+        filterGlossaryEntries(searchInput.value.toLowerCase().trim());
+      });
+    })(modeBtns[mi]);
+  }
+
+  function expandCategory(catLabel) {
+    catLabel.classList.remove('collapsed');
+    var arrowEl = catLabel.querySelector('.glossary-cat-arrow');
+    if (arrowEl) arrowEl.textContent = 'v';
+  }
+
+  function collapseCategory(catLabel) {
+    catLabel.classList.add('collapsed');
+    var arrowEl = catLabel.querySelector('.glossary-cat-arrow');
+    if (arrowEl) arrowEl.textContent = '>';
+  }
+
   function filterGlossaryEntries(query) {
-    var body = document.getElementById('glossary-body');
-    var entries = body.querySelectorAll('.glossary-entry');
-    var catLabels = body.querySelectorAll('.glossary-cat-label');
-    var catHasVisible = {};
+    var glossaryBody = document.getElementById('glossary-body');
+    var entries = glossaryBody.querySelectorAll('.glossary-entry');
+    var catLabels = glossaryBody.querySelectorAll('.glossary-cat-label');
 
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i];
-      if (!query) {
-        entry.style.display = '';
-        continue;
+    if (!query) {
+      // No query: show all category headers, restore collapsed state and counts
+      for (var i = 0; i < catLabels.length; i++) {
+        catLabels[i].style.display = '';
+        // Restore total count
+        var totalCat = catLabels[i].dataset.cat;
+        var totalCount = 0;
+        for (var ti = 0; ti < glossaryData.length; ti++) {
+          if (glossaryData[ti].cat === totalCat) totalCount++;
+        }
+        var countEl = catLabels[i].querySelector('.glossary-cat-count');
+        if (countEl) countEl.textContent = totalCount;
       }
-      var matchName = entry.dataset.searchName.indexOf(query) !== -1;
-      var matchShort = entry.dataset.searchShort.indexOf(query) !== -1;
-      var matchLong = entry.dataset.searchLong.indexOf(query) !== -1;
-      var visible = matchName || matchShort || matchLong;
-      entry.style.display = visible ? '' : 'none';
-
-      if (visible) {
-        // Find the category label for this entry
-        var prev = entry.previousElementSibling;
+      for (var j = 0; j < entries.length; j++) {
+        entries[j].dataset.filterMatch = '';
+        // Respect current collapse state of parent category
+        var prev = entries[j].previousElementSibling;
         while (prev && !prev.classList.contains('glossary-cat-label')) {
           prev = prev.previousElementSibling;
         }
-        if (prev) catHasVisible[prev.textContent] = true;
+        entries[j].style.display = (prev && prev.classList.contains('collapsed')) ? 'none' : '';
+      }
+      return;
+    }
+
+    if (glossaryMode === 'single') {
+      // Single mode: hide all category labels, show flat matching entries
+      for (var si = 0; si < catLabels.length; si++) {
+        catLabels[si].style.display = 'none';
+      }
+      for (var sj = 0; sj < entries.length; sj++) {
+        var e = entries[sj];
+        var match = e.dataset.searchName.indexOf(query) !== -1 ||
+                    e.dataset.searchShort.indexOf(query) !== -1 ||
+                    e.dataset.searchLong.indexOf(query) !== -1;
+        e.style.display = match ? '' : 'none';
+      }
+      return;
+    }
+
+    // Categories mode: show only category headers that have matches,
+    // entries stay hidden until the category is expanded by clicking
+    var catHasVisible = {};
+    var catMatchCounts = {};
+    for (var ci = 0; ci < entries.length; ci++) {
+      var entry = entries[ci];
+      var matchName = entry.dataset.searchName.indexOf(query) !== -1;
+      var matchShort = entry.dataset.searchShort.indexOf(query) !== -1;
+      var matchLong = entry.dataset.searchLong.indexOf(query) !== -1;
+      var vis = matchName || matchShort || matchLong;
+      // Mark entry with filter match but keep hidden — category click reveals
+      entry.dataset.filterMatch = vis ? '1' : '0';
+      entry.style.display = 'none';
+
+      if (vis) {
+        var pc = entry.dataset.cat;
+        if (pc) {
+          catHasVisible[pc] = true;
+          catMatchCounts[pc] = (catMatchCounts[pc] || 0) + 1;
+        }
       }
     }
 
-    for (var j = 0; j < catLabels.length; j++) {
-      if (!query) {
-        catLabels[j].style.display = '';
+    for (var ck = 0; ck < catLabels.length; ck++) {
+      var catName = catLabels[ck].dataset.cat;
+      if (catHasVisible[catName]) {
+        catLabels[ck].style.display = '';
+        // Show match count instead of total
+        var countEl = catLabels[ck].querySelector('.glossary-cat-count');
+        if (countEl) countEl.textContent = catMatchCounts[catName];
+        // Collapse so user clicks to see matches
+        collapseCategory(catLabels[ck]);
       } else {
-        catLabels[j].style.display = catHasVisible[catLabels[j].textContent] ? '' : 'none';
+        catLabels[ck].style.display = 'none';
       }
     }
   }
+
+  // Handle category click during filtered state — show matching entries
+  document.getElementById('glossary-body').addEventListener('click', function(ev) {
+    var glossaryBody = document.getElementById('glossary-body');
+    var target = ev.target;
+
+    // Walk up to find the category label click
+    while (target && !target.classList.contains('glossary-cat-label')) {
+      if (target === glossaryBody) return;
+      target = target.parentElement;
+    }
+    if (!target || !target.classList.contains('glossary-cat-label')) return;
+
+    var query = searchInput.value.toLowerCase().trim();
+    if (!query) return; // Normal collapse/expand handled by buildGlossary listeners
+
+    // During filter: toggle showing matched entries under this category
+    var wasCollapsed = target.classList.contains('collapsed');
+    if (wasCollapsed) {
+      expandCategory(target);
+      var next = target.nextElementSibling;
+      while (next && !next.classList.contains('glossary-cat-label')) {
+        if (next.dataset.filterMatch === '1') {
+          next.style.display = '';
+        }
+        next = next.nextElementSibling;
+      }
+    } else {
+      collapseCategory(target);
+      var next2 = target.nextElementSibling;
+      while (next2 && !next2.classList.contains('glossary-cat-label')) {
+        next2.style.display = 'none';
+        next2 = next2.nextElementSibling;
+      }
+    }
+  });
+
+  // Handle single-mode click: reveal category context
+  document.getElementById('glossary-body').addEventListener('click', function(ev) {
+    if (glossaryMode !== 'single') return;
+    var query = searchInput.value.toLowerCase().trim();
+    if (!query) return;
+
+    var glossaryBody = document.getElementById('glossary-body');
+    var target = ev.target;
+    // Walk up to find the entry header click
+    while (target && !target.classList.contains('glossary-entry-header')) {
+      if (target === glossaryBody) return;
+      target = target.parentElement;
+    }
+    if (!target) return;
+
+    var entryEl = target.parentElement;
+    if (!entryEl || !entryEl.classList.contains('glossary-entry')) return;
+
+    var clickedCat = entryEl.dataset.cat;
+    if (!clickedCat) return;
+
+    // Switch to categories view showing just this category
+    var catLabels2 = glossaryBody.querySelectorAll('.glossary-cat-label');
+    var entries2 = glossaryBody.querySelectorAll('.glossary-entry');
+
+    for (var li = 0; li < catLabels2.length; li++) {
+      if (catLabels2[li].dataset.cat === clickedCat) {
+        catLabels2[li].style.display = '';
+        expandCategory(catLabels2[li]);
+      } else {
+        catLabels2[li].style.display = 'none';
+      }
+    }
+
+    for (var ei = 0; ei < entries2.length; ei++) {
+      entries2[ei].style.display = entries2[ei].dataset.cat === clickedCat ? '' : 'none';
+    }
+
+    // Expand the clicked entry
+    entryEl.classList.add('expanded');
+    entryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+})();
+
+// ─── Scene presets ────────────────────────────────────────────────────
+
+function applyScenePreset(preset) {
+  // Enter 3D mode if not already
+  if (!state.mode3d) {
+    toggle3D();
+  }
+
+  // Find the orbit target object
+  var targetObj = null;
+  for (var i = 0; i < objects.length; i++) {
+    if (objects[i].name === preset.orbitObj) {
+      targetObj = objects[i]; break;
+    }
+  }
+  if (!targetObj) return;
+
+  // Select the object
+  state.selected = targetObj;
+
+  // Set up orbit mode
+  var fx = targetObj.wx3d || 0;
+  var fy = targetObj.wy3d || 0;
+  var fz = targetObj.wz3d || 0;
+  orbitMode.focalX = fx;
+  orbitMode.focalY = fy;
+  orbitMode.focalZ = fz;
+  orbitMode.focalName = displayName(targetObj);
+  orbitMode.orbitDist = preset.orbitDistAU * AU_IN_LY;
+  orbitMode.orbitYaw = (preset.orbitYawDeg || 0) * DEG2RAD;
+  orbitMode.orbitPitch = (preset.orbitPitchDeg || 0) * DEG2RAD;
+  orbitMode.active = true;
+  orbitMode.focalAnim.active = false;
+  cam3d.fov = 60;
+  orbitToCamera();
+
+  // Set time speed
+  simTime.multiplier = preset.timeSpeed || 1;
+  simTime.epoch = Date.now();
+
+  // Set HUD style
+  if (preset.hudStyle && hudStyles[preset.hudStyle]) {
+    hudStyle = preset.hudStyle;
+    try { localStorage.setItem('cosmos_hud_style', hudStyle); } catch(e) {}
+  }
+
+  // Apply effects overrides
+  if (preset.effects) {
+    for (var ek in preset.effects) {
+      if (preset.effects.hasOwnProperty(ek)) {
+        effects[ek] = preset.effects[ek];
+      }
+    }
+  }
+
+  // Rebuild effects panel to reflect changes
+  buildEffectsPanel();
+  state.dirty = true;
+}
+
+(function() {
+  var btn = document.getElementById('scenes-btn');
+  var dropdown = document.getElementById('scenes-dropdown');
+
+  // Build dropdown items
+  for (var i = 0; i < scenePresets.length; i++) {
+    var item = document.createElement('div');
+    item.className = 'scene-item';
+    item.dataset.sceneIdx = i;
+
+    var label = document.createElement('div');
+    label.className = 'scene-item-label';
+    label.textContent = scenePresets[i].label;
+
+    var desc = document.createElement('div');
+    desc.className = 'scene-item-desc';
+    desc.textContent = scenePresets[i].desc;
+
+    item.appendChild(label);
+    item.appendChild(desc);
+    dropdown.appendChild(item);
+
+    item.addEventListener('click', (function(idx) {
+      return function() {
+        applyScenePreset(scenePresets[idx]);
+        dropdown.classList.remove('open');
+        btn.classList.remove('active');
+      };
+    })(i));
+  }
+
+  // Toggle dropdown
+  btn.addEventListener('click', function() {
+    dismissWelcome();
+    var isOpen = dropdown.classList.contains('open');
+    dropdown.classList.toggle('open');
+    btn.classList.toggle('active');
+    if (!isOpen) {
+      // Position dropdown below button
+      var rect = btn.getBoundingClientRect();
+      dropdown.style.top = (rect.bottom + 4) + 'px';
+      dropdown.style.left = rect.left + 'px';
+    }
+  });
+
+  // Close on outside click
+  document.addEventListener('click', function(e) {
+    if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('open');
+      btn.classList.remove('active');
+    }
+  });
 })();
 
 // ─── Effects panel ────────────────────────────────────────────────────
@@ -5688,6 +6349,111 @@ function buildEffectsPanel() {
   overlayRow.appendChild(overlayLabel);
   overlayRow.appendChild(overlaySelect);
   panel.appendChild(overlayRow);
+
+  // Time multiplier controls
+  var timeRow = document.createElement('div');
+  timeRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:4px;';
+  var timeLabel = document.createElement('span');
+  timeLabel.style.cssText = 'color:#aaa;font-size:11px;white-space:nowrap;';
+  timeLabel.textContent = 'Time Speed';
+  var timeSelect = document.createElement('select');
+  timeSelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
+  var timeSpeeds = [
+    { label: 'Real-time', val: 1 },
+    { label: '1 hr/sec', val: 3600 },
+    { label: '1 day/sec', val: 86400 },
+    { label: '1 wk/sec', val: 604800 },
+    { label: '1 mo/sec', val: 2592000 },
+    { label: '1 yr/sec', val: 31557600 },
+    { label: '10 yr/sec', val: 315576000 },
+    { label: '100 yr/sec', val: 3155760000 }
+  ];
+  for (var ti = 0; ti < timeSpeeds.length; ti++) {
+    var topt = document.createElement('option');
+    topt.value = timeSpeeds[ti].val;
+    topt.textContent = timeSpeeds[ti].label;
+    var absCurMul = Math.abs(simTime.multiplier);
+    if (timeSpeeds[ti].val === absCurMul) topt.selected = true;
+    timeSelect.appendChild(topt);
+  }
+  // Default on first build only
+  if (simTime.multiplier === 1 && !simTime._initialized) {
+    simTime.multiplier = 86400;
+    simTime._initialized = true;
+  }
+  // Sync select to current multiplier
+  timeSelect.value = Math.abs(simTime.multiplier);
+  timeSelect.addEventListener('change', function() {
+    var absVal = parseFloat(timeSelect.value);
+    var wasReverse = simTime.multiplier < 0;
+    // Snapshot current sim time before changing speed
+    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
+    simTime.epoch = curSimMs;
+    simTime.multiplier = wasReverse ? -absVal : absVal;
+    state.dirty = true;
+  });
+  timeRow.appendChild(timeLabel);
+  timeRow.appendChild(timeSelect);
+  panel.appendChild(timeRow);
+
+  // Reverse time toggle
+  var revRow = document.createElement('div');
+  revRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:2px;';
+  var revLabel = document.createElement('label');
+  revLabel.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#9898b0;cursor:pointer;';
+  var revCb = document.createElement('input');
+  revCb.type = 'checkbox';
+  revCb.checked = simTime.multiplier < 0;
+  revCb.style.accentColor = '#4a6a9a';
+  revCb.addEventListener('change', function() {
+    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
+    simTime.epoch = curSimMs;
+    simTime.multiplier = -simTime.multiplier;
+    state.dirty = true;
+  });
+  var revText = document.createElement('span');
+  revText.textContent = 'Reverse time';
+  revLabel.appendChild(revCb);
+  revLabel.appendChild(revText);
+  revRow.appendChild(revLabel);
+  panel.appendChild(revRow);
+
+  // Start date/time input
+  var dateRow = document.createElement('div');
+  dateRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:6px;';
+  var dateLbl = document.createElement('span');
+  dateLbl.style.cssText = 'color:#aaa;font-size:11px;white-space:nowrap;';
+  dateLbl.textContent = 'Date';
+  var dateInput = document.createElement('input');
+  dateInput.type = 'datetime-local';
+  dateInput.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:10px;width:160px;';
+  // Set initial value to current sim date
+  var initDate = new Date(simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier);
+  dateInput.value = initDate.toISOString().slice(0, 16);
+  dateInput.addEventListener('change', function() {
+    var d = new Date(dateInput.value);
+    if (!isNaN(d.getTime())) {
+      simTime.epoch = d.getTime();
+      state.dirty = true;
+    }
+  });
+  var nowBtn = document.createElement('button');
+  nowBtn.style.cssText = 'background:#1a1a2e;color:#7a9aba;border:1px solid #333;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;';
+  nowBtn.textContent = 'Now';
+  nowBtn.addEventListener('click', function() {
+    simTime.epoch = Date.now();
+    if (simTime.multiplier < 0) {
+      simTime.multiplier = -simTime.multiplier;
+      revCb.checked = false;
+    }
+    var d = new Date(simTime.epoch);
+    dateInput.value = d.toISOString().slice(0, 16);
+    state.dirty = true;
+  });
+  dateRow.appendChild(dateLbl);
+  dateRow.appendChild(dateInput);
+  dateRow.appendChild(nowBtn);
+  panel.appendChild(dateRow);
 }
 
 document.getElementById('effects-toggle').addEventListener('click', function() {
@@ -5924,13 +6690,14 @@ window.addEventListener('mousemove', function(e) {
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragState.moved = true;
     if (dragState.moved) {
       if (state.mode3d) {
-        var sens = cam3d.fov / 1000;
         if (orbitMode.active) {
+          var sens = cam3d.fov / 300;
           orbitMode.orbitYaw = dragState.startYaw - dx * sens * DEG2RAD;
           orbitMode.orbitPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
             dragState.startPitch + dy * sens * DEG2RAD));
           orbitToCamera();
         } else {
+          var sens = cam3d.fov / 1000;
           cam3d.yaw = dragState.startYaw - dx * sens * DEG2RAD;
           cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
             dragState.startPitch + dy * sens * DEG2RAD));
@@ -6537,30 +7304,20 @@ function lookAtTarget(targetKey, duration) {
   if (!pos) return;
 
   if (orbitMode.active) {
-    // Stay in orbit — reposition camera so target is centered,
-    // orbited object appears below-left (over-the-shoulder framing)
+    // Stay in orbit — reposition camera on far side of focal from target,
+    // so target is visible behind the focal point
     var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
     var fwX = pos.x - fx, fwY = pos.y - fy, fwZ = pos.z - fz;
     var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
     if (fwLen > 1e-12) {
       fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
-      // Right vector (cross forward with world up)
-      var rxR = fwY, ryR = -fwX, rzR = 0;
-      var rLen = Math.sqrt(rxR * rxR + ryR * ryR);
-      if (rLen < 1e-6) { rxR = 1; ryR = 0; rLen = 1; }
-      rxR /= rLen; ryR /= rLen;
-      // Up vector (cross right with forward)
-      var uxR = ryR * fwZ - rzR * fwY;
-      var uyR = rzR * fwX - rxR * fwZ;
-      var uzR = rxR * fwY - ryR * fwX;
-      // Position behind focal object, offset right+up so object is lower-left
+      // Place camera on opposite side of focal from target
       var back = orbitMode.orbitDist;
-      var side = back * 0.15;
-      var up = back * 0.1;
-      var camX = fx - fwX * back - rxR * side + uxR * up;
-      var camY = fy - fwY * back - ryR * side + uyR * up;
-      var camZ = fz - fwZ * back + uzR * up;
-      var la = computeLookAngles(camX, camY, camZ, pos.x, pos.y, pos.z);
+      var camX = fx - fwX * back;
+      var camY = fy - fwY * back;
+      var camZ = fz - fwZ * back;
+      // Look at the focal point (consistent with orbit mode)
+      var la = computeLookAngles(camX, camY, camZ, fx, fy, fz);
       cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
         yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
       cam3dAnim.to = { px: camX, py: camY, pz: camZ,
@@ -6776,6 +7533,9 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
   if (e.key === 'v' || e.key === 'V') { toggle3D(); return; }
   if (e.key === 'o' || e.key === 'O') { toggleOrbitMode(); return; }
+  if (e.key === 's' || e.key === 'S') {
+    document.getElementById('scenes-btn').click(); return;
+  }
   if (e.key === 'w' || e.key === 'W') { showWelcome(); return; }
   if (e.key === 'd' || e.key === 'D') { showDocs(); return; }
   if (e.key === 'l' || e.key === 'L') {
@@ -6918,7 +7678,7 @@ canvas.addEventListener('touchmove', function(e) {
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) touchState.moved = true;
     if (touchState.moved) {
       if (state.mode3d && orbitMode.active) {
-        var sens = cam3d.fov / 1000;
+        var sens = cam3d.fov / 300;
         orbitMode.orbitYaw = touchState.startYaw - dx * sens * DEG2RAD;
         orbitMode.orbitPitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
           touchState.startPitch + dy * sens * DEG2RAD));

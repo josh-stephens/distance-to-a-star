@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cosmic Distance Explorer</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='4' fill='%23ffdd44'/><circle cx='16' cy='16' r='8' fill='%23ffdd4422'/><circle cx='16' cy='16' r='14' fill='%23ffdd4409'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -36,6 +39,28 @@
   }
   .glossary-btn:hover { background: #1e3838; color: #aaccdd; }
   .glossary-btn.active { background: #1a3a4a; border-color: #4a7a8a; color: #88ccdd; }
+  .scenes-btn {
+    padding: 5px 14px; border: 1px solid #4a3a2a; background: #2a1a16;
+    color: #cc9966; border-radius: 4px; font-size: 11px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .scenes-btn:hover { background: #3a2a1e; color: #eebb88; }
+  .scenes-btn.active { background: #3a2a1a; border-color: #8a6a4a; color: #ddaa66; }
+  .scenes-dropdown {
+    position: fixed; z-index: 20; background: rgba(14, 14, 26, 0.95);
+    border: 1px solid #2a2a44; border-radius: 8px; padding: 8px 0;
+    min-width: 260px; max-height: 70vh; overflow-y: auto;
+    backdrop-filter: blur(16px); display: none;
+  }
+  .scenes-dropdown.open { display: block; }
+  .scene-item {
+    padding: 10px 16px; cursor: pointer; transition: background 0.15s;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .scene-item:hover { background: rgba(255, 180, 80, 0.08); }
+  .scene-item:last-child { border-bottom: none; }
+  .scene-item-label { font-size: 13px; font-weight: 600; color: #cc9966; }
+  .scene-item-desc { font-size: 10px; color: #7a7a98; margin-top: 2px; }
   .mode3d-btn {
     padding: 5px 14px; border: 1px solid #3a2a4a; background: #1a162a;
     color: #aa88bb; border-radius: 4px; font-size: 11px; cursor: pointer;
@@ -316,7 +341,30 @@
   }
   .glossary-search-clear.visible { display: block; }
   .glossary-body { flex: 1; overflow-y: auto; padding: 12px 0; }
-  .glossary-cat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #5a5a78; padding: 12px 20px 6px; }
+  .glossary-cat-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #5a5a78;
+    padding: 10px 20px 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    user-select: none; transition: color 0.15s;
+  }
+  .glossary-cat-label:hover { color: #8888aa; }
+  .glossary-cat-arrow {
+    display: inline-block; width: 10px; font-size: 10px; flex-shrink: 0;
+    color: #6a6a88;
+  }
+  .glossary-cat-count {
+    font-size: 9px; color: #3a3a55; margin-left: auto; font-variant-numeric: tabular-nums;
+  }
+  .glossary-mode-toggle {
+    display: flex; background: #16162a; border: 1px solid #2a2a44; border-radius: 4px;
+    overflow: hidden; flex-shrink: 0; margin-left: 8px;
+  }
+  .glossary-mode-btn {
+    padding: 4px 8px; font-size: 10px; background: none; border: none;
+    color: #5a5a78; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .glossary-mode-btn.active { background: #2a2a44; color: #b0b0cc; }
+  .glossary-mode-btn:hover:not(.active) { color: #8888aa; }
+  .glossary-search-row { display: flex; align-items: center; gap: 0; }
   .glossary-entry {
     border-bottom: 1px solid #1a1a2c; cursor: pointer; transition: background 0.15s;
   }
@@ -415,6 +463,8 @@
   <button class="preset-btn" data-preset="local">Local Group <span class="key-hint">5</span></button>
   <button class="preset-btn" data-preset="cosmic">Great Attractor <span class="key-hint">6</span></button>
   <button class="glossary-btn" id="glossary-toggle-btn">Glossary <span class="key-hint">/</span></button>
+  <button class="scenes-btn" id="scenes-btn">Scenes <span class="key-hint">S</span></button>
+  <div class="scenes-dropdown" id="scenes-dropdown"></div>
   <button class="mode3d-btn" id="mode3d-btn">3D Sky <span class="key-hint">V</span></button>
   <div class="tour-menu-wrap">
     <button class="tour-btn" id="tour-btn">Tours <span class="key-hint">T</span> &#x25be;</button>
@@ -449,9 +499,15 @@
       <button class="glossary-close" id="glossary-close">&times;</button>
     </div>
     <div class="glossary-search">
-      <div class="glossary-search-wrap">
-        <input type="text" class="glossary-search-input" id="glossary-search-input" placeholder="Filter glossary...">
-        <button class="glossary-search-clear" id="glossary-search-clear">&times;</button>
+      <div class="glossary-search-row">
+        <div class="glossary-search-wrap" style="flex:1">
+          <input type="text" class="glossary-search-input" id="glossary-search-input" placeholder="Filter glossary...">
+          <button class="glossary-search-clear" id="glossary-search-clear">&times;</button>
+        </div>
+        <div class="glossary-mode-toggle" id="glossary-mode-toggle">
+          <button class="glossary-mode-btn active" data-mode="categories">Categories</button>
+          <button class="glossary-mode-btn" data-mode="single">Single</button>
+        </div>
       </div>
     </div>
     <div class="glossary-body" id="glossary-body"></div>
@@ -537,7 +593,7 @@
   <span class="zoom-value" id="zoom-label"></span>
 </div>
 
-<div class="hint" id="hint">Scroll to zoom | Click objects for info | Keys 1-5 for presets | T for tours | H for home | / for glossary</div>
+<div class="hint" id="hint">Scroll to zoom | Click objects for info | Keys 1-5 for presets | T for tours | S for scenes | H for home | / for glossary</div>
 
 
 
