@@ -1839,6 +1839,57 @@ function drawOrbits() {
   ctx.restore();
 }
 
+function drawAsteroidBelt() {
+  if (!effects.orbits) return;
+  var vr = getViewRadius();
+  if (vr > 0.003) return;
+  var scale = getScale();
+
+  var alpha = vr > 0.001 ? 1.0 - (vr - 0.001) / 0.002 : 1.0;
+  alpha = Math.max(0, Math.min(1, alpha)) * 0.3;
+  if (alpha < 0.01) return;
+
+  var belt = asteroidBeltConfig;
+  var range = belt.outerAU - belt.innerAU;
+  var gaps = belt.kirkwoodGaps;
+
+  ctx.save();
+  ctx.fillStyle = belt.color;
+  ctx.globalAlpha = alpha;
+
+  for (var i = 0; i < belt.count; i++) {
+    var h1 = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+    h1 = h1 - Math.floor(h1);
+    var h2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
+    h2 = h2 - Math.floor(h2);
+    var h3 = Math.sin(i * 419.2 + 77.9) * 43758.5453;
+    h3 = h3 - Math.floor(h3);
+
+    // Triangular distribution peaking at midpoint (~2.7 AU)
+    var t = (h1 + h2) * 0.5;
+    var rAU = belt.innerAU + t * range;
+
+    // Reject dots inside Kirkwood gaps
+    var inGap = false;
+    for (var g = 0; g < gaps.length; g++) {
+      if (Math.abs(rAU - gaps[g].au) < gaps[g].width) { inGap = true; break; }
+    }
+    if (inGap) continue;
+
+    var angle = h3 * Math.PI * 2;
+    var rLY = rAU * AU_IN_LY;
+    var rPx = rLY * scale;
+    if (rPx < 2 || rPx > W * 3) continue;
+
+    var sp = worldToScreen(rLY * Math.cos(angle), rLY * Math.sin(angle));
+    var sz = 0.5 + h1 * 1.0;
+    ctx.fillRect(sp.x - sz * 0.5, sp.y - sz * 0.5, sz, sz);
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function drawRegions() {
   var vr = getViewRadius();
   var scale = getScale();
@@ -4121,6 +4172,7 @@ function draw2D(ts) {
   drawWarpStreaks(ts);
   drawRegions();
   drawOrbits();
+  drawAsteroidBelt();
   drawConstellationLines();
   drawGalaxies();
   drawCosmicFilaments();

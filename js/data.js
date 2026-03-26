@@ -161,11 +161,27 @@ var orbitalPlaneData = {
   'Venus':    { sma: 0.723,  ecc: 0.0068, inc: 3.39,  lan: 76.68,  aop: 54.85,  M0: 50.42,  period: 224.70 },
   'Earth':    { sma: 1.000,  ecc: 0.0167, inc: 0.00,  lan: 0.0,    aop: 102.94, M0: 357.53, period: 365.256 },
   'Mars':     { sma: 1.524,  ecc: 0.0934, inc: 1.85,  lan: 49.56,  aop: 286.50, M0: 19.37,  period: 686.97 },
+  'Ceres':    { sma: 2.767,  ecc: 0.0758, inc: 10.59, lan: 80.33,  aop: 73.60,  M0: 291.4,  period: 1681.6 },
   'Jupiter':  { sma: 5.203,  ecc: 0.0484, inc: 1.30,  lan: 100.46, aop: 273.87, M0: 20.02,  period: 4332.59 },
   'Saturn':   { sma: 9.537,  ecc: 0.0539, inc: 2.49,  lan: 113.72, aop: 339.39, M0: 317.02, period: 10759.22 },
   'Uranus':   { sma: 19.19,  ecc: 0.0473, inc: 0.77,  lan: 74.00,  aop: 96.73,  M0: 142.24, period: 30688.5 },
   'Neptune':  { sma: 30.07,  ecc: 0.0086, inc: 1.77,  lan: 131.78, aop: 273.19, M0: 256.23, period: 60182.0 },
   'Pluto':    { sma: 39.48,  ecc: 0.2488, inc: 17.14, lan: 110.30, aop: 113.76, M0: 14.53,  period: 90560.0 }
+};
+
+// ─── Asteroid belt ───────────────────────────────────────────────────
+
+var asteroidBeltConfig = {
+  innerAU: 2.1,
+  outerAU: 3.3,
+  count: 800,
+  color: '#887766',
+  kirkwoodGaps: [
+    { au: 2.50, width: 0.04 },
+    { au: 2.82, width: 0.03 },
+    { au: 2.95, width: 0.03 },
+    { au: 3.28, width: 0.04 }
+  ]
 };
 
 // ─── Rotation data ───────────────────────────────────────────────────
@@ -319,6 +335,10 @@ var objects = [
     type: "Planet", category: "solar", physRadius: 3.581e-10,
     facts: [["Distance from Sun", "1.52 AU (12.7 light-min)"], ["Orbital period", "687 days"], ["Moons", "Phobos, Deimos"]],
     desc: "The Red Planet. Home to Olympus Mons, the tallest volcano in the solar system." },
+  { name: "Ceres", x: 2.77 * AU_IN_LY, y: 0, dist: 2.77 * AU_IN_LY, radius: 0.8, color: "#aaa08a", glow: "#aaa08a22",
+    type: "Dwarf planet", category: "solar", physRadius: 4.98e-11,
+    facts: [["Distance from Sun", "2.77 AU (23 light-min)"], ["Orbital period", "4.6 years"], ["Diameter", "946 km"]],
+    desc: "The largest object in the asteroid belt and the closest dwarf planet to the Sun. Dawn revealed bright salt deposits hinting at a subsurface ocean." },
   { name: "Jupiter", x: 3.5 * AU_IN_LY, y: 3.8 * AU_IN_LY, dist: 5.2 * AU_IN_LY, radius: 3, color: "#d4a56a", glow: "#d4a56a44",
     type: "Planet", category: "solar", physRadius: 7.37e-9,
     facts: [["Distance from Sun", "5.2 AU (43 light-min)"], ["Orbital period", "11.9 years"], ["Mass", "318x Earth"]],
@@ -861,6 +881,7 @@ var glossaryData = [
   { name: "Mercury", cat: "Solar System", color: "#b5a08a", short: "Closest to the Sun", long: "The smallest planet in the solar system and the closest to the Sun, orbiting at just 0.39 AU. Mercury experiences extreme temperature swings from -170 to 430 degrees Celsius between its long nights and scorching days. Its year lasts only 88 Earth days, yet a single day-night cycle takes 176 Earth days." },
   { name: "Venus", cat: "Solar System", color: "#e8c06a", short: "Earth's toxic twin", long: "Similar in size to Earth, Venus suffered a runaway greenhouse effect that made it the hottest planet in the solar system at 465 degrees Celsius -- hot enough to melt lead. Its thick atmosphere of carbon dioxide creates crushing surface pressure 90 times Earth's. It rotates backward, so the Sun rises in the west." },
   { name: "Mars", cat: "Solar System", color: "#cc6644", short: "The Red Planet", long: "Home to Olympus Mons, the tallest volcano in the solar system at 22 km, and Valles Marineris, a canyon system stretching 4,000 km. Evidence of ancient river valleys and lake beds suggests Mars once had liquid water on its surface. It remains the prime target for human exploration beyond the Moon." },
+  { name: "Ceres", cat: "Solar System", color: "#aaa08a", short: "Queen of the asteroid belt", long: "The largest object in the asteroid belt at 946 km across. Discovered in 1801, reclassified as a dwarf planet in 2006. Contains roughly a third of the belt's total mass. NASA's Dawn mission revealed bright salt deposits in Occator crater and evidence of cryovolcanic activity hinting at a subsurface ocean of briny water." },
   { name: "Jupiter", cat: "Solar System", color: "#d4a56a", short: "King of planets", long: "The largest planet in the solar system, more massive than all other planets combined. Jupiter's Great Red Spot is a storm larger than Earth that has raged for centuries. With at least 95 known moons, including the ocean world Europa, Jupiter's immense gravity acts as a cosmic shield, deflecting many asteroids that might otherwise threaten the inner planets." },
   { name: "Saturn", cat: "Solar System", color: "#e8d088", short: "The ringed wonder", long: "Famous for its spectacular ring system spanning 280,000 km but averaging only 10 meters thick, made mostly of ice particles. Saturn's moon Titan has a thick atmosphere and liquid methane lakes -- the only other body in the solar system with surface liquids. Saturn is so low in density that it would float in water if you could find a bathtub large enough." },
   { name: "Uranus", cat: "Solar System", color: "#88ccdd", short: "Sideways ice giant", long: "Unique among the planets for its extreme 98-degree axial tilt, likely caused by a massive ancient collision. Uranus essentially rolls around the Sun on its side, giving it the most extreme seasons in the solar system. Discovered by William Herschel in 1781, it was the first planet found with a telescope." },
