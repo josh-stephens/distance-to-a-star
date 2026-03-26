@@ -6651,11 +6651,28 @@ function buildEffectsPanel() {
   dateLbl.textContent = 'Date';
   var dateInput = document.createElement('input');
   dateInput.type = 'datetime-local';
-  dateInput.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:10px;width:160px;';
-  // Set initial value to current sim date
-  var initSimDays = getSimDaysJ2000();
-  var initDate = new Date(simTime.J2000 + initSimDays * 86400000);
-  dateInput.value = initDate.toISOString().slice(0, 16);
+  dateInput.step = '1';
+  dateInput.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:10px;width:175px;';
+  // Set initial value and keep in sync with sim time
+  var dateInputEditing = false;
+  var lastDateStr = '';
+  function syncDateInput() {
+    if (dateInputEditing) return;
+    var simDays = getSimDaysJ2000();
+    var simMs = simTime.J2000 + simDays * 86400000;
+    var d = new Date(simMs);
+    // Only update if the displayed value actually changed (avoid cursor flicker)
+    var str = d.toISOString().slice(0, 19);
+    if (str !== lastDateStr) {
+      dateInput.value = str;
+      lastDateStr = str;
+    }
+  }
+  syncDateInput();
+  // Update every 500ms during animation
+  setInterval(syncDateInput, 500);
+  dateInput.addEventListener('focus', function() { dateInputEditing = true; });
+  dateInput.addEventListener('blur', function() { dateInputEditing = false; });
   dateInput.addEventListener('change', function() {
     var d = new Date(dateInput.value);
     if (!isNaN(d.getTime())) {
@@ -6663,6 +6680,7 @@ function buildEffectsPanel() {
       simTime.epoch = Date.now();
       state.dirty = true;
     }
+    dateInputEditing = false;
   });
   var nowBtn = document.createElement('button');
   nowBtn.style.cssText = 'background:#1a1a2e;color:#7a9aba;border:1px solid #333;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;';
@@ -6670,12 +6688,10 @@ function buildEffectsPanel() {
   nowBtn.addEventListener('click', function() {
     simTime.simDaysAtEpoch = (Date.now() - simTime.J2000) / 86400000;
     simTime.epoch = Date.now();
-    if (simTime.multiplier < 0) {
-      simTime.multiplier = -simTime.multiplier;
-      revCb.checked = false;
-    }
-    var d = new Date(simTime.epoch);
-    dateInput.value = d.toISOString().slice(0, 16);
+    simTime.multiplier = 1;
+    simTime.paused = false;
+    if (revCb) revCb.checked = false;
+    syncDateInput();
     state.dirty = true;
   });
   dateRow.appendChild(dateLbl);
