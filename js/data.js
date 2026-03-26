@@ -19,7 +19,7 @@ var MAX_LOG = Math.log10(400 * MLY);
 
 // ─── Effects settings ──────────────────────────────────────────────────
 
-var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: false, occlusion: false };
+var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: true, occlusion: false };
 
 // ─── Overlay layer definitions ────────────────────────────────────────
 
@@ -312,7 +312,7 @@ var regions = [
 var objects = [
   // Solar
   { name: "Sun", x: 0, y: 0, dist: 0, radius: 4, color: "#ffdd44", glow: "#ffdd4466",
-    type: "Star (G2V)", category: "solar", physRadius: 7.35e-8,
+    type: "Star (G2V)", category: "solar", physRadius: 7.35e-8, visRange: [0, 250],
     facts: [["Type", "G2V main-sequence"], ["Mass", "1 solar mass"], ["Age", "~4.6 billion years"]],
     desc: "Our home star. A middle-aged yellow dwarf containing 99.86% of the solar system's mass." },
   { name: "Earth", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 2.5, color: "#4488cc", glow: "#4488cc44",

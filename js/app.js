@@ -407,7 +407,7 @@ function drawOverlay_albedo(d) {
   var TWO_PI = PI * 2;
 
   var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
-               name === 'Sun (You Are Here)';
+               name === 'Sun' || name === 'Sun (You Are Here)';
 
   if (isStar) {
     // Realistic limb darkening with many gradient stops
@@ -461,28 +461,123 @@ function drawOverlay_albedo(d) {
 
   ctx.save();
 
+  // Axial tilt
+  var tiltDeg = d.tilt || 0;
+  var tiltRad = tiltDeg * PI / 180;
+  var visTilt = Math.sin(tiltRad) * (PI / 4);
+  var rotOff = d.rotAngle || 0;
+
   // 1) Base sphere fill
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, TWO_PI);
   ctx.fill();
 
-  // 2) Gas giant horizontal banding
+  // 1b) Rotating surface features for rocky bodies
+  if (!isGasGiant && r > 6) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TWO_PI); ctx.clip();
+    ctx.translate(x, y); ctx.rotate(visTilt); ctx.translate(-x, -y);
+
+    var seed = nameHash(name, 42);
+    var isDark = (name === 'Moon' || name === 'Mercury' || name === 'Charon');
+    var isEarthy = (name === 'Earth');
+    var isMartian = (name === 'Mars');
+    var isVenus = (name === 'Venus');
+
+    // Generate continent-like clusters: each "continent" is 3-5 overlapping blobs
+    var continentCount = isEarthy ? 7 : (isDark ? 8 : 5);
+    for (var ci = 0; ci < continentCount; ci++) {
+      var ch1 = Math.sin(ci * 173.7 + seed * 271.3) * 43758.5453; ch1 -= Math.floor(ch1);
+      var ch2 = Math.sin(ci * 337.1 + seed * 149.7) * 43758.5453; ch2 -= Math.floor(ch2);
+      var ch3 = Math.sin(ci * 51.3 + seed * 433.1) * 43758.5453; ch3 -= Math.floor(ch3);
+
+      var cLon = ch1 * TWO_PI + rotOff;
+      var cLat = (ch2 - 0.5) * PI * 0.75;
+
+      // Each continent = cluster of 3-5 overlapping irregular blobs
+      var blobCount = 3 + Math.floor(ch3 * 3);
+      for (var bi = 0; bi < blobCount; bi++) {
+        var bh1 = Math.sin((ci * 7 + bi) * 127.1 + seed * 311.7) * 43758.5453; bh1 -= Math.floor(bh1);
+        var bh2 = Math.sin((ci * 7 + bi) * 269.5 + seed * 183.3) * 43758.5453; bh2 -= Math.floor(bh2);
+        var bh3 = Math.sin((ci * 7 + bi) * 419.2 + seed * 77.9) * 43758.5453; bh3 -= Math.floor(bh3);
+
+        // Offset blob from continent center
+        var bLon = cLon + (bh1 - 0.5) * 0.5;
+        var bLat = cLat + (bh2 - 0.5) * 0.35;
+        bLat = Math.max(-PI * 0.42, Math.min(PI * 0.42, bLat));
+
+        var projX = Math.sin(bLon) * Math.cos(bLat);
+        var projY = Math.sin(bLat);
+        var projZ = Math.cos(bLon) * Math.cos(bLat);
+        if (projZ < -0.05) continue;
+
+        var bx = x + projX * r * 0.85;
+        var by = y + projY * r * 0.85;
+        // Irregular size: elongated ellipses at varying angles
+        var bRx = r * (0.08 + bh3 * 0.14);
+        var bRy = bRx * (0.3 + bh1 * 0.7);
+        var bAngle = bh2 * PI;
+        var bAlpha = Math.max(0, Math.min(0.7, projZ * 0.9));
+
+        var bColor;
+        if (isEarthy) {
+          var greens = ['#2d6a2d', '#3a7a35', '#4a8a40', '#357030', '#558a45'];
+          bColor = greens[Math.floor(bh3 * greens.length)];
+        } else if (isMartian) {
+          var rusts = ['#7a3a1a', '#8a4422', '#6a3015', '#9a5030', '#5a2810'];
+          bColor = rusts[Math.floor(bh3 * rusts.length)];
+        } else if (isVenus) {
+          bColor = bh3 > 0.5 ? '#c8a850' : '#b09040';
+        } else if (isDark) {
+          bColor = 'rgba(40,40,50,' + (0.25 + bh3 * 0.15).toFixed(2) + ')';
+        } else {
+          bColor = bh3 > 0.5 ? lightenHex(color, 1.15) : darkenHex(color, 0.8);
+        }
+
+        ctx.globalAlpha = bAlpha;
+        ctx.fillStyle = bColor;
+        ctx.beginPath();
+        ctx.ellipse(bx, by, bRx, bRy, bAngle, 0, TWO_PI);
+        ctx.fill();
+      }
+    }
+
+    // Small polar caps
+    if (isEarthy || isMartian) {
+      var capA = isEarthy ? 0.4 : 0.3;
+      var capH = r * (isEarthy ? 0.1 : 0.07);
+      ctx.globalAlpha = capA;
+      ctx.fillStyle = '#e8eeff';
+      ctx.beginPath(); ctx.ellipse(x, y - r + capH * 0.6, r * 0.4, capH, 0, 0, TWO_PI); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x, y + r - capH * 0.6, r * (isEarthy ? 0.35 : 0.25), capH * 0.8, 0, 0, TWO_PI); ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // 2) Gas giant horizontal banding with tilt and rotation-driven turbulence
   if (isGasGiant && r > 3) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TWO_PI);
     ctx.clip();
-    var bandCount = (name === 'Jupiter') ? 12 : (name === 'Saturn') ? 8 : 6;
-    var bandAlpha = (name === 'Jupiter') ? 0.18 : 0.1;
+    ctx.translate(x, y); ctx.rotate(visTilt); ctx.translate(-x, -y);
+    var bandCount = (name === 'Jupiter') ? 14 : (name === 'Saturn') ? 10 : 6;
+    var bandAlpha = (name === 'Jupiter') ? 0.2 : 0.12;
     for (var bi = 0; bi < bandCount; bi++) {
-      var bandY = y - r + (2 * r * (bi + 0.5) / bandCount);
-      var bandH = (2 * r / bandCount) * 0.6;
+      var bandFrac = (bi + 0.5) / bandCount;
+      var bandLat = bandFrac * 2 - 1;
+      var bandY = y + bandLat * r;
+      var bandH = (2 * r / bandCount) * 0.7;
+      // Subtle horizontal shift from rotation
+      var turbShift = Math.sin(bi * 3.7 + rotOff * (1 + bi * 0.08)) * r * 0.02;
       var bandColor = (bi % 2 === 0)
         ? 'rgba(255,255,255,' + bandAlpha + ')'
         : 'rgba(0,0,0,' + (bandAlpha * 0.8) + ')';
       ctx.fillStyle = bandColor;
-      ctx.fillRect(x - r, bandY - bandH * 0.5, r * 2, bandH);
+      ctx.fillRect(x - r + turbShift, bandY - bandH * 0.5, r * 2, bandH);
     }
     ctx.restore();
   }
@@ -872,66 +967,97 @@ function drawOverlay_depth(d) {
       ctx.restore();
     }
 
-  } else {
-    // --- Standard topo rings for stars and rocky bodies ---
-    // Build topo color palette: warm center to cool edge for stars,
-    // light-to-dark base color for planets/other
+  } else if (isStar) {
+    // --- Stars: warm concentric topo rings (static) ---
     var topoColors = [];
     for (i = 0; i < ringCount; i++) {
-      t = i / (ringCount - 1); // 0 = center, 1 = edge
-      if (isStar) {
-        // Warm palette: white-yellow center -> gold -> orange -> deep red edge
-        if (t < 0.25) {
-          s = t / 0.25;
-          cr = 255;
-          cg = Math.round(255 - s * 30);
-          cb = Math.round(220 - s * 150);
-        } else if (t < 0.5) {
-          s = (t - 0.25) / 0.25;
-          cr = 255;
-          cg = Math.round(225 - s * 90);
-          cb = Math.round(70 - s * 50);
-        } else if (t < 0.75) {
-          s = (t - 0.5) / 0.25;
-          cr = Math.round(255 - s * 40);
-          cg = Math.round(135 - s * 85);
-          cb = Math.round(20 - s * 10);
-        } else {
-          s = (t - 0.75) / 0.25;
-          cr = Math.round(215 - s * 100);
-          cg = Math.round(50 - s * 40);
-          cb = Math.round(10 + s * 15);
-        }
+      t = i / (ringCount - 1);
+      if (t < 0.25) {
+        s = t / 0.25; cr = 255; cg = Math.round(255 - s * 30); cb = Math.round(220 - s * 150);
+      } else if (t < 0.5) {
+        s = (t - 0.25) / 0.25; cr = 255; cg = Math.round(225 - s * 90); cb = Math.round(70 - s * 50);
+      } else if (t < 0.75) {
+        s = (t - 0.5) / 0.25; cr = Math.round(255 - s * 40); cg = Math.round(135 - s * 85); cb = Math.round(20 - s * 10);
       } else {
-        // Planet/other: lighten center, darken edge, using base color
-        var lumFactor = 1.6 - t * 1.3; // 1.6 at center, 0.3 at edge
-        cr = Math.min(255, Math.round(bR * lumFactor));
-        cg = Math.min(255, Math.round(bG * lumFactor));
-        cb = Math.min(255, Math.round(bB * lumFactor));
+        s = (t - 0.75) / 0.25; cr = Math.round(215 - s * 100); cg = Math.round(50 - s * 40); cb = Math.round(10 + s * 15);
       }
       topoColors.push({ r: cr, g: cg, b: cb });
     }
-
-    // Draw concentric topo rings from outer to inner
     for (i = ringCount - 1; i >= 0; i--) {
       var ringT = (i + 1) / ringCount;
       var ringR = r * ringT;
-      var c = topoColors[i];
-
-      ctx.fillStyle = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
-      ctx.beginPath();
-      ctx.arc(x, y, ringR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Subtle ring border for definition (skip outermost)
+      var tc = topoColors[i];
+      ctx.fillStyle = 'rgb(' + tc.r + ',' + tc.g + ',' + tc.b + ')';
+      ctx.beginPath(); ctx.arc(x, y, ringR, 0, Math.PI * 2); ctx.fill();
       if (i < ringCount - 1) {
-        var borderAlpha = Math.min(0.4, 0.15 + (ringCount - i) * 0.02);
-        ctx.strokeStyle = 'rgba(255,255,255,' + borderAlpha.toFixed(2) + ')';
+        ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(0.4, 0.15 + (ringCount - i) * 0.02).toFixed(2) + ')';
         ctx.lineWidth = Math.max(0.5, r / 150);
-        ctx.beginPath();
-        ctx.arc(x, y, ringR, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, ringR, 0, Math.PI * 2); ctx.stroke();
       }
+    }
+  } else {
+    // --- Rocky bodies: procedural surface features that rotate ---
+    var rotOff = d.rotAngle || 0;
+    var isDarkBody = (objName === 'Moon' || objName === 'Mercury' || objName === 'Charon');
+    var isEarthD = (objName === 'Earth');
+    var isMarsD = (objName === 'Mars');
+
+    // Base fill
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+
+    // Apply tilt
+    ctx.translate(x, y);
+    ctx.rotate(depthVisTilt);
+    ctx.translate(-x, -y);
+
+    // Continent clusters: each is 3-5 overlapping irregular blobs
+    var dSeed = nameHash(objName, 0);
+    var dContCount = isEarthD ? 7 : (isDarkBody ? 8 : 5);
+    for (i = 0; i < dContCount; i++) {
+      var dc1 = Math.sin(i * 173.7 + dSeed * 271.3) * 43758.5453; dc1 -= Math.floor(dc1);
+      var dc2 = Math.sin(i * 337.1 + dSeed * 149.7) * 43758.5453; dc2 -= Math.floor(dc2);
+      var dc3 = Math.sin(i * 51.3 + dSeed * 433.1) * 43758.5453; dc3 -= Math.floor(dc3);
+      var dcLon = dc1 * Math.PI * 2 + rotOff;
+      var dcLat = (dc2 - 0.5) * Math.PI * 0.75;
+      var dcBlobs = 3 + Math.floor(dc3 * 3);
+      for (var dbi = 0; dbi < dcBlobs; dbi++) {
+        var db1 = Math.sin((i * 7 + dbi) * 127.1 + dSeed * 311.7) * 43758.5453; db1 -= Math.floor(db1);
+        var db2 = Math.sin((i * 7 + dbi) * 269.5 + dSeed * 183.3) * 43758.5453; db2 -= Math.floor(db2);
+        var db3 = Math.sin((i * 7 + dbi) * 419.2 + dSeed * 77.9) * 43758.5453; db3 -= Math.floor(db3);
+        var dbLon = dcLon + (db1 - 0.5) * 0.5;
+        var dbLat = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, dcLat + (db2 - 0.5) * 0.35));
+        var dpX = Math.sin(dbLon) * Math.cos(dbLat);
+        var dpY = Math.sin(dbLat);
+        var dpZ = Math.cos(dbLon) * Math.cos(dbLat);
+        if (dpZ < -0.05) continue;
+        var dbx = x + dpX * r * 0.85;
+        var dby = y + dpY * r * 0.85;
+        var dbRx = r * (0.08 + db3 * 0.14);
+        var dbRy = dbRx * (0.3 + db1 * 0.7);
+        var dbA = Math.max(0, Math.min(0.6, dpZ * 0.8));
+        var lumShift = (db3 - 0.5) * 0.5;
+        var pcr = Math.min(255, Math.max(0, Math.round(bR * (1 + lumShift))));
+        var pcg = Math.min(255, Math.max(0, Math.round(bG * (1 + lumShift))));
+        var pcb = Math.min(255, Math.max(0, Math.round(bB * (1 + lumShift))));
+        ctx.globalAlpha = dbA;
+        ctx.fillStyle = 'rgb(' + pcr + ',' + pcg + ',' + pcb + ')';
+        ctx.beginPath();
+        ctx.ellipse(dbx, dby, dbRx, dbRy, db2 * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Small polar caps
+    if (isEarthD || isMarsD) {
+      var dcapA = isEarthD ? 0.35 : 0.25;
+      var dcapH = r * (isEarthD ? 0.1 : 0.07);
+      ctx.globalAlpha = dcapA;
+      ctx.fillStyle = '#e8eeff';
+      ctx.beginPath(); ctx.ellipse(x, y - r + dcapH * 0.6, r * 0.4, dcapH, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x, y + r - dcapH * 0.6, r * (isEarthD ? 0.35 : 0.25), dcapH * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -2560,20 +2686,48 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Sun / Sun-like
   if (name === 'Sun' || name === '\u03b1 Centauri A' || name === 'Tau Ceti' || name === 'Sun (You Are Here)') {
     var sunR = Math.max(r, 3);
-    ctx.fillStyle = color;
+    // Limb-darkened solar disc
+    var sunGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sunR);
+    sunGrad.addColorStop(0, '#fff8e0');
+    sunGrad.addColorStop(0.3, '#ffee88');
+    sunGrad.addColorStop(0.6, color);
+    sunGrad.addColorStop(0.85, '#cc8800');
+    sunGrad.addColorStop(0.95, '#aa5500');
+    sunGrad.addColorStop(1, '#662200');
+    ctx.fillStyle = sunGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, sunR, 0, Math.PI * 2);
     ctx.fill();
-    // corona rays with shimmer
-    var numRays = 6;
-    var rayLen = sunR * 2.5;
+    // Granulation texture at larger sizes
+    if (sunR > 15) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, sunR * 0.92, 0, Math.PI * 2); ctx.clip();
+      var granCount = Math.min(40, Math.round(sunR / 4));
+      for (var gi = 0; gi < granCount; gi++) {
+        var gh1 = Math.sin(gi * 127.1 + 311.7) * 43758.5453; gh1 -= Math.floor(gh1);
+        var gh2 = Math.sin(gi * 269.5 + 183.3) * 43758.5453; gh2 -= Math.floor(gh2);
+        var gh3 = Math.sin(gi * 419.2 + 77.9) * 43758.5453; gh3 -= Math.floor(gh3);
+        var gx = cx + (gh1 - 0.5) * sunR * 1.6;
+        var gy = cy + (gh2 - 0.5) * sunR * 1.6;
+        var gr = sunR * (0.04 + gh3 * 0.06);
+        ctx.globalAlpha = 0.08 + gh3 * 0.06;
+        ctx.fillStyle = gh3 > 0.5 ? '#ffeeaa' : '#ddaa44';
+        ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+    // Corona rays (shorter and softer at large sizes)
+    var numRays = sunR > 20 ? 12 : 6;
+    var rayLen = sunR < 20 ? sunR * 2.5 : sunR * 1.3;
+    var rayWidth = sunR < 20 ? 1 : Math.max(1, sunR * 0.03);
     for (var ri = 0; ri < numRays; ri++) {
       var ra = (ri / numRays) * Math.PI * 2;
       var shimmer = 0.7 + 0.3 * Math.sin(tSec * 2.5 + ri * 1.3);
-      ctx.strokeStyle = 'rgba(255, 230, 100, ' + (0.4 * shimmer) + ')';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 200, 80, ' + (0.3 * shimmer) + ')';
+      ctx.lineWidth = rayWidth;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(ra) * sunR * 1.1, cy + Math.sin(ra) * sunR * 1.1);
+      ctx.moveTo(cx + Math.cos(ra) * sunR * 1.02, cy + Math.sin(ra) * sunR * 1.02);
       ctx.lineTo(cx + Math.cos(ra) * rayLen * shimmer, cy + Math.sin(ra) * rayLen * shimmer);
       ctx.stroke();
     }
@@ -4495,8 +4649,11 @@ function draw3D(ts) {
   var tSec3d = ts / 1000;
   for (var j = 0; j < visible.length; j++) {
     var obj = visible[j];
-    // Skip solar-category "Sun" — "Sun (You Are Here)" handles it in 3D
-    if (obj.name === 'Sun' && obj.category === 'solar') continue;
+    // Skip solar-category "Sun" only when "Sun (You Are Here)" galaxy marker is visible
+    if (obj.name === 'Sun' && obj.category === 'solar') {
+      var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+      if (camDist > 100) continue; // galaxy marker takes over at stellar+ distances
+    }
     var sp = obj._sp3d;
     if (!sp) continue;
 
@@ -4572,7 +4729,8 @@ function draw3D(ts) {
     // Draw glow (offset toward light source)
     // Resolved disks: reduce glow proportionally — no bloom on a planet from ISS
     var gi = effects.glowIntensity;
-    var glowFade = isPhysical ? Math.max(0, 1 - (r3d - 8) / 40) : 1;
+    var isSunOrStar = obj.category === 'stellar' || obj.category === 'exotic' || obj.name === 'Sun';
+    var glowFade = (isPhysical && !isSunOrStar) ? Math.max(0, 1 - (r3d - 8) / 40) : 1;
     if (glowFade > 0.01) {
       var glowR = r3d * 3 * gi;
       var savedAlpha = ctx.globalAlpha;
