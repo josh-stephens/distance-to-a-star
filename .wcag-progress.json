@@ -1,0 +1,34 @@
+{
+  "project": "distance-to-a-star",
+  "last_audit": "2026-03-26T20:00:00Z",
+  "files_audited": ["index.html", "js/app.js"],
+  "summary": {
+    "total": 18,
+    "critical": 5,
+    "serious": 8,
+    "moderate": 5,
+    "fixed": 13,
+    "needs_manual_review": 5,
+    "open": 0
+  },
+  "issues": [
+    { "id": 1, "file": "index.html", "criterion": "1.1.1 A", "severity": "critical", "title": "Canvas has no text alternative or fallback", "status": "fixed", "fix": "Added role=application, aria-label, and fallback <p> inside canvas", "fixed_at": "2026-03-26" },
+    { "id": 2, "file": "index.html", "criterion": "2.1.1 A", "severity": "critical", "title": "Canvas interactive content not keyboard accessible", "status": "fixed", "fix": "Added tabindex=0 and role=application to canvas element", "fixed_at": "2026-03-26" },
+    { "id": 3, "file": "index.html", "criterion": "1.4.3 AA", "severity": "critical", "title": "Muted gray text on dark backgrounds fails contrast", "status": "fixed", "fix": "Brightened #4a4a66 to #8a8aa4, #5a5a78 to #7a7a96, #6a6a88 to #7a7a96, #4a5a7a to #7a8a9a for all text elements in CSS and JS inline styles", "fixed_at": "2026-03-26" },
+    { "id": 4, "file": "index.html", "criterion": "3.3.2 A", "severity": "critical", "title": "Tour settings inputs missing associated labels", "status": "fixed", "fix": "Changed span.narr-setting-label to label elements with for attributes; added aria-label to all inputs", "fixed_at": "2026-03-26" },
+    { "id": 5, "file": "index.html", "criterion": "2.4.1 A", "severity": "critical", "title": "No skip navigation link", "status": "fixed", "fix": "Added visually-hidden skip link before nav that targets #main-area", "fixed_at": "2026-03-26" },
+    { "id": 6, "file": "index.html", "criterion": "1.3.1 A", "severity": "serious", "title": "Glossary uses div/span instead of semantic list", "status": "needs_manual_review", "note": "JS-generated in buildGlossary() in app.js — changing to ul/li risks breaking layout and interaction patterns", "fixed_at": null },
+    { "id": 7, "file": "index.html", "criterion": "2.4.7 AA", "severity": "serious", "title": "Focus indicators rely on browser default", "status": "fixed", "fix": "Added *:focus-visible rule with 2px solid #7aaaee outline; removed all outline:none declarations from inputs", "fixed_at": "2026-03-26" },
+    { "id": 8, "file": "index.html", "criterion": "4.1.2 A", "severity": "serious", "title": "Close buttons use x character without aria-label", "status": "fixed", "fix": "Added aria-label to glossary-close, info-close, and glossary-search-clear buttons", "fixed_at": "2026-03-26" },
+    { "id": 9, "file": "index.html", "criterion": "2.4.3 A", "severity": "serious", "title": "Tab order follows DOM not visual layout", "status": "needs_manual_review", "note": "Canvas-heavy app with overlays — reordering tab flow requires extensive testing of all interactive states", "fixed_at": null },
+    { "id": 10, "file": "index.html", "criterion": "1.3.1 A", "severity": "serious", "title": "Info panel facts should use dl/dt/dd", "status": "needs_manual_review", "note": "JS-generated in showInfo() in app.js — converting info-stat divs to dl/dt/dd requires careful refactoring", "fixed_at": null },
+    { "id": 11, "file": "index.html", "criterion": "4.1.3 AA", "severity": "serious", "title": "Dynamic content updates lack aria-live", "status": "fixed", "fix": "Added aria-live=polite to #zoom-label, #scale-label, and #info-name", "fixed_at": "2026-03-26" },
+    { "id": 12, "file": "index.html", "criterion": "2.4.2 A", "severity": "serious", "title": "Page title does not update to reflect current view", "status": "needs_manual_review", "note": "Would need JS changes to updateHash/navigation functions to update document.title dynamically", "fixed_at": null },
+    { "id": 13, "file": "index.html", "criterion": "1.4.11 AA", "severity": "serious", "title": "Input/slider borders may fail non-text contrast", "status": "fixed", "fix": "Changed form input borders from #2a2a44 to #4a4a66 for feedback, narration settings, and glossary search", "fixed_at": "2026-03-26" },
+    { "id": 14, "file": "index.html", "criterion": "1.3.6 AAA", "severity": "moderate", "title": "Landmark regions missing (main, nav)", "status": "fixed", "fix": "Wrapped top-bar in <nav> with aria-label; added role=main to #main-area", "fixed_at": "2026-03-26" },
+    { "id": 15, "file": "index.html", "criterion": "2.3.1 A", "severity": "moderate", "title": "No prefers-reduced-motion for animations", "status": "fixed", "fix": "Added @media (prefers-reduced-motion: reduce) that neutralizes all transitions and animations", "fixed_at": "2026-03-26" },
+    { "id": 16, "file": "index.html", "criterion": "1.4.4 AA", "severity": "moderate", "title": "Font sizes in px not rem/em", "status": "needs_manual_review", "note": "Converting all px font sizes to rem touches nearly every CSS rule — large refactor", "fixed_at": null },
+    { "id": 17, "file": "index.html", "criterion": "1.4.10 AA", "severity": "moderate", "title": "Viewport meta disables user scaling", "status": "fixed", "fix": "Removed maximum-scale=1.0 and user-scalable=no from viewport meta tag", "fixed_at": "2026-03-26" },
+    { "id": 18, "file": "index.html", "criterion": "4.1.2 A", "severity": "moderate", "title": "Decorative elements not aria-hidden", "status": "fixed", "fix": "Added aria-hidden=true to all .key-hint spans and .sun-icon span", "fixed_at": "2026-03-26" }
+  ]
+}

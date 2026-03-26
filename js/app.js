@@ -5429,7 +5429,7 @@ function showInfo(obj) {
 
   if (obj.dist > 0) {
     var c = document.createElement('p');
-    c.style.cssText = 'margin-top:16px;font-size:11px;color:#5a5a78';
+    c.style.cssText = 'margin-top:16px;font-size:11px;color:#7a7a96';
     if (obj.dist < 0.01) c.textContent = "Light takes " + (obj.dist * 365.25 * 24 * 60).toFixed(1) + " minutes to reach us.";
     else if (obj.dist < 100) c.textContent = "If the Sun were a grain of sand, " + obj.name + " would be ~" + (obj.dist * 4.8).toFixed(0) + " miles away.";
     else if (obj.dist < 1e6) c.textContent = (obj.dist / 4.24).toFixed(0) + "x farther than Proxima Centauri.";
@@ -5442,7 +5442,7 @@ function showInfo(obj) {
       var hDiv = document.createElement('div');
       hDiv.style.cssText = 'margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.02);border-left:2px solid #3a4a6a;border-radius:0 4px 4px 0';
       var hLabel = document.createElement('div');
-      hLabel.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#4a5a7a;margin-bottom:4px';
+      hLabel.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#7a8a9a;margin-bottom:4px';
       hLabel.textContent = 'When this light left';
       var hText = document.createElement('div');
       hText.style.cssText = 'font-size:12px;color:#9898b8;line-height:1.5';
@@ -6904,7 +6904,7 @@ document.getElementById('docs-btn').addEventListener('click', function() {
     if (!msg) { statusEl.style.color = '#cc6644'; statusEl.textContent = 'Please enter a message.'; return; }
 
     sendBtn.disabled = true;
-    statusEl.style.color = '#6a6a88';
+    statusEl.style.color = '#7a7a96';
     statusEl.textContent = 'Sending...';
 
     var payload = { name: nameInput.value.trim() || 'Anonymous', message: msg };
