@@ -29,6 +29,64 @@ var defaultLayers = [
   { ratio: 1.0, color: '#888888', label: 'Surface' }
 ];
 
+// Category-based layer defaults for objects without individual entries
+var categoryLayers = {
+  stellar: [
+    { ratio: 0.12, color: '#ffcc00', label: 'Core (fusion)' },
+    { ratio: 0.45, color: '#ffaa33', label: 'Radiative zone' },
+    { ratio: 0.85, color: '#ffdd55', label: 'Convective zone' },
+    { ratio: 1.0, color: '#ffee88', label: 'Photosphere' }
+  ],
+  stellar_giant: [
+    { ratio: 0.02, color: '#ffcc00', label: 'Inert core' },
+    { ratio: 0.08, color: '#ff8800', label: 'Shell burning' },
+    { ratio: 0.6, color: '#ff6633', label: 'Convective envelope' },
+    { ratio: 1.0, color: '#ff4422', label: 'Extended atmosphere' }
+  ],
+  stellar_reddwarf: [
+    { ratio: 0.15, color: '#cc4400', label: 'Core (fusion)' },
+    { ratio: 1.0, color: '#dd5533', label: 'Convective zone' }
+  ],
+  stellar_whitedwarf: [
+    { ratio: 0.8, color: '#aabbcc', label: 'Degenerate carbon/oxygen' },
+    { ratio: 0.95, color: '#ccddee', label: 'Helium layer' },
+    { ratio: 1.0, color: '#eeeeff', label: 'Thin hydrogen atmosphere' }
+  ],
+  nebula: [
+    { ratio: 0.2, color: '#553366', label: 'Dense core' },
+    { ratio: 0.6, color: '#7744aa', label: 'Ionized gas' },
+    { ratio: 1.0, color: '#9966cc', label: 'Diffuse envelope' }
+  ],
+  cluster: [
+    { ratio: 0.3, color: '#ffcc66', label: 'Dense core' },
+    { ratio: 0.7, color: '#ddaa44', label: 'Half-light radius' },
+    { ratio: 1.0, color: '#aa8833', label: 'Tidal boundary' }
+  ],
+  galaxy: [
+    { ratio: 0.05, color: '#ffcc44', label: 'Supermassive black hole' },
+    { ratio: 0.15, color: '#ddaa55', label: 'Bulge' },
+    { ratio: 0.7, color: '#8899bb', label: 'Disk / spiral arms' },
+    { ratio: 1.0, color: '#445577', label: 'Dark matter halo' }
+  ],
+  exotic_blackhole: [
+    { ratio: 0.15, color: '#111111', label: 'Event horizon' },
+    { ratio: 0.4, color: '#222222', label: 'Ergosphere' },
+    { ratio: 0.7, color: '#ff6600', label: 'Accretion disk' },
+    { ratio: 1.0, color: '#ffaa44', label: 'Relativistic jets' }
+  ],
+  exotic_neutronstar: [
+    { ratio: 0.3, color: '#666688', label: 'Superfluid core' },
+    { ratio: 0.7, color: '#8888aa', label: 'Nuclear pasta mantle' },
+    { ratio: 0.9, color: '#aaaacc', label: 'Neutron-rich crust' },
+    { ratio: 1.0, color: '#ccccee', label: 'Iron surface' }
+  ],
+  cosmic: [
+    { ratio: 0.1, color: '#ffaa33', label: 'Central galaxies' },
+    { ratio: 0.4, color: '#886644', label: 'Intracluster medium' },
+    { ratio: 1.0, color: '#334455', label: 'Dark matter halo' }
+  ]
+};
+
 var objectLayers = {
   'Sun (You Are Here)': [
     { ratio: 0.25, color: '#ffaa00', label: 'Core' },
@@ -129,20 +187,53 @@ var rotationData = {
   'Charon':             { rotPeriod: 153.29,   tilt: 0.0 }
 };
 
+// ─── Proper motion data ─────────────────────────────────────────────
+// pmRA = μα* (mas/yr, includes cos(dec) factor), pmDec (mas/yr), rv (km/s, positive = receding)
+
+var properMotionData = {
+  'Proxima Centauri':    { pmRA: -3781.74, pmDec: 769.77,  rv: -21.7 },
+  '\u03b1 Centauri A':   { pmRA: -3679.25, pmDec: 473.67,  rv: -21.4 },
+  '\u03b1 Centauri B':   { pmRA: -3614.39, pmDec: 802.98,  rv: -18.6 },
+  "Barnard's Star":      { pmRA: -798.58,  pmDec: 10328.12, rv: -110.6 },
+  'Wolf 359':            { pmRA: -3842,    pmDec: -2725,   rv: 19.3 },
+  'Sirius':              { pmRA: -546.01,  pmDec: -1223.14, rv: -5.5 },
+  'Ross 154':            { pmRA: 636.7,    pmDec: -191.2,  rv: -10.7 },
+  'Tau Ceti':            { pmRA: -1721.94, pmDec: 854.17,  rv: -16.4 },
+  'Procyon':             { pmRA: -714.59,  pmDec: -1036.8, rv: -3.2 },
+  'Vega':                { pmRA: 200.94,   pmDec: 286.23,  rv: -13.9 },
+  'Arcturus':            { pmRA: -1093.45, pmDec: -1999.4, rv: -5.2 },
+  'Aldebaran':           { pmRA: 63.45,    pmDec: -189.94, rv: 54.3 },
+  'Polaris':             { pmRA: 44.48,    pmDec: -11.85,  rv: -17.4 },
+  'Betelgeuse':          { pmRA: 24.95,    pmDec: 9.56,    rv: 21.9 },
+  'Rigel':               { pmRA: 1.31,     pmDec: -0.56,   rv: 17.8 },
+  'Deneb':               { pmRA: 1.56,     pmDec: 1.55,    rv: -4.5 },
+  'Canopus':             { pmRA: 19.99,    pmDec: 23.67,   rv: 20.3 },
+  'Antares':             { pmRA: -12.11,   pmDec: -23.30,  rv: -3.4 },
+  // Big Dipper — UMa Moving Group (5 share motion, 2 diverge)
+  'Dubhe':               { pmRA: -134.11,  pmDec: -34.70,  rv: -9.3 },
+  'Merak':               { pmRA: 81.43,    pmDec: 33.49,   rv: -12.0 },
+  'Phecda':              { pmRA: -12.20,   pmDec: 13.60,   rv: -12.6 },
+  'Megrez':              { pmRA: 104.11,   pmDec: 7.30,    rv: -13.4 },
+  'Alioth':              { pmRA: 111.74,   pmDec: -8.99,   rv: -9.3 },
+  'Mizar':               { pmRA: 121.23,   pmDec: -22.01,  rv: -6.3 },
+  'Alkaid':              { pmRA: -121.23,  pmDec: -15.56,  rv: -10.9 }
+};
+
 // ─── Time state ──────────────────────────────────────────────────────
 
 var simTime = {
   epoch: Date.now(),         // real-world epoch when sim started
-  multiplier: 1,             // 1 = real-time, 3600 = 1 hr/sec, etc.
+  multiplier: 1,             // days-per-day (same numeric value as seconds-per-second)
   paused: false,
-  J2000: Date.UTC(2000, 0, 1, 12, 0, 0) // J2000.0 epoch in ms
+  J2000: Date.UTC(2000, 0, 1, 12, 0, 0), // J2000.0 epoch in ms
+  simDaysAtEpoch: (Date.now() - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000 // accumulated sim days at epoch
 };
 
 // ─── Category visibility ranges ────────────────────────────────────────
 
 var catRanges = {
   solar: [0, 0.3],
-  stellar: [0.3, 60],
+  stellar: [0.3, 2000],
   nebula: [50, 150000],
   cluster: [200, 200000],
   exotic: [50, 250000],
@@ -286,7 +377,7 @@ var objects = [
     facts: [["Distance", "39.46 light-years"], ["Planets", "7 rocky (b through h)"], ["Habitable zone", "e, f, g"], ["Star", "Ultra-cool red dwarf"]],
     desc: "Seven Earth-sized rocky planets orbiting a dim red dwarf, three in the habitable zone. The most promising system for finding habitable worlds beyond our own. JWST is actively studying their atmospheres." },
   { name: "Kepler-452b", x: 1200, y: -1300, dist: 1800, radius: 2, color: "#77bb99", glow: "#77bb9944",
-    type: "Exoplanet (super-Earth)", category: "stellar", visRange: [80, 8000],
+    type: "Exoplanet (super-Earth)", category: "stellar", visRange: [80, 16000],
     facts: [["Distance", "1,800 light-years"], ["Radius", "~1.6 Earth radii"], ["Orbital period", "385 days"], ["Star", "Sun-like (G2V)"]],
     desc: "Dubbed 'Earth 2.0' -- the first near-Earth-sized planet found in the habitable zone of a Sun-like star. Its year lasts 385 days and its star is nearly identical to our Sun, making it the most Earth-like world discovered by Kepler." },
   { name: "51 Pegasi b", x: 35, y: -35, dist: 50.45, radius: 1.8, color: "#ff9944", glow: "#ff994433",
@@ -298,7 +389,7 @@ var objects = [
     facts: [["Distance", "159 light-years"], ["Nickname", "Osiris"], ["Orbital period", "3.52 days"], ["Discovery", "First transiting exoplanet (1999)"]],
     desc: "The first exoplanet caught crossing its star's face. Nicknamed 'Osiris' after the Egyptian god of the dead, this gas giant is so close to its star that its atmosphere is boiling away into space, leaving a comet-like tail of hydrogen and carbon." },
   { name: "WASP-12b", x: -950, y: 1050, dist: 1410, radius: 2, color: "#ff6633", glow: "#ff663344",
-    type: "Ultra-hot Jupiter (doomed)", category: "stellar", visRange: [80, 6000],
+    type: "Ultra-hot Jupiter (doomed)", category: "stellar", visRange: [80, 12000],
     facts: [["Distance", "1,410 light-years"], ["Surface temp", "~2,600\u00b0C"], ["Orbital period", "1.09 days"], ["Fate", "Being consumed by its star"]],
     desc: "One of the hottest and most extreme planets known. Orbiting so close that tidal forces stretch it into an egg shape, WASP-12b is being slowly devoured by its star. It reflects almost no light -- darker than asphalt. It will be consumed entirely within 10 million years." },
 
@@ -306,7 +397,7 @@ var objects = [
     type: "Red dwarf (M4Ve)", category: "stellar",
     facts: [["Distance", "5.96 light-years"], ["Age", "~10 billion years"]],
     desc: "The fastest-moving star in our sky. An ancient red dwarf, twice the age of our solar system." },
-  { name: "Wolf 359", x: -5.0, y: 5.5, dist: 7.86, radius: 1.2, color: "#cc4422", glow: "#cc442222",
+  { name: "Wolf 359", x: -5.0, y: 5.5, dist: 7.86, ra: 164.12, dec: 7.01, radius: 1.2, color: "#cc4422", glow: "#cc442222",
     type: "Red dwarf (M6.5Ve)", category: "stellar",
     facts: [["Distance", "7.86 light-years"], ["Luminosity", "0.001 L\u2609"]],
     desc: "One of the faintest stars known. Invisible to the naked eye despite being a close neighbor." },
@@ -314,11 +405,11 @@ var objects = [
     type: "Star (A1V)", category: "stellar",
     facts: [["Distance", "8.6 light-years"], ["Luminosity", "25.4 L\u2609"], ["Apparent mag", "-1.46 (brightest)"]],
     desc: "The brightest star in Earth's night sky. 25 times more luminous than the Sun." },
-  { name: "Ross 154", x: 7.0, y: 5.5, dist: 9.69, radius: 1.2, color: "#cc5533", glow: "#cc553322",
+  { name: "Ross 154", x: 7.0, y: 5.5, dist: 9.69, ra: 283.27, dec: -23.83, radius: 1.2, color: "#cc5533", glow: "#cc553322",
     type: "Red dwarf", category: "stellar",
     facts: [["Distance", "9.69 ly"]],
     desc: "A flare star that can suddenly brighten by several magnitudes." },
-  { name: "Tau Ceti", x: -8.0, y: -7.5, dist: 11.9, radius: 2.5, color: "#ffdd88", glow: "#ffdd8833",
+  { name: "Tau Ceti", x: -8.0, y: -7.5, dist: 11.9, ra: 26.02, dec: -15.94, radius: 2.5, color: "#ffdd88", glow: "#ffdd8833",
     type: "Star (G8.5V, Sun-like)", category: "stellar",
     facts: [["Distance", "11.9 light-years"], ["Planets", "5 candidates"]],
     desc: "A Sun-like star with possibly 5 planets." },
@@ -339,133 +430,133 @@ var objects = [
     facts: [["Distance", "65 light-years"], ["Diameter", "44x Sun"], ["Constellation", "Taurus (the eye)"]],
     desc: "The red eye of Taurus. Appears embedded in the Hyades but is only half as far." },
   { name: "Canopus", x: 150, y: -270, dist: 310, ra: 95.99, dec: -52.70, radius: 3.5, color: "#ffffcc", glow: "#ffffcc44",
-    type: "Supergiant (A9II)", category: "stellar", visRange: [50, 1500],
+    type: "Supergiant (A9II)", category: "stellar", visRange: [50, 15000],
     facts: [["Distance", "310 light-years"], ["Luminosity", "10,700 L\u2609"], ["Rank", "2nd brightest star"]],
     desc: "The 2nd brightest star in Earth's sky. Used for spacecraft navigation." },
   { name: "Polaris", x: 200, y: 380, dist: 433, ra: 37.95, dec: 89.26, radius: 3, color: "#ffeedd", glow: "#ffeedd44",
-    type: "Supergiant (F7Ib)", category: "stellar", visRange: [80, 2000],
+    type: "Supergiant (F7Ib)", category: "stellar", visRange: [80, 15000],
     facts: [["Distance", "433 light-years"], ["Type", "Cepheid variable (triple system)"], ["Role", "Current North Star"]],
     desc: "Earth's North Star. A Cepheid variable -- a standard candle for measuring cosmic distances." },
   // ── Orion ──
   { name: "Antares", x: -300, y: 420, dist: 550, ra: 247.35, dec: -26.43, radius: 4, color: "#ff4422", glow: "#ff442244",
-    type: "Red supergiant (M1Iab)", category: "stellar", visRange: [80, 2500], constellation: "scorpius",
+    type: "Red supergiant (M1Iab)", category: "stellar", visRange: [80, 15000], constellation: "scorpius",
     facts: [["Distance", "550 light-years"], ["Diameter", "680x Sun"], ["Constellation", "Scorpius (the heart)"]],
     desc: "Heart of the Scorpion. So large that if placed at the Sun, Mars would orbit inside it." },
   { name: "Betelgeuse", x: 20, y: -380, dist: 700, ra: 88.79, dec: 7.41, radius: 5, color: "#ff6633", glow: "#ff663355",
-    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 3000], constellation: "orion", physRadius: 0.0057,
+    type: "Red supergiant (M2Iab)", category: "stellar", visRange: [50, 15000], constellation: "orion", physRadius: 0.0057,
     facts: [["Distance", "700 light-years"], ["Diameter", "700-1000x Sun"], ["Fate", "Supernova within 100,000 yr"]],
     desc: "A red supergiant so immense it would engulf Jupiter. Will explode as a supernova." },
   { name: "Bellatrix", x: 230, y: -400, dist: 250, ra: 81.28, dec: 6.35, radius: 3, color: "#99aaff", glow: "#99aaff44",
-    type: "Blue giant (B2III)", category: "stellar", visRange: [50, 2000], constellation: "orion",
+    type: "Blue giant (B2III)", category: "stellar", visRange: [50, 10000], constellation: "orion",
     facts: [["Distance", "250 light-years"], ["Luminosity", "9,200 L\u2609"], ["Name meaning", "'Female warrior' in Latin"]],
     desc: "Orion's right shoulder. At 250 ly, Bellatrix is much closer than the other Orion stars -- the constellation is an illusion of perspective." },
   { name: "Alnitak", x: 60, y: -540, dist: 1200, ra: 85.19, dec: -1.94, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
-    type: "Triple star system (O9.7Ib)", category: "stellar", visRange: [50, 4000], constellation: "orion",
+    type: "Triple star system (O9.7Ib)", category: "stellar", visRange: [50, 10000], constellation: "orion",
     facts: [["Distance", "~1,200 light-years"], ["System", "Triple star system"], ["Nearby", "Illuminates Flame and Horsehead Nebulae"]],
     desc: "The leftmost belt star. Its UV radiation illuminates the nearby Flame Nebula and sculpts the iconic Horsehead Nebula." },
   { name: "Alnilam", x: 120, y: -555, dist: 2000, ra: 84.05, dec: -1.20, radius: 3, color: "#bbccff", glow: "#bbccff55",
-    type: "Blue supergiant (B0Ia)", category: "stellar", visRange: [50, 6000], constellation: "orion",
+    type: "Blue supergiant (B0Ia)", category: "stellar", visRange: [50, 10000], constellation: "orion",
     facts: [["Distance", "~2,000 light-years"], ["Luminosity", "275,000 L\u2609"], ["Belt position", "Center belt star (brightest)"]],
     desc: "The center jewel of Orion's Belt and the most distant of the three. At 2,000 ly, it is nearly twice as far as its belt companions -- proof that constellations are illusions of projection." },
   { name: "Mintaka", x: 180, y: -570, dist: 1200, ra: 83.00, dec: -0.30, radius: 2.5, color: "#aabbff", glow: "#aabbff44",
-    type: "Multiple star system (O9.5II)", category: "stellar", visRange: [50, 4000], constellation: "orion",
+    type: "Multiple star system (O9.5II)", category: "stellar", visRange: [50, 10000], constellation: "orion",
     facts: [["Distance", "~1,200 light-years"], ["System", "Eclipsing binary + 2 companions"], ["Belt position", "Westernmost (right) belt star"]],
     desc: "The rightmost star of Orion's Belt. Actually a complex system of at least four stars, nearly on the celestial equator." },
   { name: "Saiph", x: 40, y: -720, dist: 650, ra: 86.94, dec: -9.67, radius: 3, color: "#88aaff", glow: "#88aaff44",
-    type: "Blue supergiant (B0.5Ia)", category: "stellar", visRange: [50, 3000], constellation: "orion",
+    type: "Blue supergiant (B0.5Ia)", category: "stellar", visRange: [50, 10000], constellation: "orion",
     facts: [["Distance", "~650 light-years"], ["Luminosity", "56,000 L\u2609"], ["Name meaning", "'Sword of the Giant' in Arabic"]],
     desc: "Orion's left foot. Despite similar luminosity to Rigel, it appears dimmer because more of its light is in the ultraviolet." },
   { name: "Rigel", x: 210, y: -700, dist: 863, ra: 78.63, dec: -8.20, radius: 4.5, color: "#99bbff", glow: "#99bbff55",
-    type: "Blue supergiant (B8Ia)", category: "stellar", visRange: [50, 4000], constellation: "orion",
+    type: "Blue supergiant (B8Ia)", category: "stellar", visRange: [50, 15000], constellation: "orion",
     facts: [["Distance", "863 light-years"], ["Luminosity", "120,000 L\u2609"], ["Role", "Illuminates Witch Head Nebula"]],
     desc: "A blue supergiant blazing at 120,000x the Sun's luminosity. The 7th brightest star." },
 
   // ── Scorpius (tail curves down from Antares) ──
   { name: "Dschubba", x: -220, y: 280, dist: 490, ra: 240.08, dec: -22.62, radius: 2.5, color: "#aabbff", glow: "#aabbff33",
-    type: "Subgiant (B0.3IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
+    type: "Subgiant (B0.3IV)", category: "stellar", visRange: [50, 5000], constellation: "scorpius",
     facts: [["Distance", "~490 light-years"], ["Name", "\u03b4 Scorpii"], ["Feature", "Be star with episodic brightening"]],
     desc: "The forehead of the Scorpion. A Be star that occasionally ejects disks of gas, causing dramatic brightness changes." },
   { name: "Sargas", x: -380, y: 540, dist: 300, ra: 264.33, dec: -42.99, radius: 2.5, color: "#ffddaa", glow: "#ffddaa33",
-    type: "Giant (F1II)", category: "stellar", visRange: [50, 2000], constellation: "scorpius",
+    type: "Giant (F1II)", category: "stellar", visRange: [50, 5000], constellation: "scorpius",
     facts: [["Distance", "~300 light-years"], ["Name", "\u03b8 Scorpii"], ["Luminosity", "~1,800 L\u2609"]],
     desc: "A bright giant in the Scorpion's tail. At 300 ly, Sargas is much closer than the heart star Antares at 550 ly." },
   { name: "Shaula", x: -440, y: 640, dist: 570, ra: 263.40, dec: -37.10, radius: 3, color: "#99bbff", glow: "#99bbff44",
-    type: "Triple star system (B2IV)", category: "stellar", visRange: [50, 2500], constellation: "scorpius",
+    type: "Triple star system (B2IV)", category: "stellar", visRange: [50, 5000], constellation: "scorpius",
     facts: [["Distance", "~570 light-years"], ["Name", "\u03bb Scorpii (the stinger)"], ["System", "Triple star"]],
     desc: "The stinger at the tip of the Scorpion's tail. The second brightest star in Scorpius after Antares." },
 
   // ── Big Dipper / Ursa Major ──
   { name: "Dubhe", x: 320, y: 380, dist: 124, ra: 165.93, dec: 61.75, radius: 2.5, color: "#ffcc66", glow: "#ffcc6633",
-    type: "Giant (K0III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Giant (K0III)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "124 light-years"], ["Name", "\u03b1 Ursae Majoris"], ["Note", "NOT part of the Ursa Major Moving Group"]],
     desc: "The front lip of the Big Dipper's bowl. Unlike 5 of the other Dipper stars, Dubhe is not part of the Ursa Major Moving Group -- the pattern is slowly dissolving." },
   { name: "Merak", x: 340, y: 300, dist: 79, ra: 165.46, dec: 56.38, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
-    type: "Star (A1V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Star (A1V)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "79 light-years"], ["Name", "\u03b2 Ursae Majoris"], ["Use", "Pointer star toward Polaris"]],
     desc: "The bottom of the Dipper's bowl, and a pointer star: the line from Merak through Dubhe leads to Polaris." },
   { name: "Phecda", x: 400, y: 270, dist: 84, ra: 178.46, dec: 53.69, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
-    type: "Star (A0V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Star (A0V)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "84 light-years"], ["Name", "\u03b3 Ursae Majoris"], ["Group", "Ursa Major Moving Group"]],
     desc: "The inner bottom corner of the Big Dipper's bowl. Part of the Ursa Major Moving Group, a loose cluster of stars sharing a common motion through space." },
   { name: "Megrez", x: 410, y: 340, dist: 58, ra: 183.86, dec: 57.03, radius: 1.8, color: "#ddeeff", glow: "#ddeeff22",
-    type: "Star (A3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Star (A3V)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "58 light-years"], ["Name", "\u03b4 Ursae Majoris"], ["Note", "Faintest Dipper star"]],
     desc: "The faintest star in the Big Dipper, where the bowl meets the handle. Also the closest Dipper star at just 58 ly." },
   { name: "Alioth", x: 470, y: 310, dist: 81, ra: 193.51, dec: 55.96, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
-    type: "Star (A1III)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Star (A1III)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "81 light-years"], ["Name", "\u03b5 Ursae Majoris"], ["Rank", "Brightest star in Ursa Major"]],
     desc: "The brightest star in Ursa Major and the first star of the Dipper's handle." },
   { name: "Mizar", x: 530, y: 270, dist: 78, ra: 200.98, dec: 54.93, radius: 2.5, color: "#ddeeff", glow: "#ddeeff33",
-    type: "Sextuple star system (A2V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Sextuple star system (A2V)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "78 light-years"], ["Companion", "Alcor (visual double)"], ["System", "Actually 6 stars"]],
     desc: "The famous double star at the bend of the Dipper's handle. Paired with Alcor as an ancient eye test. Mizar itself is actually a sextuple system -- six stars masquerading as one." },
   { name: "Alkaid", x: 590, y: 220, dist: 104, ra: 206.89, dec: 49.31, radius: 2.5, color: "#bbccff", glow: "#bbccff33",
-    type: "Star (B3V)", category: "stellar", visRange: [30, 1000], constellation: "bigdipper",
+    type: "Star (B3V)", category: "stellar", visRange: [30, 5000], constellation: "bigdipper",
     facts: [["Distance", "104 light-years"], ["Name", "\u03b7 Ursae Majoris"], ["Note", "NOT part of the Moving Group"]],
     desc: "The tip of the Dipper's handle. Like Dubhe at the bowl's front, Alkaid is NOT part of the Ursa Major Moving Group -- in millions of years, the Dipper will lose its shape." },
 
   // ── Crux / Southern Cross ──
   { name: "Acrux", x: -420, y: -310, dist: 321, ra: 186.65, dec: -63.10, radius: 3, color: "#aabbff", glow: "#aabbff44",
-    type: "Triple star system (B0.5IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    type: "Triple star system (B0.5IV)", category: "stellar", visRange: [50, 5000], constellation: "crux",
     facts: [["Distance", "321 light-years"], ["Name", "\u03b1 Crucis"], ["System", "Triple star"], ["Use", "Points toward south celestial pole"]],
     desc: "The brightest star in the Southern Cross and the southernmost first-magnitude star. A triple system used for centuries to find south." },
   { name: "Mimosa", x: -490, y: -220, dist: 280, ra: 191.93, dec: -59.69, radius: 3, color: "#99bbff", glow: "#99bbff44",
-    type: "Giant (B1III)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    type: "Giant (B1III)", category: "stellar", visRange: [50, 5000], constellation: "crux",
     facts: [["Distance", "280 light-years"], ["Name", "\u03b2 Crucis"], ["Feature", "Pulsating variable (Beta Cephei type)"]],
     desc: "The left arm of the Southern Cross. A pulsating variable that subtly changes brightness every few hours." },
   { name: "Gacrux", x: -420, y: -130, dist: 88, ra: 187.79, dec: -57.11, radius: 2.5, color: "#ff9966", glow: "#ff996644",
-    type: "Red giant (M3.5III)", category: "stellar", visRange: [30, 1500], constellation: "crux",
+    type: "Red giant (M3.5III)", category: "stellar", visRange: [30, 5000], constellation: "crux",
     facts: [["Distance", "88 light-years"], ["Name", "\u03b3 Crucis"], ["Color", "Distinctly red/orange"]],
     desc: "The top of the Southern Cross -- and by far the closest of its stars at just 88 ly. Its warm orange color contrasts with the blue-white of the other three, a visual clue to its very different distance." },
   { name: "Delta Crucis", x: -350, y: -220, dist: 345, ra: 183.79, dec: -58.75, radius: 2, color: "#aabbff", glow: "#aabbff33",
-    type: "Subgiant (B2IV)", category: "stellar", visRange: [50, 2000], constellation: "crux",
+    type: "Subgiant (B2IV)", category: "stellar", visRange: [50, 5000], constellation: "crux",
     facts: [["Distance", "345 light-years"], ["Name", "\u03b4 Crucis"], ["Feature", "Pulsating variable"]],
     desc: "The right arm of the Southern Cross. The faintest of the four main stars." },
 
   // ── Cassiopeia (W-shape) ──
   { name: "Caph", x: 400, y: -110, dist: 54, ra: 2.29, dec: 59.15, radius: 2, color: "#ffeedd", glow: "#ffeedd33",
-    type: "Giant (F2III)", category: "stellar", visRange: [20, 1000], constellation: "cassiopeia",
+    type: "Giant (F2III)", category: "stellar", visRange: [20, 5000], constellation: "cassiopeia",
     facts: [["Distance", "54 light-years"], ["Name", "\u03b2 Cassiopeiae"], ["Feature", "Delta Scuti variable"]],
     desc: "The leftmost peak of Cassiopeia's W and the closest of its stars at just 54 ly. A rapidly oscillating star used to study stellar interiors." },
   { name: "Schedar", x: 440, y: -220, dist: 228, ra: 10.13, dec: 56.54, radius: 2.5, color: "#ffaa66", glow: "#ffaa6633",
-    type: "Giant (K0IIIa)", category: "stellar", visRange: [40, 1500], constellation: "cassiopeia",
+    type: "Giant (K0IIIa)", category: "stellar", visRange: [40, 5000], constellation: "cassiopeia",
     facts: [["Distance", "228 light-years"], ["Name", "\u03b1 Cassiopeiae"], ["Color", "Distinctly orange"]],
     desc: "The brightest star in Cassiopeia and the left valley of the W. Its warm orange glow marks it among its bluer neighbors." },
   { name: "Gamma Cassiopeiae", x: 510, y: -100, dist: 550, ra: 14.18, dec: 60.72, radius: 3, color: "#aaccff", glow: "#aaccff44",
-    type: "Be star (B0.5IVe)", category: "stellar", visRange: [50, 2500], constellation: "cassiopeia",
+    type: "Be star (B0.5IVe)", category: "stellar", visRange: [50, 5000], constellation: "cassiopeia",
     facts: [["Distance", "~550 light-years"], ["Feature", "Eruptive variable, spins near breakup speed"], ["X-ray", "Anomalously strong X-ray source"]],
     desc: "The center peak of Cassiopeia's W. A Be star spinning so fast it flings off disks of gas, causing unpredictable brightness changes. A mysteriously strong X-ray source." },
   { name: "Ruchbah", x: 570, y: -240, dist: 99, ra: 21.45, dec: 60.24, radius: 2, color: "#ddeeff", glow: "#ddeeff33",
-    type: "Eclipsing binary (A5III-IV)", category: "stellar", visRange: [30, 1000], constellation: "cassiopeia",
+    type: "Eclipsing binary (A5III-IV)", category: "stellar", visRange: [30, 5000], constellation: "cassiopeia",
     facts: [["Distance", "99 light-years"], ["Name", "\u03b4 Cassiopeiae"], ["Feature", "Algol-type eclipsing binary"]],
     desc: "The right valley of Cassiopeia's W. An eclipsing binary where the companion star periodically passes in front, dimming its light." },
   { name: "Segin", x: 630, y: -130, dist: 410, ra: 28.60, dec: 63.67, radius: 2, color: "#bbccff", glow: "#bbccff33",
-    type: "Subgiant (B3III)", category: "stellar", visRange: [50, 2000], constellation: "cassiopeia",
+    type: "Subgiant (B3III)", category: "stellar", visRange: [50, 5000], constellation: "cassiopeia",
     facts: [["Distance", "410 light-years"], ["Name", "\u03b5 Cassiopeiae"], ["Cluster", "Near open cluster NGC 146"]],
     desc: "The rightmost peak of Cassiopeia's W. The depth story is vivid here: Caph (54 ly) and Ruchbah (99 ly) are nearby, while Segin (410 ly) and Gamma Cas (550 ly) are 5-10x farther." },
 
   { name: "Deneb", x: 700, y: 80, dist: 2615, ra: 310.36, dec: 45.28, radius: 4, color: "#bbccff", glow: "#bbccff44",
-    type: "Supergiant (A2Ia)", category: "stellar", visRange: [300, 8000],
+    type: "Supergiant (A2Ia)", category: "stellar", visRange: [300, 15000],
     facts: [["Distance", "2,615 light-years"], ["Luminosity", "200,000 L\u2609"], ["Light departed", "~400 BC"]],
     desc: "200,000x the Sun's luminosity. Its light left when Socrates walked Athens." },
 
@@ -653,15 +744,15 @@ var objects = [
     desc: "Pulling the MW, Andromeda, and thousands of galaxies toward it. Hidden behind our own galaxy's disk." },
 
   // Galaxy type exemplars
-  { name: "M87", x: -42 * MLY, y: -33 * MLY, dist: 53.8 * MLY, radius: 10, color: "#eeddaa", glow: "#eeddaa44",
+  { name: "M87", x: -42 * MLY, y: -33 * MLY, dist: 53.8 * MLY, radius: 5, color: "#eeddaa", glow: "#eeddaa44",
     type: "Giant elliptical galaxy (E0)", category: "cosmic",
     facts: [["Distance", "~53.8 Mly"], ["Stars", "~1 trillion"], ["Black hole", "M87*, 6.5 billion M\u2609 (first imaged BH)"], ["Jet", "Relativistic jet ~5,000 ly long"]],
     desc: "The dominant galaxy of the Virgo Cluster. Its supermassive black hole was the first ever directly imaged by the Event Horizon Telescope in 2019, producing humanity's iconic black hole photograph." },
-  { name: "NGC 1300", x: 25 * MLY, y: -57 * MLY, dist: 61 * MLY, radius: 6, color: "#aabbee", glow: "#aabbee33",
+  { name: "NGC 1300", x: 25 * MLY, y: -57 * MLY, dist: 61 * MLY, radius: 4, color: "#aabbee", glow: "#aabbee33",
     type: "Barred spiral galaxy (SBbc)", category: "cosmic",
     facts: [["Distance", "~61 Mly"], ["Constellation", "Eridanus"], ["Feature", "Textbook example of barred spiral structure"]],
     desc: "Considered the prototypical barred spiral galaxy. Its prominent central bar channels gas inward, fueling star formation in a ring around the core." },
-  { name: "IC 1101", x: -300 * MLY, y: 180 * MLY, dist: 1040 * MLY, radius: 14, color: "#ddccaa", glow: "#ddccaa44",
+  { name: "IC 1101", x: -300 * MLY, y: 180 * MLY, dist: 1040 * MLY, radius: 6, color: "#ddccaa", glow: "#ddccaa44",
     type: "Supergiant elliptical galaxy (cD)", category: "cosmic", visRange: [80 * MLY, 400 * MLY],
     facts: [["Distance", "~1.04 Gly"], ["Diameter", "~4 Mly (largest known galaxy)"], ["Stars", "~100 trillion"], ["Cluster", "Abell 2029"]],
     desc: "One of the largest known galaxies in the observable universe. If placed where the Milky Way is, its halo would engulf both Magellanic Clouds and reach halfway to Andromeda." }
@@ -1001,6 +1092,10 @@ var refDistances = [
   { name: "Earth \u2192 Sun", dist: AU_IN_LY, color: "#4488cc" },
   { name: "Sun \u2192 Proxima Cen.", dist: 4.24, color: "#ff6644" },
   { name: "Sun \u2192 Sirius", dist: 8.6, color: "#aaccff" },
+  { name: "Sun \u2192 Vega", dist: 25, color: "#aabbdd" },
+  { name: "Sun \u2192 Betelgeuse", dist: 700, color: "#ff8855" },
+  { name: "Sun \u2192 Deneb", dist: 2615, color: "#99bbff" },
+  { name: "Sun \u2192 Galactic Center", dist: 26000, color: "#ddaa44" },
   { name: "Milky Way diameter", dist: 105000, color: "#6699cc" },
   { name: "MW \u2192 Andromeda", dist: 2.537 * MLY, color: "#bbaaee" },
   { name: "Local Group diameter", dist: 10 * MLY, color: "#9999cc" }

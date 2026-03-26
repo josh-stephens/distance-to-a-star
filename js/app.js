@@ -19,6 +19,7 @@ var state = {
   hoverObj: null,
   hoverIconPos: null,
   mode3d: false,
+  follow: null,             // 2D: object to keep centered (set by dbl-click)
   lastPanX: 0, lastPanY: 0, lastZoom: 0  // saved 2D state when entering 3D
 };
 
@@ -27,7 +28,8 @@ var state = {
 var cam3d = {
   px: 0, py: 0, pz: 0,    // position in light-years (0,0,0 = Sun/Earth)
   yaw: 0, pitch: 0,       // look direction in radians
-  fov: 60                  // field of view in degrees
+  fov: 60,                 // field of view in degrees
+  trackTarget: null        // key from cam3dLookTargets, or null
 };
 
 var cam3dAnim = { active: false, startTime: 0, duration: 0, from: null, to: null };
@@ -231,11 +233,10 @@ function lightenHex(hex, factor) {
 // ─── Keplerian orbital mechanics ─────────────────────────────────────
 
 // Returns simulation time in days since J2000
+// Uses simDaysAtEpoch to avoid overflow at extreme multipliers (>3e12)
 function getSimDaysJ2000() {
-  var now = Date.now();
-  var elapsed = (now - simTime.epoch) * simTime.multiplier;
-  var simMs = simTime.epoch + elapsed;
-  return (simMs - simTime.J2000) / 86400000;
+  var elapsedRealDays = (Date.now() - simTime.epoch) / 86400000;
+  return simTime.simDaysAtEpoch + elapsedRealDays * simTime.multiplier;
 }
 
 // Solve Kepler's equation M = E - e*sin(E) via Newton-Raphson
@@ -281,6 +282,17 @@ function keplerPosition(elem, daysJ2000) {
 }
 
 // Update planet positions in-place based on current sim time
+// Minimum 2D separation for satellite–parent pairs (in world ly).
+// Mirrors drawObject sizing: max(cosmetic * solarScale, physical).
+function satMinSep(parentR, parentPhys, satR, satPhys) {
+  var scale = getScale();
+  var vr = getViewRadius();
+  var ss = Math.max(1, Math.min(4, 0.00004 / Math.max(vr, 0.000000005)));
+  var pDr = parentPhys ? Math.max(parentR * ss, parentPhys * scale) : parentR * ss;
+  var sDr = satPhys ? Math.max(satR * ss, satPhys * scale) : satR * ss;
+  return (pDr + sDr) * 2.5 / scale;
+}
+
 function updatePlanetPositions() {
   var days = getSimDaysJ2000();
   var earthX = 0, earthY = 0, earthZ = 0;
@@ -304,10 +316,28 @@ function updatePlanetPositions() {
     }
   }
   // Second pass: place satellites relative to their parent
-  var plutoX = 0, plutoY = 0, plutoZ = 0;
+  // Pluto-Charon: binary system. Keplerian orbit gives the barycenter position.
+  // Barycenter is ~2,110 km from Pluto's center (outside Pluto, radius 1,188 km).
+  // Pluto orbits barycenter at 2,110 km, Charon at 17,461 km. Period: 6.387 days.
+  var baryX = 0, baryY = 0, baryZ = 0;
   for (var j = 0; j < objects.length; j++) {
     if (objects[j].name === 'Pluto') {
-      plutoX = objects[j].x; plutoY = objects[j].y; plutoZ = objects[j].orbZ || 0;
+      baryX = objects[j].x; baryY = objects[j].y; baryZ = objects[j].orbZ || 0;
+    }
+  }
+  var pcPeriod = 6.387;
+  var pcAngle = (days / pcPeriod) * Math.PI * 2;
+  var plutoBaryDist = 2.23e-10;   // 2,110 km in ly
+  var charonBaryDist = 1.845e-9;  // 17,461 km in ly
+  // Offset Pluto from barycenter (Pluto is opposite side from Charon)
+  for (var j = 0; j < objects.length; j++) {
+    if (objects[j].name === 'Pluto') {
+      var po = objects[j];
+      po.wx3d = baryX - plutoBaryDist * Math.cos(pcAngle);
+      po.wy3d = baryY - plutoBaryDist * Math.sin(pcAngle);
+      po.wz3d = baryZ;
+      po.x = baryX - plutoBaryDist * Math.cos(pcAngle);
+      po.y = baryY - plutoBaryDist * Math.sin(pcAngle);
     }
   }
   for (var j = 0; j < objects.length; j++) {
@@ -317,24 +347,31 @@ function updatePlanetPositions() {
       var moonPeriod = 27.322;
       var moonAngle = (days / moonPeriod) * Math.PI * 2;
       var moonDist = 4.06e-8;
-      sat.x = earthX + moonDist * Math.cos(moonAngle);
-      sat.y = earthY + moonDist * Math.sin(moonAngle);
-      sat.orbZ = earthZ + moonDist * Math.sin(moonAngle) * Math.sin(5.145 * Math.PI / 180);
+      // 3D: real orbital distance
+      sat.wx3d = earthX + moonDist * Math.cos(moonAngle);
+      sat.wy3d = earthY + moonDist * Math.sin(moonAngle);
+      sat.wz3d = earthZ + moonDist * Math.sin(moonAngle) * Math.sin(5.145 * Math.PI / 180);
+      // 2D: keep Moon visually separated from Earth at all zoom levels
+      var moonVisualDist = Math.max(moonDist, satMinSep(2.5, 6.74e-10, 1.8, 1.84e-10));
+      sat.x = earthX + moonVisualDist * Math.cos(moonAngle);
+      sat.y = earthY + moonVisualDist * Math.sin(moonAngle);
+      sat.orbZ = sat.wz3d;
     } else if (sat.name === 'Charon') {
-      // Charon: ~19,571 km = ~2.07e-9 ly from Pluto
-      var charonPeriod = 6.387;
-      var charonAngle = (days / charonPeriod) * Math.PI * 2;
-      var charonDist = 2.07e-9;
-      sat.x = plutoX + charonDist * Math.cos(charonAngle);
-      sat.y = plutoY + charonDist * Math.sin(charonAngle);
-      sat.orbZ = plutoZ;
+      // Charon orbits the Pluto-Charon barycenter at 17,461 km
+      sat.wx3d = baryX + charonBaryDist * Math.cos(pcAngle);
+      sat.wy3d = baryY + charonBaryDist * Math.sin(pcAngle);
+      sat.wz3d = baryZ;
+      // 2D: keep Charon visually separated from Pluto
+      var pcSep = plutoBaryDist + charonBaryDist;  // total separation
+      var charonVisualDist = Math.max(pcSep, satMinSep(1, 1.256e-10, 0.7, 6.39e-11));
+      // Offset from barycenter (same direction as 3D, but exaggerated)
+      sat.x = baryX + charonVisualDist * Math.cos(pcAngle);
+      sat.y = baryY + charonVisualDist * Math.sin(pcAngle);
+      sat.orbZ = baryZ;
     } else {
       continue;
     }
-    sat.wx3d = sat.x;
-    sat.wy3d = sat.y;
-    sat.wz3d = sat.orbZ || 0;
-    sat.dist = Math.sqrt(sat.x * sat.x + sat.y * sat.y);
+    sat.dist = Math.sqrt(sat.wx3d * sat.wx3d + sat.wy3d * sat.wy3d);
   }
 }
 
@@ -937,10 +974,29 @@ function drawOverlay_depth(d) {
   ctx.restore();
 }
 
+function getLayerDef(obj) {
+  if (objectLayers[obj.name]) return objectLayers[obj.name];
+  var cat = obj.category;
+  var typ = (obj.type || '').toLowerCase();
+  if (cat === 'stellar' || obj.name === 'Sun (You Are Here)') {
+    if (typ.indexOf('white dwarf') >= 0) return categoryLayers.stellar_whitedwarf;
+    if (typ.indexOf('red dwarf') >= 0 || typ.indexOf('m ') >= 0 || typ.indexOf('m-type') >= 0 || typ.indexOf('m5') >= 0 || typ.indexOf('m6') >= 0) return categoryLayers.stellar_reddwarf;
+    if (typ.indexOf('giant') >= 0 || typ.indexOf('supergiant') >= 0) return categoryLayers.stellar_giant;
+    return categoryLayers.stellar;
+  }
+  if (cat === 'exotic') {
+    if (typ.indexOf('black hole') >= 0) return categoryLayers.exotic_blackhole;
+    if (typ.indexOf('neutron') >= 0 || typ.indexOf('pulsar') >= 0 || typ.indexOf('magnetar') >= 0) return categoryLayers.exotic_neutronstar;
+    return defaultLayers;
+  }
+  if (categoryLayers[cat]) return categoryLayers[cat];
+  return defaultLayers;
+}
+
 function drawOverlay_layers(d) {
   var ctx = d.ctx;
   var x = d.x, y = d.y, r = d.r;
-  var layerDef = objectLayers[d.obj.name] || defaultLayers;
+  var layerDef = getLayerDef(d.obj);
   var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
                d.obj.name === 'Sun (You Are Here)';
   var hasConvective = false;
@@ -1306,6 +1362,41 @@ function initObjects3D() {
       o.wy3d = o.y;
       o.wz3d = 0;
     }
+    // Store base positions for proper motion
+    if (properMotionData[o.name] && o.ra !== undefined) {
+      o._baseRA = o.ra;
+      o._baseDec = o.dec;
+      o._baseDist = o.dist;
+      o._baseX = o.x;
+      o._baseY = o.y;
+    }
+  }
+}
+
+// Update stellar positions based on proper motion and radial velocity
+function updateStellarPositions() {
+  var years = getSimDaysJ2000() / 365.25;
+  for (var i = 0; i < objects.length; i++) {
+    var o = objects[i];
+    var pm = properMotionData[o.name];
+    if (!pm || o._baseRA === undefined) continue;
+
+    // Apply proper motion (linear)
+    var newRA = o._baseRA + (pm.pmRA / 3600000 / Math.cos(o._baseDec * DEG2RAD)) * years;
+    var newDec = o._baseDec + (pm.pmDec / 3600000) * years;
+    // Radial velocity: rv km/s -> ly/yr
+    var rvLyPerYr = pm.rv * 3.156e7 / 9.461e12;
+    var newDist = Math.max(0.01, o._baseDist + rvLyPerYr * years);
+
+    // Update 3D position
+    var c = raDecToXYZ(newRA, newDec, newDist);
+    o.wx3d = c.x; o.wy3d = c.y; o.wz3d = c.z;
+
+    // Update 2D position (delta from J2000 baseline)
+    var c0 = raDecToXYZ(o._baseRA, o._baseDec, o._baseDist);
+    o.x = o._baseX + (c.x - c0.x);
+    o.y = o._baseY + (c.y - c0.y);
+    o.dist = newDist;
   }
 }
 
@@ -1561,7 +1652,7 @@ function getVisibleObjects() {
     }
     var range = o.visRange || catRanges[o.category];
     if (!range) return false;
-    if (vr < range[0] || vr > range[1]) return false;
+    if (vr < range[0] * 0.99 || vr > range[1] * 1.01) return false;
     var sp = worldToScreen(o.x, o.y);
     return sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m;
   });
@@ -1709,32 +1800,40 @@ function drawOrbits() {
   var vr = getViewRadius();
   if (vr > 0.003) return;          // only at solar system scale
   var scale = getScale();
-  var sp0 = worldToScreen(0, 0);   // Sun position
-
-  var orbitNames = ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
-  var orbitData = [];
-  objects.forEach(function(o) {
-    if (orbitNames.indexOf(o.name) === -1) return;
-    var r = Math.sqrt(o.x * o.x + o.y * o.y);
-    orbitData.push({ name: o.name, r: r, color: o.color });
-  });
 
   // Fade in below vr 0.003, full below 0.001
   var alpha = vr > 0.001 ? 1.0 - (vr - 0.001) / 0.002 : 1.0;
   alpha = Math.max(0, Math.min(1, alpha)) * 0.35;
 
+  // Collect orbit color from objects array
+  var orbitColors = {};
+  for (var i = 0; i < objects.length; i++) {
+    if (orbitalPlaneData[objects[i].name]) orbitColors[objects[i].name] = objects[i].color;
+  }
+
   ctx.save();
   ctx.setLineDash([4, 6]);
   ctx.lineWidth = 0.8;
-  orbitData.forEach(function(o) {
-    var rPx = o.r * scale;
-    if (rPx < 3 || rPx > W * 4) return;
-    ctx.strokeStyle = o.color;
+  var STEPS = 90;
+  for (var name in orbitalPlaneData) {
+    var elem = orbitalPlaneData[name];
+    var color = orbitColors[name];
+    if (!color) continue;
+    var rCheck = elem.sma * AU_IN_LY * scale;
+    if (rCheck < 3 || rCheck > W * 4) continue;
+    ctx.strokeStyle = color;
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.arc(sp0.x, sp0.y, rPx, 0, Math.PI * 2);
+    for (var si = 0; si <= STEPS; si++) {
+      // Sample one full orbit using mean anomaly 0..360
+      var fakeDays = si * elem.period / STEPS;
+      var pos = keplerPosition(elem, fakeDays - elem.M0 * elem.period / 360);
+      var sp = worldToScreen(pos.x * AU_IN_LY, pos.y * AU_IN_LY);
+      if (si === 0) ctx.moveTo(sp.x, sp.y);
+      else ctx.lineTo(sp.x, sp.y);
+    }
     ctx.stroke();
-  });
+  }
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -2007,13 +2106,8 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   var type = obj.type || '';
   var cat = obj.category || '';
 
-  // Dynamic detail scaling: planets and solar objects grow larger as you zoom in
-  var detailScale = 1;
-  if (cat === 'solar') {
-    var vr = getViewRadius();
-    // At default solar view (0.00004), scale = 1. At max zoom, scale up to 30.
-    detailScale = Math.max(1, Math.min(30, 0.00004 / Math.max(vr, 0.000000005)));
-  }
+  // Detail scale derived from display radius (r is already dr from drawObject)
+  var detailScale = r / (obj.radius || 1);
 
   // ──── SPACECRAFT ────
 
@@ -2221,7 +2315,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Mercury
   if (name === 'Mercury') {
-    var mr = Math.max(r * detailScale, 3);
+    var mr = Math.max(r, 3);
     ctx.fillStyle = '#b5a08a';
     ctx.beginPath();
     ctx.arc(cx, cy, mr, 0, Math.PI * 2);
@@ -2240,7 +2334,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Venus
   if (name === 'Venus') {
-    var vr = Math.max(r * detailScale, 3);
+    var vr = Math.max(r, 3);
     ctx.fillStyle = '#d8b060';
     ctx.beginPath();
     ctx.arc(cx, cy, vr, 0, Math.PI * 2);
@@ -2261,7 +2355,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Earth
   if (name === 'Earth') {
-    var er = Math.max(r * detailScale, 3);
+    var er = Math.max(r, 3);
     // blue body
     ctx.fillStyle = '#3377bb';
     ctx.beginPath();
@@ -2287,7 +2381,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Mars
   if (name === 'Mars') {
-    var msr = Math.max(r * detailScale, 3);
+    var msr = Math.max(r, 3);
     ctx.fillStyle = '#cc6644';
     ctx.beginPath();
     ctx.arc(cx, cy, msr, 0, Math.PI * 2);
@@ -2302,7 +2396,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Jupiter
   if (name === 'Jupiter') {
-    var jr = Math.max(r * detailScale, 4);
+    var jr = Math.max(r, 4);
     // base
     ctx.fillStyle = '#d4a56a';
     ctx.beginPath();
@@ -2332,7 +2426,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Saturn
   if (name === 'Saturn') {
-    var sr = Math.max(r * detailScale, 4);
+    var sr = Math.max(r, 4);
     // base body
     ctx.fillStyle = '#e8d088';
     ctx.beginPath();
@@ -2370,7 +2464,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Uranus
   if (name === 'Uranus') {
-    var ur = Math.max(r * detailScale, 3);
+    var ur = Math.max(r, 3);
     ctx.fillStyle = '#88ccdd';
     ctx.beginPath();
     ctx.arc(cx, cy, ur, 0, Math.PI * 2);
@@ -2386,7 +2480,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Neptune
   if (name === 'Neptune') {
-    var nr = Math.max(r * detailScale, 3);
+    var nr = Math.max(r, 3);
     ctx.fillStyle = '#3355bb';
     ctx.beginPath();
     ctx.arc(cx, cy, nr, 0, Math.PI * 2);
@@ -2400,21 +2494,12 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     return;
   }
 
-  // Pluto (binary with Charon)
+  // Pluto
   if (name === 'Pluto') {
-    var pr = Math.max(r * detailScale, 2);
+    var pr = Math.max(r, 2);
     ctx.fillStyle = '#ccbbaa';
     ctx.beginPath();
     ctx.arc(cx, cy, pr, 0, Math.PI * 2);
-    ctx.fill();
-    // Charon at offset
-    var charonAngle = tSec * 0.3;
-    var charonDist = pr * 2.5;
-    var charonX = cx + Math.cos(charonAngle) * charonDist;
-    var charonY = cy + Math.sin(charonAngle) * charonDist;
-    ctx.fillStyle = '#999988';
-    ctx.beginPath();
-    ctx.arc(charonX, charonY, pr * 0.55, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
@@ -2423,7 +2508,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Sun / Sun-like
   if (name === 'Sun' || name === '\u03b1 Centauri A' || name === 'Tau Ceti' || name === 'Sun (You Are Here)') {
-    var sunR = Math.max(r * detailScale, 3);
+    var sunR = Math.max(r, 3);
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(cx, cy, sunR, 0, Math.PI * 2);
@@ -2717,8 +2802,6 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
         cx + Math.cos(enAngle) * enDist, cy + Math.sin(enAngle) * enDist, 0,
         cx + Math.cos(enAngle) * enDist, cy + Math.sin(enAngle) * enDist, enSize
       );
-      enG.addColorStop(0, color.replace(')', ', 0.3)').replace('rgb(', 'rgba(').replace('#', ''));
-      // Use a manual approach for hex colors
       ctx.save();
       ctx.globalAlpha = 0.25;
       ctx.fillStyle = color;
@@ -3222,13 +3305,18 @@ function drawObject(obj, sp, ts) {
   var r = obj.radius;
   var gi = effects.glowIntensity;
 
-  // Dynamic scale for solar objects at close zoom
-  var solarScale = 1;
+  // Display radius: modest cosmetic scaling for visibility at wide zoom,
+  // transitioning to accurate physical size as you zoom in.
+  var dr = r;
   if (obj.category === 'solar') {
     var vrNow = getViewRadius();
-    solarScale = Math.max(1, Math.min(30, 0.00004 / Math.max(vrNow, 0.000000005)));
+    var solarScale = Math.max(1, Math.min(4, 0.00004 / Math.max(vrNow, 0.000000005)));
+    dr = r * solarScale;
   }
-  var dr = r * solarScale; // display radius
+  if (obj.physRadius && (obj.category === 'solar' || obj.category === 'stellar')) {
+    var physR = obj.physRadius * getScale();
+    if (physR > dr) dr = physR;  // physical takes over → accurate ratios
+  }
 
   // Nebulae: draw as soft colored glows
   if (obj.category === 'nebula') {
@@ -3287,7 +3375,7 @@ function drawObject(obj, sp, ts) {
   });
 
   // Draw type-specific visual detail on top of the base glow
-  drawObjectDetail(obj, sp.x, sp.y, r, ts);
+  drawObjectDetail(obj, sp.x, sp.y, dr, ts);
 }
 
 function drawLabels() {
@@ -3332,7 +3420,7 @@ function drawLabels() {
     }
 
     // Determine opacity: full if no overlap, reduced if some
-    var alpha = bestOverlap === 0 ? 1.0 : Math.max(0.2, 1.0 - bestOverlap / (nameW * labelH));
+    var alpha = bestOverlap === 0 ? 1.0 : Math.max(0.45, 1.0 - bestOverlap / (nameW * labelH));
     if (lb.sel) alpha = 1.0; // selected always full opacity
     // Apply 3D visibility alpha
     if (lb.alpha !== undefined) alpha *= lb.alpha;
@@ -4010,8 +4098,15 @@ function draw(ts) {
 
 function draw2D(ts) {
   // Update planet positions from Keplerian elements
-  if (!simTime.paused && simTime.multiplier > 0) {
+  if (!simTime.paused && simTime.multiplier !== 0) {
     updatePlanetPositions();
+    updateStellarPositions();
+  }
+  // 2D follow: keep pan centered on the followed object
+  if (state.follow) {
+    state.panX = state.follow.x;
+    state.panY = state.follow.y;
+    state.dirty = true;
   }
 
   var sw = W / devicePixelRatio;
@@ -4103,6 +4198,16 @@ function draw2D(ts) {
   ctx.fillStyle = '#3a3a55';
   ctx.textAlign = 'right';
   ctx.fillText(sd, sw - 16, 20);
+  var hudRightY = 34;
+  if (simTime.paused) {
+    ctx.fillStyle = '#9a6a5a';
+    ctx.fillText('\u23f8 Paused', sw - 16, hudRightY);
+    hudRightY += 14;
+  }
+  if (state.follow) {
+    ctx.fillStyle = '#7a9a7a';
+    ctx.fillText('Following ' + displayName(state.follow), sw - 16, hudRightY);
+  }
 
   updateUI();
 }
@@ -4267,8 +4372,9 @@ function draw3D(ts) {
   }
 
   // Update planet positions from Keplerian elements
-  if (!simTime.paused && simTime.multiplier > 0) {
+  if (!simTime.paused && simTime.multiplier !== 0) {
     updatePlanetPositions();
+    updateStellarPositions();
     // Track orbit focal point to moving object
     if (orbitMode.active && !orbitMode.focalAnim.active) {
       for (var pi = 0; pi < objects.length; pi++) {
@@ -4282,6 +4388,29 @@ function draw3D(ts) {
       }
     }
     state.dirty = true;
+  }
+
+  // Camera tracking — continuously look at tracked target
+  if (cam3d.trackTarget && !cam3dAnim.active && !orbitMode.active) {
+    var trackPos = getLookTarget(cam3d.trackTarget);
+    if (!trackPos) {
+      for (var ti = 0; ti < objects.length; ti++) {
+        if (objects[ti].name === cam3d.trackTarget && objects[ti].wx3d !== undefined) {
+          trackPos = { x: objects[ti].wx3d, y: objects[ti].wy3d, z: objects[ti].wz3d };
+          break;
+        }
+      }
+    }
+    if (trackPos) {
+      var tdx = trackPos.x - cam3d.px, tdy = trackPos.y - cam3d.py, tdz = trackPos.z - cam3d.pz;
+      var tDist = Math.sqrt(tdx * tdx + tdy * tdy + tdz * tdz);
+      if (tDist > 1e-8) {
+        var ta = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, trackPos.x, trackPos.y, trackPos.z);
+        cam3d.yaw = ta.yaw;
+        cam3d.pitch = ta.pitch;
+      }
+      state.dirty = true;
+    }
   }
 
   ctx.clearRect(0, 0, sw, sh);
@@ -4584,22 +4713,31 @@ function draw3DHUD(sw, sh) {
     tlY += 16;
   }
 
-  // Facing direction
-  var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
-    y: Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw), z: Math.sin(cam3d.pitch) };
-  var bestDot = -1, facingLabel = '';
-  for (var ci = 0; ci < cam3dLookTargets.length; ci++) {
-    var tgt = getLookTarget(cam3dLookTargets[ci].key);
-    if (!tgt) continue;
-    var dx2 = tgt.x - cam3d.px, dy2 = tgt.y - cam3d.py, dz2 = tgt.z - cam3d.pz;
-    var len = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
-    if (len < 0.001) continue;
-    var dot = (dx2 * fwd.x + dy2 * fwd.y + dz2 * fwd.z) / len;
-    if (dot > bestDot) { bestDot = dot; facingLabel = cam3dLookTargets[ci].label; }
-  }
-  if (bestDot > 0.85 && facingLabel) {
-    ctx.fillStyle = '#6a6a8a';
-    ctx.fillText('Facing ' + facingLabel, 16, tlY);
+  // Facing direction / tracking indicator
+  if (cam3d.trackTarget) {
+    var trackLabel = cam3d.trackTarget;
+    for (var tli = 0; tli < cam3dLookTargets.length; tli++) {
+      if (cam3dLookTargets[tli].key === cam3d.trackTarget) { trackLabel = cam3dLookTargets[tli].label; break; }
+    }
+    ctx.fillStyle = '#7a9a7a';
+    ctx.fillText('Tracking ' + trackLabel, 16, tlY);
+  } else {
+    var fwd = { x: Math.cos(cam3d.pitch) * Math.cos(cam3d.yaw),
+      y: Math.cos(cam3d.pitch) * Math.sin(cam3d.yaw), z: Math.sin(cam3d.pitch) };
+    var bestDot = -1, facingLabel = '';
+    for (var ci = 0; ci < cam3dLookTargets.length; ci++) {
+      var tgt = getLookTarget(cam3dLookTargets[ci].key);
+      if (!tgt) continue;
+      var dx2 = tgt.x - cam3d.px, dy2 = tgt.y - cam3d.py, dz2 = tgt.z - cam3d.pz;
+      var len = Math.sqrt(dx2 * dx2 + dy2 * dy2 + dz2 * dz2);
+      if (len < 0.001) continue;
+      var dot = (dx2 * fwd.x + dy2 * fwd.y + dz2 * fwd.z) / len;
+      if (dot > bestDot) { bestDot = dot; facingLabel = cam3dLookTargets[ci].label; }
+    }
+    if (bestDot > 0.85 && facingLabel) {
+      ctx.fillStyle = '#6a6a8a';
+      ctx.fillText('Facing ' + facingLabel, 16, tlY);
+    }
   }
 
   // ── Bottom-right cinematic HUD ──
@@ -4639,7 +4777,10 @@ function draw3DHUD(sw, sh) {
   if (absMul > 1) {
     var tsMul = absMul;
     var tsLabel;
-    if (tsMul >= 31557600) tsLabel = (tsMul / 31557600).toFixed(0) + ' yr/s';
+    if (tsMul >= 31557600000000) tsLabel = '1 Myr/s';
+    else if (tsMul >= 3155760000000) tsLabel = '100 kyr/s';
+    else if (tsMul >= 31557600000) tsLabel = '1 kyr/s';
+    else if (tsMul >= 31557600) tsLabel = (tsMul / 31557600).toFixed(0) + ' yr/s';
     else if (tsMul >= 2592000) tsLabel = (tsMul / 2592000).toFixed(0) + ' mo/s';
     else if (tsMul >= 604800) tsLabel = (tsMul / 604800).toFixed(0) + ' wk/s';
     else if (tsMul >= 86400) tsLabel = (tsMul / 86400).toFixed(0) + ' day/s';
@@ -4650,14 +4791,29 @@ function draw3DHUD(sw, sh) {
     ctx.fillText('Time: ' + tsLabel, sw - 16, trY);
     trY += 14;
   }
-  // Show current sim date
+  // Show current sim date (adaptive format for extreme time scales)
   if (absMul > 1) {
-    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
-    var simDate = new Date(curSimMs);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var dateStr = simDate.getUTCFullYear() + ' ' + months[simDate.getUTCMonth()] + ' ' + simDate.getUTCDate();
+    var simDays = getSimDaysJ2000();
+    var ceYear = 2000 + simDays / 365.25;
+    var absYear = Math.abs(ceYear);
+    var dateStr;
+    if (absYear >= 1e6) {
+      dateStr = (ceYear / 1e6).toFixed(1) + ' Myr';
+    } else if (absYear >= 10000) {
+      dateStr = (ceYear / 1000).toFixed(1) + ' kyr';
+    } else {
+      var curSimMs = simTime.J2000 + simDays * 86400000;
+      var simDate = new Date(curSimMs);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      dateStr = simDate.getUTCFullYear() + ' ' + months[simDate.getUTCMonth()] + ' ' + simDate.getUTCDate();
+    }
     ctx.fillStyle = '#5a5a6a';
     ctx.fillText(dateStr, sw - 16, trY);
+    trY += 14;
+  }
+  if (simTime.paused) {
+    ctx.fillStyle = '#9a6a5a';
+    ctx.fillText('\u23f8 Paused', sw - 16, trY);
     trY += 14;
   }
 
@@ -4674,6 +4830,15 @@ function draw3DHUD(sw, sh) {
     ctx.fillStyle = '#5a7a5a';
     ctx.fillText('Orbiting: ' + orbitMode.focalName, sw - 16, trY);
     ctx.fillText('Distance: ' + odLabel, sw - 16, trY + 14);
+    trY += 28;
+    if (cam3d.trackTarget) {
+      var orbitTrackLabel = cam3d.trackTarget;
+      for (var otli = 0; otli < cam3dLookTargets.length; otli++) {
+        if (cam3dLookTargets[otli].key === cam3d.trackTarget) { orbitTrackLabel = cam3dLookTargets[otli].label; break; }
+      }
+      ctx.fillStyle = '#7a9a7a';
+      ctx.fillText('Tracking: ' + orbitTrackLabel, sw - 16, trY);
+    }
   }
 
   ctx.restore();
@@ -4705,12 +4870,14 @@ function animationLoop(ts) {
   // Light pulse animation
   if (lightPulse.active) state.dirty = true;
 
-  // 3D camera animation
+  // 2D follow / 3D camera animation / tracking
+  if (state.follow && !state.mode3d) state.dirty = true;
   if (cam3dAnim.active) state.dirty = true;
+  if (cam3d.trackTarget && state.mode3d) state.dirty = true;
 
   if (state.dirty) {
     state.dirty = false;
-    try { draw(ts); } catch(e) { /* canvas render error, skip frame */ }
+    try { draw(ts); } catch(e) { console.error('[draw error]', e.message, e.stack); }
   }
   lastFrameTime = ts;
 }
@@ -6160,8 +6327,9 @@ function applyScenePreset(preset) {
   orbitToCamera();
 
   // Set time speed
-  simTime.multiplier = preset.timeSpeed || 1;
+  simTime.simDaysAtEpoch = getSimDaysJ2000();
   simTime.epoch = Date.now();
+  simTime.multiplier = preset.timeSpeed || 1;
 
   // Set HUD style
   if (preset.hudStyle && hudStyles[preset.hudStyle]) {
@@ -6366,7 +6534,10 @@ function buildEffectsPanel() {
     { label: '1 mo/sec', val: 2592000 },
     { label: '1 yr/sec', val: 31557600 },
     { label: '10 yr/sec', val: 315576000 },
-    { label: '100 yr/sec', val: 3155760000 }
+    { label: '100 yr/sec', val: 3155760000 },
+    { label: '1 kyr/sec', val: 31557600000 },
+    { label: '100 kyr/sec', val: 3155760000000 },
+    { label: '1 Myr/sec', val: 31557600000000 }
   ];
   for (var ti = 0; ti < timeSpeeds.length; ti++) {
     var topt = document.createElement('option');
@@ -6378,6 +6549,8 @@ function buildEffectsPanel() {
   }
   // Default on first build only
   if (simTime.multiplier === 1 && !simTime._initialized) {
+    simTime.simDaysAtEpoch = getSimDaysJ2000();
+    simTime.epoch = Date.now();
     simTime.multiplier = 86400;
     simTime._initialized = true;
   }
@@ -6386,9 +6559,9 @@ function buildEffectsPanel() {
   timeSelect.addEventListener('change', function() {
     var absVal = parseFloat(timeSelect.value);
     var wasReverse = simTime.multiplier < 0;
-    // Snapshot current sim time before changing speed
-    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
-    simTime.epoch = curSimMs;
+    // Snapshot current sim days before changing speed
+    simTime.simDaysAtEpoch = getSimDaysJ2000();
+    simTime.epoch = Date.now();
     simTime.multiplier = wasReverse ? -absVal : absVal;
     state.dirty = true;
   });
@@ -6406,8 +6579,8 @@ function buildEffectsPanel() {
   revCb.checked = simTime.multiplier < 0;
   revCb.style.accentColor = '#4a6a9a';
   revCb.addEventListener('change', function() {
-    var curSimMs = simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier;
-    simTime.epoch = curSimMs;
+    simTime.simDaysAtEpoch = getSimDaysJ2000();
+    simTime.epoch = Date.now();
     simTime.multiplier = -simTime.multiplier;
     state.dirty = true;
   });
@@ -6428,12 +6601,14 @@ function buildEffectsPanel() {
   dateInput.type = 'datetime-local';
   dateInput.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:10px;width:160px;';
   // Set initial value to current sim date
-  var initDate = new Date(simTime.epoch + (Date.now() - simTime.epoch) * simTime.multiplier);
+  var initSimDays = getSimDaysJ2000();
+  var initDate = new Date(simTime.J2000 + initSimDays * 86400000);
   dateInput.value = initDate.toISOString().slice(0, 16);
   dateInput.addEventListener('change', function() {
     var d = new Date(dateInput.value);
     if (!isNaN(d.getTime())) {
-      simTime.epoch = d.getTime();
+      simTime.simDaysAtEpoch = (d.getTime() - simTime.J2000) / 86400000;
+      simTime.epoch = Date.now();
       state.dirty = true;
     }
   });
@@ -6441,6 +6616,7 @@ function buildEffectsPanel() {
   nowBtn.style.cssText = 'background:#1a1a2e;color:#7a9aba;border:1px solid #333;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;';
   nowBtn.textContent = 'Now';
   nowBtn.addEventListener('click', function() {
+    simTime.simDaysAtEpoch = (Date.now() - simTime.J2000) / 86400000;
     simTime.epoch = Date.now();
     if (simTime.multiplier < 0) {
       simTime.multiplier = -simTime.multiplier;
@@ -6536,8 +6712,8 @@ function updateHash() {
   hashUpdateTimer = setTimeout(function() {
     var vr = getViewRadius();
     var hash = 'vr=' + vr.toPrecision(4);
-    if (Math.abs(state.panX) > 0.001 || Math.abs(state.panY) > 0.001) {
-      hash += '&px=' + state.panX.toPrecision(4) + '&py=' + state.panY.toPrecision(4);
+    if (Math.abs(state.panX) > 1e-10 || Math.abs(state.panY) > 1e-10) {
+      hash += '&px=' + state.panX.toExponential(6) + '&py=' + state.panY.toExponential(6);
     }
     if (state.selected) hash += '&obj=' + encodeURIComponent(state.selected.name);
     if (window.location.hash !== '#' + hash) {
@@ -6570,6 +6746,11 @@ function readHash() {
         state.selected = objects[i];
         saveSelectedObject(objects[i].name);
         showInfo(objects[i]);
+        // Auto-center on object if pan wasn't specified in hash
+        if (!params.px && !params.py) {
+          state.panX = objects[i].x;
+          state.panY = objects[i].y;
+        }
         break;
       }
     }
@@ -6634,7 +6815,7 @@ canvas.addEventListener('wheel', function(e) {
   }
   if (tourEngine.active) tourEngine.stop();
   var prevZoom = state.zoom;
-  state.zoom = Math.max(0, Math.min(1000, state.zoom - e.deltaY * 0.5));
+  state.zoom = Math.max(0, Math.min(1000, state.zoom - e.deltaY * 0.15));
   panTowardTargetOnZoomIn(prevZoom, state.zoom);
   slider.value = Math.round(state.zoom);
   state.activePreset = null;
@@ -6701,12 +6882,14 @@ window.addEventListener('mousemove', function(e) {
           cam3d.yaw = dragState.startYaw - dx * sens * DEG2RAD;
           cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
             dragState.startPitch + dy * sens * DEG2RAD));
+          stopTracking();
         }
         state.dirty = true;
       } else {
         var scale = getScale();
         state.panX = dragState.startPanX - dx / scale;
         state.panY = dragState.startPanY - dy / scale;
+        state.follow = null;
         state.dirty = true;
         updateRecenterBtn();
       }
@@ -6884,6 +7067,7 @@ canvas.addEventListener('dblclick', function(e) {
 
   if (hit) {
     navigateToObject(hit.name);
+    state.follow = hit;
     // Trigger flash effect after a short delay for the navigation to start
     setTimeout(function() {
       frameFlash.active = true;
@@ -6993,6 +7177,8 @@ function navigateToObject(objName) {
     var elapsed = t - startTime;
     var progress = Math.min(1, elapsed / duration);
     var ease = easeInOutCubic(progress);
+    // Track live position if following a moving object
+    if (state.follow) { targetPanX = state.follow.x; targetPanY = state.follow.y; }
     state.zoom = startZoom + (targetSlider - startZoom) * ease;
     state.panX = startPanX + (targetPanX - startPanX) * ease;
     state.panY = startPanY + (targetPanY - startPanY) * ease;
@@ -7175,26 +7361,39 @@ function initCam3dPresets() {
   }
 }
 
-function getLookTarget(targetKey) {
-  var target = null;
-  for (var i = 0; i < cam3dLookTargets.length; i++) {
-    if (cam3dLookTargets[i].key === targetKey) { target = cam3dLookTargets[i]; break; }
+function updateTrackingUI() {
+  var bar = document.getElementById('cam3d-presets');
+  if (!bar) return;
+  var btns = bar.querySelectorAll('.cam-preset-btn[data-look-target]');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('data-look-target') === cam3d.trackTarget) {
+      btns[i].classList.add('tracking');
+    } else {
+      btns[i].classList.remove('tracking');
+    }
   }
-  if (!target) return null;
+}
 
-  var tx = 0, ty = 0, tz = 0;
+function stopTracking() {
+  if (cam3d.trackTarget) {
+    cam3d.trackTarget = null;
+    updateTrackingUI();
+  }
+}
+
+function resolveLookTargetPos(target) {
   if (target.type === 'object') {
-    if (target.obj === 'Sun') return { x: 0, y: 0, z: 0 };
     for (var j = 0; j < objects.length; j++) {
-      if (objects[j].name === target.obj) {
+      if (objects[j].name === target.obj && objects[j].wx3d !== undefined) {
         return { x: objects[j].wx3d, y: objects[j].wy3d, z: objects[j].wz3d };
       }
     }
+    // Sun fallback (may not have wx3d if not yet initialized)
+    if (target.obj === 'Sun' || target.obj === 'Sun (You Are Here)') return { x: 0, y: 0, z: 0 };
   } else if (target.type === 'constellation') {
     var cDef = constellationDefs[target.id];
     if (!cDef) return null;
-    var count = 0;
-    var seen = {};
+    var tx = 0, ty = 0, tz = 0, count = 0, seen = {};
     for (var li = 0; li < cDef.lines.length; li++) {
       for (var si = 0; si < 2; si++) {
         var sName = cDef.lines[li][si];
@@ -7214,6 +7413,46 @@ function getLookTarget(targetKey) {
   return null;
 }
 
+function getLookTarget(targetKey) {
+  // 1. Try registered lookup
+  var target = null;
+  for (var i = 0; i < cam3dLookTargets.length; i++) {
+    if (cam3dLookTargets[i].key === targetKey) { target = cam3dLookTargets[i]; break; }
+  }
+  if (target) {
+    var pos = resolveLookTargetPos(target);
+    if (pos) return pos;
+  }
+
+  // 2. Self-resolve: parse dynamic keys (dyn_objectslug or dyn_constellationid)
+  if (targetKey.indexOf('dyn_') === 0) {
+    var slug = targetKey.substring(4);
+    // Try constellation IDs
+    if (constellationDefs[slug]) {
+      cam3dLookTargets.push({ key: targetKey, label: constellationDefs[slug].name, type: 'constellation', id: slug });
+      return resolveLookTargetPos({ type: 'constellation', id: slug });
+    }
+    // Try object name slugs
+    for (var oi = 0; oi < objects.length; oi++) {
+      if (objects[oi].wx3d === undefined) continue;
+      var nameSlug = objects[oi].name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (nameSlug === slug) {
+        cam3dLookTargets.push({ key: targetKey, label: objects[oi].name, type: 'object', obj: objects[oi].name });
+        return resolveLookTargetPos({ type: 'object', obj: objects[oi].name });
+      }
+    }
+  }
+
+  // 3. Try direct object name match
+  for (var oi2 = 0; oi2 < objects.length; oi2++) {
+    if (objects[oi2].name === targetKey && objects[oi2].wx3d !== undefined) {
+      return { x: objects[oi2].wx3d, y: objects[oi2].wy3d, z: objects[oi2].wz3d };
+    }
+  }
+
+  return null;
+}
+
 function computeLookAngles(px, py, pz, tx, ty, tz) {
   var dx = tx - px, dy = ty - py, dz = tz - pz;
   var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -7227,11 +7466,43 @@ function computeLookAngles(px, py, pz, tx, ty, tz) {
 // ─── Orbit mode helpers ──────────────────────────────────────────────
 
 function orbitToCamera() {
-  cam3d.px = orbitMode.focalX + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
-  cam3d.py = orbitMode.focalY + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
-  cam3d.pz = orbitMode.focalZ + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
-  var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz,
-    orbitMode.focalX, orbitMode.focalY, orbitMode.focalZ);
+  var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
+
+  if (cam3d.trackTarget) {
+    // When tracking, position camera behind focal object relative to target.
+    // This keeps the focal object visible in the foreground while looking at the target.
+    var tp = getLookTarget(cam3d.trackTarget);
+    if (tp) {
+      var dx = tp.x - fx, dy = tp.y - fy, dz = tp.z - fz;
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > 1e-12) {
+        // Unit vector from focal → target
+        var ux = dx / d, uy = dy / d, uz = dz / d;
+        // Place camera behind focal object (opposite direction from target)
+        // Elevation produces ~Dec -8° when looking past focal object toward target
+        var elevAngle = 8 * DEG2RAD;
+        var zOff = (d + orbitMode.orbitDist) * Math.tan(elevAngle);
+        cam3d.px = fx - ux * orbitMode.orbitDist;
+        cam3d.py = fy - uy * orbitMode.orbitDist;
+        cam3d.pz = fz - uz * orbitMode.orbitDist + zOff;
+      } else {
+        // Target coincides with focal — fall back to orbit params
+        cam3d.px = fx + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
+        cam3d.py = fy + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
+        cam3d.pz = fz + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+      }
+      var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, tp.x, tp.y, tp.z);
+      cam3d.yaw = angles.yaw;
+      cam3d.pitch = angles.pitch;
+      return;
+    }
+  }
+
+  // Default: orbit around focal point using orbit yaw/pitch
+  cam3d.px = fx + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
+  cam3d.py = fy + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
+  cam3d.pz = fz + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+  var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, fx, fy, fz);
   cam3d.yaw = angles.yaw;
   cam3d.pitch = angles.pitch;
 }
@@ -7291,48 +7562,31 @@ function animateOrbitFocal(tx, ty, tz, tname) {
 }
 
 function lookAtTarget(targetKey, duration) {
-  var pos = getLookTarget(targetKey);
-  if (!pos) {
-    // Try resolving as an object name directly
-    for (var li = 0; li < objects.length; li++) {
-      if (objects[li].name === targetKey && objects[li].wx3d !== undefined) {
-        pos = { x: objects[li].wx3d, y: objects[li].wy3d, z: objects[li].wz3d };
-        break;
-      }
-    }
+  // Toggle tracking: click same target = stop tracking
+  if (cam3d.trackTarget === targetKey) {
+    cam3d.trackTarget = null;
+    updateTrackingUI();
+    return;
   }
+
+  var pos = getLookTarget(targetKey);
   if (!pos) return;
 
+  // Enable tracking — works in both orbit mode and free-fly
+  cam3d.trackTarget = targetKey;
+  updateTrackingUI();
+
   if (orbitMode.active) {
-    // Stay in orbit — reposition camera on far side of focal from target,
-    // so target is visible behind the focal point
-    var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
-    var fwX = pos.x - fx, fwY = pos.y - fy, fwZ = pos.z - fz;
-    var fwLen = Math.sqrt(fwX * fwX + fwY * fwY + fwZ * fwZ);
-    if (fwLen > 1e-12) {
-      fwX /= fwLen; fwY /= fwLen; fwZ /= fwLen;
-      // Place camera on opposite side of focal from target
-      var back = orbitMode.orbitDist;
-      var camX = fx - fwX * back;
-      var camY = fy - fwY * back;
-      var camZ = fz - fwZ * back;
-      // Look at the focal point (consistent with orbit mode)
-      var la = computeLookAngles(camX, camY, camZ, fx, fy, fz);
-      cam3dAnim.from = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
-        yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
-      cam3dAnim.to = { px: camX, py: camY, pz: camZ,
-        yaw: la.yaw, pitch: la.pitch, fov: cam3d.fov };
-      cam3dAnim.duration = duration || 1200;
-      cam3dAnim.startTime = performance.now();
-      cam3dAnim.active = true;
-      // Update orbit params to match new position
-      var orbDx = camX - fx, orbDy = camY - fy, orbDz = camZ - fz;
-      orbitMode.orbitDist = Math.sqrt(orbDx * orbDx + orbDy * orbDy + orbDz * orbDz);
-      orbitMode.orbitYaw = Math.atan2(orbDy, orbDx);
-      orbitMode.orbitPitch = Math.atan2(orbDz, Math.sqrt(orbDx * orbDx + orbDy * orbDy));
-      state.dirty = true;
-      return;
+    // Set orbit distance to 0.9× the focal-to-target distance so the focal
+    // object stays visible in the foreground while looking at the target
+    var fdx = pos.x - orbitMode.focalX, fdy = pos.y - orbitMode.focalY, fdz = pos.z - orbitMode.focalZ;
+    var focalToTarget = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
+    if (focalToTarget > 1e-12) {
+      orbitMode.orbitDist = focalToTarget * 0.9;
     }
+    orbitToCamera();
+    state.dirty = true;
+    return;
   }
 
   // Free fly: just rotate in place to face the target
@@ -7395,6 +7649,7 @@ function toggle3D() {
     presetBar.style.display = 'none';
     cam3dAnim.active = false;
     orbitMode.active = false;
+    stopTracking();
     document.querySelector('.zoom-control').style.display = '';
     document.getElementById('hint').style.display = '';
     document.querySelector('.scale-bar').style.display = '';
@@ -7420,6 +7675,16 @@ function flyCamera(presetName, duration, lookTarget) {
       var angles = computeLookAngles(toX, toY, toZ, pos.x, pos.y, pos.z);
       toYaw = angles.yaw;
       toPitch = angles.pitch;
+    } else {
+      var la = computeLookAngles(toX, toY, toZ, fx, fy, fz);
+      toYaw = la.yaw; toPitch = la.pitch;
+    }
+  } else if (cam3d.trackTarget) {
+    // Look at the tracked target from new orbit position
+    var tp = getLookTarget(cam3d.trackTarget);
+    if (tp) {
+      var la = computeLookAngles(toX, toY, toZ, tp.x, tp.y, tp.z);
+      toYaw = la.yaw; toPitch = la.pitch;
     } else {
       var la = computeLookAngles(toX, toY, toZ, fx, fy, fz);
       toYaw = la.yaw; toPitch = la.pitch;
@@ -7521,6 +7786,18 @@ document.addEventListener('keydown', function(e) {
     var searchInput = document.getElementById('glossary-search-input');
     searchInput.focus();
     searchInput.select();
+    return;
+  }
+
+  // Space: pause tour (if active) or toggle sim time pause
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (tourEngine.active) {
+      tourEngine.togglePause();
+    } else {
+      simTime.paused = !simTime.paused;
+      state.dirty = true;
+    }
     return;
   }
 
@@ -7689,11 +7966,13 @@ canvas.addEventListener('touchmove', function(e) {
         cam3d.yaw = touchState.startYaw - dx * sens * DEG2RAD;
         cam3d.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01,
           touchState.startPitch + dy * sens * DEG2RAD));
+        stopTracking();
         state.dirty = true;
       } else {
         var scale = getScale();
         state.panX = touchState.startPanX - dx / scale;
         state.panY = touchState.startPanY - dy / scale;
+        state.follow = null;
         state.dirty = true;
         updateRecenterBtn();
       }
@@ -7801,7 +8080,7 @@ function openSlotDropdown(btn, type) {
               cam3dPresets[vpKey] = { px: obj.wx3d, py: obj.wy3d, pz: obj.wz3d,
                 yaw: lookAngles2.yaw, pitch: lookAngles2.pitch, fov: 60, label: c.label,
                 physRadius: obj.physRadius || 0, category: obj.category };
-              btn.textContent = c.label;
+              btn.childNodes[0].textContent = c.label;
               btn.setAttribute('data-cam-preset', vpKey);
               flyCamera(vpKey, 2000);
             }
@@ -7818,7 +8097,7 @@ function openSlotDropdown(btn, type) {
               if (!found) {
                 cam3dLookTargets.push({ key: ltKey, label: c.label, type: 'constellation', id: c.id });
               }
-              btn.textContent = c.label;
+              btn.childNodes[0].textContent = c.label;
               btn.setAttribute('data-look-target', ltKey);
               lookAtTarget(ltKey, 1200);
             } else {
@@ -7830,7 +8109,7 @@ function openSlotDropdown(btn, type) {
               if (!found2) {
                 cam3dLookTargets.push({ key: ltKey2, label: c.label, type: 'object', obj: c.obj });
               }
-              btn.textContent = c.label;
+              btn.childNodes[0].textContent = c.label;
               btn.setAttribute('data-look-target', ltKey2);
               lookAtTarget(ltKey2, 1200);
             }
@@ -8009,6 +8288,31 @@ function loadSlotConfig() {
       var lt = config.lookTargets[j];
       laBtns[j].setAttribute('data-look-target', lt.key);
       laBtns[j].childNodes[0].textContent = lt.label;
+      // Ensure cam3dLookTargets entry exists for this key
+      var ltExists = false;
+      for (var lk = 0; lk < cam3dLookTargets.length; lk++) {
+        if (cam3dLookTargets[lk].key === lt.key) { ltExists = true; break; }
+      }
+      if (!ltExists) {
+        var resolved = false;
+        // Try to resolve as an object name
+        for (var oi2 = 0; oi2 < objects.length; oi2++) {
+          if (objects[oi2].name === lt.label) {
+            cam3dLookTargets.push({ key: lt.key, label: lt.label, type: 'object', obj: lt.label });
+            resolved = true;
+            break;
+          }
+        }
+        // Try as constellation
+        if (!resolved && constellationDefs) {
+          for (var cId in constellationDefs) {
+            if (constellationDefs[cId].name === lt.label) {
+              cam3dLookTargets.push({ key: lt.key, label: lt.label, type: 'constellation', id: cId });
+              break;
+            }
+          }
+        }
+      }
     }
   } catch(e) {}
 }
