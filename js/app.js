@@ -1,3 +1,92 @@
+// ─── Moved from data.js (pure var declarations only in data.js) ─────
+function standardOrbitDist(obj) {
+  var physR = (obj && obj.physRadius) || 0;
+  var minDist = (obj && obj.category === 'solar') ? ORBIT_CLOSE_LY : ORBIT_FAR_LY;
+  return Math.max(minDist, physR * ORBIT_RADIUS_MULT);
+}
+
+// ─── Shared helpers ──────────────────────────────────────────────────
+
+function isStar(obj) {
+  return obj.category === 'stellar' || obj.category === 'exotic' ||
+         obj.name === 'Sun' || obj.name === 'Sun (You Are Here)';
+}
+
+function hash3(i, seed) {
+  var h1 = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453; h1 -= Math.floor(h1);
+  var h2 = Math.sin(i * 269.5 + seed * 183.3) * 43758.5453; h2 -= Math.floor(h2);
+  var h3 = Math.sin(i * 419.2 + seed * 77.9) * 43758.5453; h3 -= Math.floor(h3);
+  return { a: h1, b: h2, c: h3 };
+}
+
+// ─── Object name index ──────────────────────────────────────────────
+
+var _objectByName = {};
+
+function buildObjectNameIndex() {
+  _objectByName = {};
+  for (var i = 0; i < objects.length; i++) {
+    _objectByName[objects[i].name] = objects[i];
+  }
+}
+
+function findObject(name) {
+  return _objectByName[name] || null;
+}
+
+// ─── Caches ─────────────────────────────────────────────────────────
+
+var _orbitCache = {};
+var _asteroidCache = [];
+var _cosY = 1, _sinY = 0, _cosP = 1, _sinP = 0;
+var _vignetteW = 0, _vignetteH = 0, _vignetteGrad = null;
+var _presetBtns = null;
+
+function buildOrbitCache() {
+  _orbitCache = {};
+  var STEPS = 90;
+  for (var name in orbitalPlaneData) {
+    var elem = orbitalPlaneData[name];
+    var points = [];
+    for (var si = 0; si <= STEPS; si++) {
+      var fakeDays = si * elem.period / STEPS;
+      var pos = keplerPosition(elem, fakeDays - elem.M0 * elem.period / 360);
+      points.push({ x: pos.x * AU_IN_LY, y: pos.y * AU_IN_LY });
+    }
+    _orbitCache[name] = points;
+  }
+}
+
+function buildAsteroidCache() {
+  _asteroidCache = [];
+  var belt = asteroidBeltConfig;
+  var range = belt.outerAU - belt.innerAU;
+  var gaps = belt.kirkwoodGaps;
+
+  for (var i = 0; i < belt.count; i++) {
+    var h = hash3(i, 1);
+    var h1 = h.a, h2 = h.b, h3 = h.c;
+
+    var t = (h1 + h2) * 0.5;
+    var rAU = belt.innerAU + t * range;
+
+    var inGap = false;
+    for (var g = 0; g < gaps.length; g++) {
+      if (Math.abs(rAU - gaps[g].au) < gaps[g].width) { inGap = true; break; }
+    }
+    if (inGap) continue;
+
+    var angle = h3 * Math.PI * 2;
+    var rLY = rAU * AU_IN_LY;
+    var wx = rLY * Math.cos(angle);
+    var wy = rLY * Math.sin(angle);
+    var sz = 0.5 + h1 * 1.0;
+    _asteroidCache.push({ wx: wx, wy: wy, rLY: rLY, sz: sz });
+  }
+}
+
+// ─── Slider / View helpers ──────────────────────────────────────────
+
 function viewRadiusToSlider(vr) {
   return ((Math.log10(vr) - MIN_LOG) / (MAX_LOG - MIN_LOG)) * 1000;
 }
@@ -406,10 +495,9 @@ function drawOverlay_albedo(d) {
   var PI = Math.PI;
   var TWO_PI = PI * 2;
 
-  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
-               name === 'Sun' || name === 'Sun (You Are Here)';
+  var _isStar = isStar(d.obj);
 
-  if (isStar) {
+  if (_isStar) {
     // Realistic limb darkening with many gradient stops
     // Stars are brighter at center, darker at limb following I(r) ~ (1 - u*(1 - sqrt(1 - r^2)))
     var grad = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -498,9 +586,8 @@ function drawOverlay_albedo(d) {
       // Each continent = cluster of 3-5 overlapping irregular blobs
       var blobCount = 3 + Math.floor(ch3 * 3);
       for (var bi = 0; bi < blobCount; bi++) {
-        var bh1 = Math.sin((ci * 7 + bi) * 127.1 + seed * 311.7) * 43758.5453; bh1 -= Math.floor(bh1);
-        var bh2 = Math.sin((ci * 7 + bi) * 269.5 + seed * 183.3) * 43758.5453; bh2 -= Math.floor(bh2);
-        var bh3 = Math.sin((ci * 7 + bi) * 419.2 + seed * 77.9) * 43758.5453; bh3 -= Math.floor(bh3);
+        var bh = hash3(ci * 7 + bi, seed);
+        var bh1 = bh.a, bh2 = bh.b, bh3 = bh.c;
 
         // Offset blob from continent center
         var bLon = cLon + (bh1 - 0.5) * 0.5;
@@ -695,13 +782,12 @@ function drawOverlay_wireframe(d) {
   ctx.fill();
   ctx.restore();
 
-  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
-               d.obj.name === 'Sun (You Are Here)';
+  var _isStar = isStar(d.obj);
 
   // Light direction angle and magnitude
   var lMag = Math.sqrt(d.lightOffX * d.lightOffX + d.lightOffY * d.lightOffY);
   var lightAngle = lMag > 0.01 ? Math.atan2(d.lightOffY, d.lightOffX) : 0;
-  var hasLight = lMag > 0.01 && !isStar;
+  var hasLight = lMag > 0.01 && !_isStar;
 
   // Scale line count with radius, capped for performance
   var latCount = Math.min(12, Math.max(4, Math.round(r / 12)));
@@ -712,7 +798,7 @@ function drawOverlay_wireframe(d) {
 
   // Grid color: warm for stars, cool white for others
   var gridR, gridG, gridB;
-  if (isStar) {
+  if (_isStar) {
     gridR = 255; gridG = 220; gridB = 160;
   } else {
     gridR = 200; gridG = 220; gridB = 255;
@@ -757,7 +843,7 @@ function drawOverlay_wireframe(d) {
       // Bias toward light side: bright = 0.6, dark = 0.12
       lineAlpha = 0.12 + 0.48 * Math.max(0, 0.5 + 0.5 * dot);
     } else {
-      lineAlpha = isStar ? 0.45 : 0.35;
+      lineAlpha = _isStar ? 0.45 : 0.35;
     }
 
     if (isEquator) {
@@ -791,7 +877,7 @@ function drawOverlay_wireframe(d) {
       var dot2 = nrmX * lnx + nrmY * lny;
       lineAlpha2 = 0.1 + 0.5 * Math.max(0, 0.5 + 0.5 * Math.abs(dot2));
     } else {
-      lineAlpha2 = isStar ? 0.45 : 0.35;
+      lineAlpha2 = _isStar ? 0.45 : 0.35;
     }
 
     ctx.lineWidth = baseWidth;
@@ -831,15 +917,7 @@ function drawOverlay_depth(d) {
   var bB = parseInt(color.substr(5, 2), 16);
 
   // Determine if this is a star (warm topo palette) or planet/other (base color palette)
-  var objType = (d.obj && d.obj.type) ? d.obj.type : '';
-  var isStar = objType.indexOf('Star') !== -1 ||
-               objType.indexOf('dwarf') !== -1 ||
-               objType.indexOf('giant') !== -1 ||
-               objType.indexOf('supergiant') !== -1 ||
-               objType.indexOf('Pulsar') !== -1 ||
-               objType.indexOf('White Dwarf') !== -1 ||
-               (d.obj && d.obj.category === 'stellar' && objType.indexOf('planet') === -1 && objType.indexOf('Planet') === -1) ||
-               (d.obj && d.obj.name === 'Sun (You Are Here)');
+  var _isStar = isStar(d.obj);
 
   // Detect gas giants for volumetric cloud rendering
   var objName = d.obj ? d.obj.name : '';
@@ -967,7 +1045,7 @@ function drawOverlay_depth(d) {
       ctx.restore();
     }
 
-  } else if (isStar) {
+  } else if (_isStar) {
     // --- Stars: warm concentric topo rings (static) ---
     var topoColors = [];
     for (i = 0; i < ringCount; i++) {
@@ -1022,9 +1100,8 @@ function drawOverlay_depth(d) {
       var dcLat = (dc2 - 0.5) * Math.PI * 0.75;
       var dcBlobs = 3 + Math.floor(dc3 * 3);
       for (var dbi = 0; dbi < dcBlobs; dbi++) {
-        var db1 = Math.sin((i * 7 + dbi) * 127.1 + dSeed * 311.7) * 43758.5453; db1 -= Math.floor(db1);
-        var db2 = Math.sin((i * 7 + dbi) * 269.5 + dSeed * 183.3) * 43758.5453; db2 -= Math.floor(db2);
-        var db3 = Math.sin((i * 7 + dbi) * 419.2 + dSeed * 77.9) * 43758.5453; db3 -= Math.floor(db3);
+        var dbh = hash3(i * 7 + dbi, dSeed);
+        var db1 = dbh.a, db2 = dbh.b, db3 = dbh.c;
         var dbLon = dcLon + (db1 - 0.5) * 0.5;
         var dbLat = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, dcLat + (db2 - 0.5) * 0.35));
         var dpX = Math.sin(dbLon) * Math.cos(dbLat);
@@ -1123,14 +1200,13 @@ function drawOverlay_layers(d) {
   var ctx = d.ctx;
   var x = d.x, y = d.y, r = d.r;
   var layerDef = getLayerDef(d.obj);
-  var isStar = d.obj.category === 'stellar' || d.obj.category === 'exotic' ||
-               d.obj.name === 'Sun (You Are Here)';
+  var _isStar = isStar(d.obj);
   var hasConvective = false;
   var convIdx = -1;
   var PI = Math.PI;
 
   // Detect convective zone for stars
-  if (isStar) {
+  if (_isStar) {
     for (var ci = 0; ci < layerDef.length; ci++) {
       if (layerDef[ci].label.toLowerCase().indexOf('convect') >= 0) {
         hasConvective = true;
@@ -1151,7 +1227,7 @@ function drawOverlay_layers(d) {
   ctx.clip();
 
   var outerColor = layerDef[layerDef.length - 1].color;
-  if (isStar) {
+  if (_isStar) {
     var surfGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
     surfGrad.addColorStop(0, lightenHex(outerColor, 1.3));
     surfGrad.addColorStop(0.5, outerColor);
@@ -1531,15 +1607,12 @@ function worldToScreen3D(wx, wy, wz) {
   var dy = wy - cam3d.py;
   var dz = wz - cam3d.pz;
 
-  var cosY = Math.cos(cam3d.yaw), sinY = Math.sin(cam3d.yaw);
-  var cosP = Math.cos(cam3d.pitch), sinP = Math.sin(cam3d.pitch);
-
   // Right vector: (-sinY, cosY, 0)
-  var viewX = dx * (-sinY) + dy * cosY;
+  var viewX = dx * (-_sinY) + dy * _cosY;
   // Up vector: (-sinP*cosY, -sinP*sinY, cosP)
-  var viewY = dx * (-sinP * cosY) + dy * (-sinP * sinY) + dz * cosP;
+  var viewY = dx * (-_sinP * _cosY) + dy * (-_sinP * _sinY) + dz * _cosP;
   // Forward vector: (cosP*cosY, cosP*sinY, sinP)
-  var viewZ = dx * (cosP * cosY) + dy * (cosP * sinY) + dz * sinP;
+  var viewZ = dx * (_cosP * _cosY) + dy * (_cosP * _sinY) + dz * _sinP;
 
   if (viewZ <= 1e-12) return null; // behind camera
 
@@ -1605,12 +1678,10 @@ function updateFocusedConstellationStars() {
         if (seen[sn]) continue;
         seen[sn] = true;
         memberNames.push(sn);
-        for (var oi = 0; oi < objects.length; oi++) {
-          if (objects[oi].name === sn) {
-            cx += objects[oi].wx3d; cy += objects[oi].wy3d; cz += objects[oi].wz3d;
-            cnt++;
-            break;
-          }
+        var _sobj = findObject(sn);
+        if (_sobj) {
+          cx += _sobj.wx3d; cy += _sobj.wy3d; cz += _sobj.wz3d;
+          cnt++;
         }
       }
     }
@@ -1801,12 +1872,10 @@ function drawStarfield(ts) {
   layers.forEach(function(layer) {
     var seed = Math.floor(logVR * layer.seedMult);
     for (var i = 0; i < layer.count; i++) {
-      var h1 = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453;
-      var x = (h1 - Math.floor(h1)) * sw;
-      var h2 = Math.sin(i * 269.5 + seed * 183.3) * 43758.5453;
-      var y = (h2 - Math.floor(h2)) * sh;
-      var h3 = Math.sin(i * 419.2 + seed * 77.9) * 43758.5453;
-      var b = h3 - Math.floor(h3);
+      var h = hash3(i, seed);
+      var x = h.a * sw;
+      var y = h.b * sh;
+      var b = h.c;
       ctx.fillStyle = "rgba(200, 200, 240, " + (layer.alpha * (0.3 + b * 0.7)) + ")";
       var s = b > 0.6 ? layer.sizeMax : layer.sizeMax * 0.6;
       ctx.fillRect(x, y, s, s);
@@ -1909,13 +1978,17 @@ function drawAmbientParticles(ts) {
 function drawVignette() {
   var sw = W / devicePixelRatio;
   var sh = H / devicePixelRatio;
-  var cx = sw / 2;
-  var cy = sh / 2;
-  var r = Math.max(sw, sh) * 0.7;
-  var gradient = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r);
-  gradient.addColorStop(0, 'rgba(10, 10, 18, 0)');
-  gradient.addColorStop(1, 'rgba(10, 10, 18, 0.5)');
-  ctx.fillStyle = gradient;
+  if (sw !== _vignetteW || sh !== _vignetteH) {
+    _vignetteW = sw;
+    _vignetteH = sh;
+    var cx = sw / 2;
+    var cy = sh / 2;
+    var r = Math.max(sw, sh) * 0.7;
+    _vignetteGrad = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r);
+    _vignetteGrad.addColorStop(0, 'rgba(10, 10, 18, 0)');
+    _vignetteGrad.addColorStop(1, 'rgba(10, 10, 18, 0.5)');
+  }
+  ctx.fillStyle = _vignetteGrad;
   ctx.fillRect(0, 0, sw, sh);
 }
 
@@ -1940,8 +2013,7 @@ function drawOrbits() {
   ctx.save();
   ctx.setLineDash([4, 6]);
   ctx.lineWidth = 0.8;
-  var STEPS = 90;
-  for (var name in orbitalPlaneData) {
+  for (var name in _orbitCache) {
     var elem = orbitalPlaneData[name];
     var color = orbitColors[name];
     if (!color) continue;
@@ -1950,11 +2022,9 @@ function drawOrbits() {
     ctx.strokeStyle = color;
     ctx.globalAlpha = alpha;
     ctx.beginPath();
-    for (var si = 0; si <= STEPS; si++) {
-      // Sample one full orbit using mean anomaly 0..360
-      var fakeDays = si * elem.period / STEPS;
-      var pos = keplerPosition(elem, fakeDays - elem.M0 * elem.period / 360);
-      var sp = worldToScreen(pos.x * AU_IN_LY, pos.y * AU_IN_LY);
+    var pts = _orbitCache[name];
+    for (var si = 0; si < pts.length; si++) {
+      var sp = worldToScreen(pts[si].x, pts[si].y);
       if (si === 0) ctx.moveTo(sp.x, sp.y);
       else ctx.lineTo(sp.x, sp.y);
     }
@@ -1975,41 +2045,16 @@ function drawAsteroidBelt() {
   alpha = Math.max(0, Math.min(1, alpha)) * 0.3;
   if (alpha < 0.01) return;
 
-  var belt = asteroidBeltConfig;
-  var range = belt.outerAU - belt.innerAU;
-  var gaps = belt.kirkwoodGaps;
-
   ctx.save();
-  ctx.fillStyle = belt.color;
+  ctx.fillStyle = asteroidBeltConfig.color;
   ctx.globalAlpha = alpha;
 
-  for (var i = 0; i < belt.count; i++) {
-    var h1 = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-    h1 = h1 - Math.floor(h1);
-    var h2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
-    h2 = h2 - Math.floor(h2);
-    var h3 = Math.sin(i * 419.2 + 77.9) * 43758.5453;
-    h3 = h3 - Math.floor(h3);
-
-    // Triangular distribution peaking at midpoint (~2.7 AU)
-    var t = (h1 + h2) * 0.5;
-    var rAU = belt.innerAU + t * range;
-
-    // Reject dots inside Kirkwood gaps
-    var inGap = false;
-    for (var g = 0; g < gaps.length; g++) {
-      if (Math.abs(rAU - gaps[g].au) < gaps[g].width) { inGap = true; break; }
-    }
-    if (inGap) continue;
-
-    var angle = h3 * Math.PI * 2;
-    var rLY = rAU * AU_IN_LY;
-    var rPx = rLY * scale;
+  for (var i = 0; i < _asteroidCache.length; i++) {
+    var ast = _asteroidCache[i];
+    var rPx = ast.rLY * scale;
     if (rPx < 2 || rPx > W * 3) continue;
-
-    var sp = worldToScreen(rLY * Math.cos(angle), rLY * Math.sin(angle));
-    var sz = 0.5 + h1 * 1.0;
-    ctx.fillRect(sp.x - sz * 0.5, sp.y - sz * 0.5, sz, sz);
+    var sp = worldToScreen(ast.wx, ast.wy);
+    ctx.fillRect(sp.x - ast.sz * 0.5, sp.y - ast.sz * 0.5, ast.sz, ast.sz);
   }
 
   ctx.globalAlpha = 1;
@@ -2231,7 +2276,6 @@ function drawFlowParticles(ts) {
   var vr = getViewRadius();
   if (vr < 40 * MLY || vr > 500 * MLY) return;
 
-  var dt = 0.016;
   for (var i = 0; i < flowParticles.length; i++) {
     var p = flowParticles[i];
     p.t += p.speed;
@@ -3003,10 +3047,6 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
       var enAngle = nameHash(name, eni * 7) * Math.PI * 2;
       var enDist = nameHash(name, eni * 13) * enR * 0.6;
       var enSize = enR * (0.6 + nameHash(name, eni * 19) * 0.5);
-      var enG = ctx.createRadialGradient(
-        cx + Math.cos(enAngle) * enDist, cy + Math.sin(enAngle) * enDist, 0,
-        cx + Math.cos(enAngle) * enDist, cy + Math.sin(enAngle) * enDist, enSize
-      );
       ctx.save();
       ctx.globalAlpha = 0.25;
       ctx.fillStyle = color;
@@ -3690,10 +3730,9 @@ function drawSunIndicator() {
   if (onScreen) {
     // Sun is on screen but may not have an object dot at this scale.
     // Draw a small subtle crosshair + ☉ label to mark home.
-    var hasSolarObj = vr < 0.3; // solar objects visible
     var hasGalaxyObj = vr > 200 && vr < 250000; // "Sun (You Are Here)" visible
     var hasCosmicObj = vr > 2e6; // "Milky Way (You Are Here)" visible
-    if (hasSolarObj || hasGalaxyObj || hasCosmicObj) return; // already drawn as an object
+    if (hasGalaxyObj || hasCosmicObj) return; // already drawn as an object
 
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 221, 68, 0.2)';
@@ -4027,11 +4066,8 @@ function drawConstellationLines() {
   if (vr > 2500) alpha = (4000 - vr) / 1500;
   alpha = Math.max(0, Math.min(1, alpha));
 
-  // Build name->object lookup
-  var objByName = {};
-  for (var i = 0; i < objects.length; i++) {
-    if (objects[i].constellation) objByName[objects[i].name] = objects[i];
-  }
+  // Use name index for lookups (constellation membership checked inline)
+  var objByName = _objectByName;
 
   ctx.save();
 
@@ -4583,14 +4619,15 @@ function draw3D(ts) {
     updateStellarPositions();
     // Track orbit focal point to moving object
     if (orbitMode.active && !orbitMode.focalAnim.active) {
-      for (var pi = 0; pi < objects.length; pi++) {
-        if (displayName(objects[pi]) === orbitMode.focalName) {
-          orbitMode.focalX = objects[pi].wx3d;
-          orbitMode.focalY = objects[pi].wy3d;
-          orbitMode.focalZ = objects[pi].wz3d;
-          orbitToCamera();
-          break;
-        }
+      var _fobj = findObject(orbitMode.focalName);
+      // displayName may shorten "Sun (You Are Here)" to "Sun"
+      if (!_fobj && orbitMode.focalName === 'Sun') _fobj = findObject('Sun (You Are Here)');
+      if (!_fobj && orbitMode.focalName === 'Milky Way') _fobj = findObject('Milky Way (You Are Here)');
+      if (_fobj) {
+        orbitMode.focalX = _fobj.wx3d;
+        orbitMode.focalY = _fobj.wy3d;
+        orbitMode.focalZ = _fobj.wz3d;
+        orbitToCamera();
       }
     }
     state.dirty = true;
@@ -4600,11 +4637,9 @@ function draw3D(ts) {
   if (cam3d.trackTarget && !cam3dAnim.active && !orbitMode.active) {
     var trackPos = getLookTarget(cam3d.trackTarget);
     if (!trackPos) {
-      for (var ti = 0; ti < objects.length; ti++) {
-        if (objects[ti].name === cam3d.trackTarget && objects[ti].wx3d !== undefined) {
-          trackPos = { x: objects[ti].wx3d, y: objects[ti].wy3d, z: objects[ti].wz3d };
-          break;
-        }
+      var _tobj = findObject(cam3d.trackTarget);
+      if (_tobj && _tobj.wx3d !== undefined) {
+        trackPos = { x: _tobj.wx3d, y: _tobj.wy3d, z: _tobj.wz3d };
       }
     }
     if (trackPos) {
@@ -4618,6 +4653,10 @@ function draw3D(ts) {
       state.dirty = true;
     }
   }
+
+  // Cache camera trig for worldToScreen3D
+  _cosY = Math.cos(cam3d.yaw); _sinY = Math.sin(cam3d.yaw);
+  _cosP = Math.cos(cam3d.pitch); _sinP = Math.sin(cam3d.pitch);
 
   ctx.clearRect(0, 0, sw, sh);
   ctx.fillStyle = '#0a0a12';
@@ -5497,7 +5536,8 @@ function updateUI() {
   if (newTime !== _lastScaleTime) { document.getElementById('scale-time').textContent = newTime; _lastScaleTime = newTime; }
   if (newZoom !== _lastZoomLabel) { document.getElementById('zoom-label').textContent = newZoom; _lastZoomLabel = newZoom; }
 
-  document.querySelectorAll('.preset-btn').forEach(function(btn) {
+  if (!_presetBtns) _presetBtns = document.querySelectorAll('.preset-btn');
+  _presetBtns.forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.preset === state.activePreset);
   });
 
@@ -5634,10 +5674,7 @@ var tourEngine = {
 
   resolveTarget: function(name) {
     if (!name) return null;
-    for (var i = 0; i < objects.length; i++) {
-      if (objects[i].name === name) return objects[i];
-    }
-    return null;
+    return findObject(name);
   },
 
   nextStep: function() {
@@ -6514,12 +6551,7 @@ function applyScenePreset(preset) {
   }
 
   // Find the orbit target object
-  var targetObj = null;
-  for (var i = 0; i < objects.length; i++) {
-    if (objects[i].name === preset.orbitObj) {
-      targetObj = objects[i]; break;
-    }
-  }
+  var targetObj = findObject(preset.orbitObj);
   if (!targetObj) return;
 
   // Select the object
@@ -6972,18 +7004,16 @@ function readHash() {
     }
   }
   if (params.obj) {
-    for (var i = 0; i < objects.length; i++) {
-      if (objects[i].name === params.obj) {
-        state.selected = objects[i];
-        saveSelectedObject(objects[i].name);
-        showInfo(objects[i]);
+    var _hashObj = findObject(params.obj);
+    if (_hashObj) {
+        state.selected = _hashObj;
+        saveSelectedObject(_hashObj.name);
+        showInfo(_hashObj);
         // Auto-center on object if pan wasn't specified in hash
         if (!params.px && !params.py) {
-          state.panX = objects[i].x;
-          state.panY = objects[i].y;
+          state.panX = _hashObj.x;
+          state.panY = _hashObj.y;
         }
-        break;
-      }
     }
   }
   state.dirty = true;
@@ -7349,10 +7379,10 @@ document.querySelectorAll('.preset-btn').forEach(function(btn) {
 // ─── Navigate to object ─────────────────────────────────────────────
 
 function navigateToObject(objName) {
-  var obj = null;
-  for (var i = 0; i < objects.length; i++) {
-    if (objects[i].name === objName || objects[i].name.indexOf(objName) === 0) {
-      obj = objects[i]; break;
+  var obj = findObject(objName);
+  if (!obj) {
+    for (var i = 0; i < objects.length; i++) {
+      if (objects[i].name.indexOf(objName) === 0) { obj = objects[i]; break; }
     }
   }
   if (!obj) return;
@@ -7425,10 +7455,10 @@ function navigateToObject(objName) {
 }
 
 function navigateToObject3D(objName) {
-  var obj = null;
-  for (var i = 0; i < objects.length; i++) {
-    if (objects[i].name === objName || objects[i].name.indexOf(objName) === 0) {
-      obj = objects[i]; break;
+  var obj = findObject(objName);
+  if (!obj) {
+    for (var i = 0; i < objects.length; i++) {
+      if (objects[i].name.indexOf(objName) === 0) { obj = objects[i]; break; }
     }
   }
   if (!obj) return;
@@ -8080,12 +8110,6 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
-  if (e.key === ' ' && tourEngine.active) {
-    e.preventDefault();
-    tourEngine.togglePause();
-    return;
-  }
-
   if (e.key === 'ArrowLeft' && tourEngine.active) {
     e.preventDefault();
     tourEngine.prevStep();
@@ -8232,7 +8256,10 @@ canvas.addEventListener('touchend', function(e) {
 // ─── Init ──────────────────────────────────────────────────────────────
 
 initParticles();
+buildObjectNameIndex();
 initObjects3D();
+buildOrbitCache();
+buildAsteroidCache();
 initCam3dPresets();
 buildTourDropdown();
 buildGlossary();
@@ -8474,13 +8501,11 @@ function loadSelectedObject() {
   try {
     var name = localStorage.getItem('cosmos_selected');
     if (!name) return;
-    for (var i = 0; i < objects.length; i++) {
-      if (objects[i].name === name) {
-        state.selected = objects[i];
-        showInfo(objects[i]);
-        document.getElementById('info-panel').classList.remove('hidden');
-        return;
-      }
+    var obj = findObject(name);
+    if (obj) {
+      state.selected = obj;
+      showInfo(obj);
+      document.getElementById('info-panel').classList.remove('hidden');
     }
   } catch(e) {}
 }

@@ -9,11 +9,6 @@ var ORBIT_CLOSE_LY = ORBIT_CLOSE_KM * KM_IN_LY;
 var ORBIT_FAR_LY = ORBIT_FAR_KM * KM_IN_LY;
 var ORBIT_RADIUS_MULT = 5;    // orbit at 5× physRadius — object fills ~1/3 of viewport
 
-function standardOrbitDist(obj) {
-  var physR = (obj && obj.physRadius) || 0;
-  var minDist = (obj && obj.category === 'solar') ? ORBIT_CLOSE_LY : ORBIT_FAR_LY;
-  return Math.max(minDist, physR * ORBIT_RADIUS_MULT);
-}
 var MIN_LOG = Math.log10(0.000000005); // ~0.0003 AU, close enough to see planet surface details
 var MAX_LOG = Math.log10(400 * MLY);
 
