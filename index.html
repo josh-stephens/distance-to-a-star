@@ -503,7 +503,7 @@
   <div class="feedback-status" id="fb-status"></div>
 </div>
 
-<div class="main-area" id="main-area" role="main">
+<main class="main-area" id="main-area">
   <canvas id="canvas" tabindex="0" role="application" aria-label="Interactive cosmic distance visualization showing celestial objects from the Solar System to the Great Attractor. Use scroll to zoom, click objects for details, and keyboard shortcuts 1-6 for zoom presets.">
     <p>Interactive visualization of cosmic distances from Earth to the Great Attractor. Your browser does not support the canvas element.</p>
   </canvas>
@@ -553,19 +553,19 @@
         <div class="narr-back-title">Tour Settings</div>
         <div class="narr-setting-row">
           <label class="narr-setting-label" for="narr-dwell-slider">Dwell time</label>
-          <input type="range" class="narr-setting-slider" id="narr-dwell-slider" min="3" max="30" step="1" value="10" aria-label="Dwell time">
+          <input type="range" class="narr-setting-slider" id="narr-dwell-slider" min="3" max="30" step="1" value="10">
           <input type="number" class="narr-setting-input" id="narr-dwell-input" min="3" max="30" step="1" value="10" aria-label="Dwell time seconds">
           <span class="narr-setting-unit" aria-hidden="true">sec</span>
         </div>
         <div class="narr-setting-row">
           <label class="narr-setting-label" for="narr-speed-slider">Fly speed</label>
-          <input type="range" class="narr-setting-slider" id="narr-speed-slider" min="0.5" max="3" step="0.25" value="1" aria-label="Fly speed">
+          <input type="range" class="narr-setting-slider" id="narr-speed-slider" min="0.5" max="3" step="0.25" value="1">
           <input type="number" class="narr-setting-input" id="narr-speed-input" min="0.5" max="3" step="0.25" value="1" aria-label="Fly speed multiplier">
           <span class="narr-setting-unit" aria-hidden="true">&times;</span>
         </div>
         <div class="narr-setting-row">
           <label class="narr-setting-label" for="narr-opacity-slider">Opacity</label>
-          <input type="range" class="narr-setting-slider" id="narr-opacity-slider" min="0.2" max="1" step="0.05" value="0.7" aria-label="Narration opacity">
+          <input type="range" class="narr-setting-slider" id="narr-opacity-slider" min="0.2" max="1" step="0.05" value="0.7">
           <input type="number" class="narr-setting-input" id="narr-opacity-input" min="0.2" max="1" step="0.05" value="0.7" aria-label="Narration opacity value">
         </div>
         <div class="narr-setting-row">
@@ -591,7 +591,7 @@
     </div>
     <div class="info-body" id="info-body"></div>
   </div>
-</div>
+</main>
 
 <button class="effects-toggle" id="effects-toggle" title="Effects settings">&#x2699;</button>
 <div class="effects-panel" id="effects-panel"></div>
@@ -603,7 +603,7 @@
 </div>
 
 <div class="zoom-control">
-  <label>Zoom</label>
+  <label for="zoom-slider">Zoom</label>
   <input type="range" id="zoom-slider" min="0" max="1000" value="0">
   <span class="zoom-value" id="zoom-label" aria-live="polite"></span>
 </div>

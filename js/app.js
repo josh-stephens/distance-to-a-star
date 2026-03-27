@@ -5484,13 +5484,18 @@ function showRegionInfo(r) {
 
 // ─── UI updates ───────────────────────────────────────────────────────
 
+var _lastScaleLabel = '', _lastScaleTime = '', _lastZoomLabel = '';
 function updateUI() {
   var vr = getViewRadius();
   var sw = W / devicePixelRatio, sh = H / devicePixelRatio;
   var scaleBarLy = (120 / Math.min(sw, sh)) * 2 * vr;
-  document.getElementById('scale-label').textContent = formatViewRadius(scaleBarLy);
-  document.getElementById('scale-time').textContent = lightTravelTime(scaleBarLy);
-  document.getElementById('zoom-label').textContent = "\u00b1" + formatViewRadius(vr);
+  var newScale = formatViewRadius(scaleBarLy);
+  var newTime = lightTravelTime(scaleBarLy);
+  var newZoom = "\u00b1" + formatViewRadius(vr);
+  // Guard against no-op writes — aria-live elements fire on every textContent set
+  if (newScale !== _lastScaleLabel) { document.getElementById('scale-label').textContent = newScale; _lastScaleLabel = newScale; }
+  if (newTime !== _lastScaleTime) { document.getElementById('scale-time').textContent = newTime; _lastScaleTime = newTime; }
+  if (newZoom !== _lastZoomLabel) { document.getElementById('zoom-label').textContent = newZoom; _lastZoomLabel = newZoom; }
 
   document.querySelectorAll('.preset-btn').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.preset === state.activePreset);
