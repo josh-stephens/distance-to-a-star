@@ -2325,6 +2325,105 @@ function drawGalaxies() {
   }
 }
 
+// ─── Draw: 3D spiral arms ──────────────────────────────────────────────
+
+function drawSpiralArms3D() {
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  // Visible at galaxy scale: fade in 2000-5000 ly, fade out 200k-250k ly
+  if (camDist < 2000 || camDist > 250000) return;
+  var fade = 1;
+  if (camDist < 5000) fade = (camDist - 2000) / 3000;
+  if (camDist > 200000) fade = (250000 - camDist) / 50000;
+  var alpha = Math.max(0, Math.min(1, fade)) * 0.35;
+  if (alpha < 0.01) return;
+
+  var galCX = -26000, galCY = 0, galCZ = 0;
+  var numArms = 4, armRadius = 52500, rotation = 0.82;
+  var b = 0.22;
+  var maxTheta = 3.0 * Math.PI;
+  var a = armRadius / Math.exp(b * maxTheta);
+  var steps = 120;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+
+  for (var arm = 0; arm < numArms; arm++) {
+    var angleOff = (arm / numArms) * Math.PI * 2 + rotation;
+
+    // Two passes: wide dim glow, narrow bright core
+    var passes = [
+      { wMul: 3.0, al: alpha * 0.12 },
+      { wMul: 1.0, al: alpha * 0.35 }
+    ];
+
+    for (var pi = 0; pi < passes.length; pi++) {
+      var pass = passes[pi];
+      ctx.strokeStyle = 'rgba(180, 200, 255, ' + pass.al + ')';
+      ctx.beginPath();
+      var started = false;
+      var lastSP = null;
+
+      for (var si = 0; si <= steps; si++) {
+        var frac = si / steps;
+        var theta = frac * maxTheta;
+        var r3 = a * Math.exp(b * theta);
+        var angle = theta + angleOff;
+        // Spiral in galactic plane (z=0)
+        var wx = galCX + Math.cos(angle) * r3;
+        var wy = galCY + Math.sin(angle) * r3;
+        var sp = worldToScreen3D(wx, wy, galCZ);
+        if (!sp) { started = false; lastSP = null; continue; }
+        // Set line width based on perspective scale
+        if (!started) {
+          ctx.lineWidth = Math.max(0.5, pass.wMul * Math.min(8, sp.scale * 500));
+          ctx.moveTo(sp.x, sp.y);
+          started = true;
+        } else {
+          ctx.lineTo(sp.x, sp.y);
+        }
+        lastSP = sp;
+      }
+      ctx.stroke();
+    }
+
+    // Star-forming knots along arm
+    if (camDist < 100000) {
+      ctx.fillStyle = 'rgba(200, 220, 255, ' + (alpha * 0.3) + ')';
+      for (var k = 0; k < 8; k++) {
+        var kFrac = 0.15 + k * 0.10;
+        var kTheta = kFrac * maxTheta;
+        var kR = a * Math.exp(b * kTheta);
+        var kAngle = kTheta + angleOff;
+        var ksp = worldToScreen3D(galCX + Math.cos(kAngle) * kR, galCY + Math.sin(kAngle) * kR, galCZ);
+        if (!ksp) continue;
+        var kSize = Math.max(1, 2 * ksp.scale * 500);
+        ctx.beginPath();
+        ctx.arc(ksp.x, ksp.y, Math.min(kSize, 6), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Central bar
+  var barLen = armRadius * 0.27;
+  var barSp1 = worldToScreen3D(
+    galCX + Math.cos(rotation + 0.47) * barLen,
+    galCY + Math.sin(rotation + 0.47) * barLen, galCZ);
+  var barSp2 = worldToScreen3D(
+    galCX - Math.cos(rotation + 0.47) * barLen,
+    galCY - Math.sin(rotation + 0.47) * barLen, galCZ);
+  if (barSp1 && barSp2) {
+    ctx.strokeStyle = 'rgba(255, 220, 160, ' + (alpha * 0.25) + ')';
+    ctx.lineWidth = Math.max(1, Math.min(12, barSp1.scale * 2000));
+    ctx.beginPath();
+    ctx.moveTo(barSp1.x, barSp1.y);
+    ctx.lineTo(barSp2.x, barSp2.y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 // ─── Draw: flow particles ─────────────────────────────────────────────
 
 var flowSources = [
@@ -3239,8 +3338,8 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // ──── EXOTIC OBJECTS ────
 
-  // Pulsars (Vela Pulsar, Crab Pulsar)
-  if (name === 'Vela Pulsar' || name === 'Crab Pulsar') {
+  // Pulsars / Neutron stars
+  if (type.indexOf('Neutron star') >= 0 || type.indexOf('Pulsar') >= 0) {
     var pulsR = Math.max(r, 2);
     // tiny bright dot
     ctx.fillStyle = color;
@@ -3265,10 +3364,10 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     return;
   }
 
-  // Black holes (Cygnus X-1, Sagittarius A*)
-  if (name === 'Cygnus X-1' || name === 'Sagittarius A*') {
+  // Black holes
+  if (type.indexOf('black hole') >= 0 || type.indexOf('Black hole') >= 0) {
     var bhR = Math.max(r, 3);
-    var bhScale = name === 'Sagittarius A*' ? 1.4 : 1.0;
+    var bhScale = type.indexOf('Supermassive') >= 0 ? 1.4 : 1.0;
     bhR = bhR * bhScale;
     // dark center
     ctx.fillStyle = '#080810';
@@ -3331,8 +3430,8 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     return;
   }
 
-  // Magnetar (SGR 1806-20)
-  if (name === 'SGR 1806-20') {
+  // Magnetars
+  if (type === 'Magnetar') {
     var magR = Math.max(r, 3);
     // intense glow
     var magG = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR * 4);
@@ -4822,6 +4921,9 @@ function draw3D(ts) {
 
   // Draw constellation lines behind objects
   drawConstellationLines3D(projected);
+
+  // Draw Milky Way spiral arms in 3D
+  drawSpiralArms3D();
 
   // Draw orbital planes behind objects
   drawOrbitalPlanes3D();
@@ -7280,6 +7382,13 @@ function updateHash() {
         hash += '&orb=1&od=' + orbitMode.orbitDist.toExponential(4) + '&fn=' + encodeURIComponent(orbitMode.focalName);
       }
     }
+    // Time state
+    if (simTime.multiplier !== 86400) hash += '&ts=' + simTime.multiplier;
+    var simDays = getSimDaysJ2000();
+    hash += '&td=' + simDays.toFixed(2);
+    // Visible card
+    var ip = document.getElementById('info-panel');
+    if (ip && !ip.classList.contains('hidden') && state.selected) hash += '&card=info';
     if (window.location.hash !== '#' + hash) {
       history.replaceState(null, '', '#' + hash);
     }
@@ -7335,6 +7444,26 @@ function readHash() {
         orbitMode.focalZ = fObj.wz3d || 0;
       }
     }
+  }
+  // Restore time state
+  if (params.ts) {
+    var ts = parseFloat(params.ts);
+    if (!isNaN(ts)) {
+      simTime.simDaysAtEpoch = getSimDaysJ2000();
+      simTime.epoch = Date.now();
+      simTime.multiplier = ts;
+    }
+  }
+  if (params.td) {
+    var td = parseFloat(params.td);
+    if (!isNaN(td)) {
+      simTime.simDaysAtEpoch = td;
+      simTime.epoch = Date.now();
+    }
+  }
+  // Restore card visibility
+  if (params.card === 'info' && state.selected) {
+    showInfo(state.selected);
   }
   state.dirty = true;
 }
