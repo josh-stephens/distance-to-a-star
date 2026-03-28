@@ -7392,6 +7392,7 @@ canvas.addEventListener('wheel', function(e) {
       cam3d.fov = Math.max(5, Math.min(120, cam3d.fov + e.deltaY * 0.05));
     }
     state.dirty = true;
+    updateHash();
     return;
   }
   if (tourEngine.active) tourEngine.stop();
@@ -7483,7 +7484,7 @@ window.addEventListener('mouseup', function() {
   if (dragState.dragging) {
     dragState.dragging = false;
     canvas.classList.remove('grabbing');
-    if (dragState.moved && !state.mode3d) updateHash();
+    if (dragState.moved) updateHash();
   }
 });
 
@@ -8224,6 +8225,7 @@ function toggle3D() {
     document.querySelector('.scale-bar').style.display = '';
   }
   state.dirty = true;
+  updateHash();
 }
 
 function flyCamera(presetName, duration, lookTarget) {
