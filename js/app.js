@@ -8145,13 +8145,13 @@ function lookAtTarget(targetKey, duration) {
   updateTrackingUI();
 
   if (orbitMode.active) {
-    // Set orbit to start behind focal object relative to target, with slight elevation
+    // Keep current orbit distance — just rotate to look past focal toward target
     var fdx = pos.x - orbitMode.focalX, fdy = pos.y - orbitMode.focalY, fdz = pos.z - orbitMode.focalZ;
     var focalToTarget = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
     if (focalToTarget > 1e-12) {
-      orbitMode.orbitDist = focalToTarget * 0.9;
+      // Position camera on opposite side of focal from target (focal between camera and target)
       orbitMode.orbitYaw = Math.atan2(-fdy, -fdx);
-      orbitMode.orbitPitch = 0.14; // ~8° elevation
+      orbitMode.orbitPitch = 0.14; // slight elevation
     }
     orbitToCamera();
     state.dirty = true;
