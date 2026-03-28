@@ -48,12 +48,23 @@ Data format per galaxy: `{ vx, vy, vz }` in ly/yr, applied linearly. For satelli
 Visualize the ~200-400 billion Milky Way stars as a flowing particle field. Shows differential rotation, density wave bunching in spiral arms, and gives a populated sky at all zoom levels.
 
 ### Particle generation (at init)
-- **Total**: 1000 particles
-- **Distribution**: 30% within 500 ly of Sun (stellar neighborhood), 70% across full galactic disk (0-50,000 ly galactocentric radius)
-- Each particle: `{ galR, galAngle0, galZ, brightness, size }`
-- galR: biased distribution as described above
+Two separate populations that cross-fade by zoom level (avoids unnatural clumping at galaxy scale):
+
+**Local particles (200)** — stellar neighborhood:
+- galR: Sun's galactocentric radius ± 500 ly
+- galAngle0: Sun's galactic angle ± spread for 500 ly arc
+- Visible at vr < 2000 ly, fade out 1000-2000
+- Gives a populated sky at stellar/constellation zoom
+
+**Galactic particles (800)** — full disk:
+- galR: uniform across 0-50,000 ly galactocentric radius
 - galAngle0: uniform random [0, 2π]
-- galZ: gaussian, σ ≈ 500 ly (thin disk), larger for outer particles
+- Visible at vr > 1000 ly, fade in 1000-2000
+- Even distribution — no clump at Sun's position
+
+Both populations share the same properties per particle:
+- `{ galR, galAngle0, galZ, brightness, size }`
+- galZ: gaussian, σ ≈ 500 ly (thin disk)
 - brightness: 0.1-0.5 (dimmer than named objects)
 - size: 0.3-0.8 px (clearly smaller than real objects)
 
