@@ -1640,17 +1640,20 @@ function initObjects3D() {
 // Update stellar positions based on proper motion and radial velocity
 function updateStellarPositions() {
   var years = getSimDaysJ2000() / 365.25;
+  // Clamp to +/-50,000 yr: linear proper motion breaks at longer timescales
+  // (stars need galactic orbital motion for Myr+ accuracy — see #70)
+  var clampedYears = Math.max(-50000, Math.min(50000, years));
   for (var i = 0; i < objects.length; i++) {
     var o = objects[i];
     var pm = properMotionData[o.name];
     if (!pm || o._baseRA === undefined) continue;
 
-    // Apply proper motion (linear)
-    var newRA = o._baseRA + (pm.pmRA / 3600000 / Math.cos(o._baseDec * DEG2RAD)) * years;
-    var newDec = o._baseDec + (pm.pmDec / 3600000) * years;
+    // Apply proper motion (linear, clamped)
+    var newRA = o._baseRA + (pm.pmRA / 3600000 / Math.cos(o._baseDec * DEG2RAD)) * clampedYears;
+    var newDec = o._baseDec + (pm.pmDec / 3600000) * clampedYears;
     // Radial velocity: rv km/s -> ly/yr
     var rvLyPerYr = pm.rv * 3.156e7 / 9.461e12;
-    var newDist = Math.max(0.01, o._baseDist + rvLyPerYr * years);
+    var newDist = Math.max(0.01, o._baseDist + rvLyPerYr * clampedYears);
 
     // Update 3D position
     var c = raDecToXYZ(newRA, newDec, newDist);
