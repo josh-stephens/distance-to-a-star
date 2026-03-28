@@ -3862,8 +3862,8 @@ function drawDistanceLine(o1, o2) {
 
 function drawSunIndicator() {
   var vr = getViewRadius();
-  // At solar/stellar scales where the Sun dot is drawn, skip the indicator
-  if (vr < 0.3) return;
+  // Skip when the solar-category Sun object is visible (it has its own label)
+  if (vr < 250) return;
 
   var sp = worldToScreen(0, 0);
   var sw = W / dpr;
