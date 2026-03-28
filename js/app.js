@@ -3340,88 +3340,186 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // Pulsars / Neutron stars
   if (type.indexOf('Neutron star') >= 0 || type.indexOf('Pulsar') >= 0) {
+    // Scale up when selected for structural detail
     var pulsR = Math.max(r, 2);
-    // tiny bright dot
-    ctx.fillStyle = color;
+    var isSel = state.selected === obj;
+    if (isSel) pulsR = Math.max(pulsR, 25);
+    // Magnetosphere glow
+    if (pulsR > 8) {
+      var pmG = ctx.createRadialGradient(cx, cy, pulsR * 0.3, cx, cy, pulsR * 2.5);
+      pmG.addColorStop(0, 'rgba(68, 255, 170, 0.15)');
+      pmG.addColorStop(0.5, 'rgba(68, 255, 170, 0.05)');
+      pmG.addColorStop(1, 'rgba(68, 255, 170, 0)');
+      ctx.fillStyle = pmG;
+      ctx.beginPath();
+      ctx.arc(cx, cy, pulsR * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Neutron star surface
+    var nsGrad = ctx.createRadialGradient(cx - pulsR * 0.2, cy - pulsR * 0.2, 0, cx, cy, pulsR);
+    nsGrad.addColorStop(0, '#ccffee');
+    nsGrad.addColorStop(0.6, color);
+    nsGrad.addColorStop(1, 'rgba(30, 80, 60, 0.8)');
+    ctx.fillStyle = nsGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, pulsR, 0, Math.PI * 2);
     ctx.fill();
-    // two opposing rotating beams (~2 rev/sec)
-    var beamAngle = tSec * Math.PI * 4; // 2 revolutions per second
-    var beamLen = 25;
+    // Rotating beam cones (two opposing beams with sweep glow)
+    var beamAngle = tSec * Math.PI * 4;
+    var beamLen = pulsR * 4;
+    var beamW = pulsR * 0.6;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(beamAngle);
+    // Beam 1
+    ctx.fillStyle = 'rgba(68, 255, 170, 0.25)';
+    ctx.beginPath();
+    ctx.moveTo(-beamW * 0.3, 0);
+    ctx.lineTo(-beamW, beamLen);
+    ctx.lineTo(beamW, beamLen);
+    ctx.lineTo(beamW * 0.3, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Beam 2 (opposite)
+    ctx.beginPath();
+    ctx.moveTo(-beamW * 0.3, 0);
+    ctx.lineTo(-beamW, -beamLen);
+    ctx.lineTo(beamW, -beamLen);
+    ctx.lineTo(beamW * 0.3, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Bright beam cores
     ctx.strokeStyle = color;
     ctx.globalAlpha = 0.7;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = Math.max(1, pulsR * 0.15);
     ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(beamAngle) * pulsR, cy + Math.sin(beamAngle) * pulsR);
-    ctx.lineTo(cx + Math.cos(beamAngle) * beamLen, cy + Math.sin(beamAngle) * beamLen);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx - Math.cos(beamAngle) * pulsR, cy - Math.sin(beamAngle) * pulsR);
-    ctx.lineTo(cx - Math.cos(beamAngle) * beamLen, cy - Math.sin(beamAngle) * beamLen);
+    ctx.moveTo(0, pulsR); ctx.lineTo(0, beamLen);
+    ctx.moveTo(0, -pulsR); ctx.lineTo(0, -beamLen);
     ctx.stroke();
     ctx.globalAlpha = 1;
+    ctx.restore();
     return;
   }
 
   // Black holes
   if (type.indexOf('black hole') >= 0 || type.indexOf('Black hole') >= 0) {
     var bhR = Math.max(r, 3);
-    var bhScale = type.indexOf('Supermassive') >= 0 ? 1.4 : 1.0;
-    bhR = bhR * bhScale;
-    // dark center
-    ctx.fillStyle = '#080810';
+    var bhIsSel = state.selected === obj;
+    if (bhIsSel) bhR = Math.max(bhR, 35);
+    var bhScale2 = type.indexOf('Supermassive') >= 0 ? 1.3 : 1.0;
+    bhR = bhR * bhScale2;
+    // Gravitational lensing glow (photon sphere)
+    if (bhR > 10) {
+      var lensG = ctx.createRadialGradient(cx, cy, bhR * 0.8, cx, cy, bhR * 3.5);
+      lensG.addColorStop(0, 'rgba(255, 140, 40, 0.12)');
+      lensG.addColorStop(0.4, 'rgba(255, 100, 20, 0.04)');
+      lensG.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = lensG;
+      ctx.beginPath();
+      ctx.arc(cx, cy, bhR * 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Accretion disk — outer diffuse ring
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(0.4);
+    var diskG = ctx.createRadialGradient(0, 0, bhR * 0.9, 0, 0, bhR * 2.8);
+    diskG.addColorStop(0, 'rgba(255, 180, 80, 0)');
+    diskG.addColorStop(0.3, 'rgba(255, 140, 40, 0.2)');
+    diskG.addColorStop(0.6, 'rgba(200, 80, 20, 0.12)');
+    diskG.addColorStop(1, 'rgba(100, 30, 10, 0)');
+    ctx.fillStyle = diskG;
+    ctx.scale(1, 0.32);
     ctx.beginPath();
-    ctx.arc(cx, cy, bhR, 0, Math.PI * 2);
+    ctx.arc(0, 0, bhR * 2.8, 0, Math.PI * 2);
     ctx.fill();
-    // accretion ring (tilted ellipse)
+    ctx.restore();
+    // Inner accretion ring (bright)
     ctx.strokeStyle = color;
-    ctx.lineWidth = bhR * 0.3;
+    ctx.lineWidth = Math.max(1, bhR * 0.2);
     ctx.globalAlpha = 0.7;
     ctx.beginPath();
     ctx.ellipse(cx, cy, bhR * 2.2, bhR * 0.7, 0.4, 0, Math.PI * 2);
     ctx.stroke();
-    // brighter inner ring
     ctx.strokeStyle = 'rgba(255, 200, 100, 0.5)';
-    ctx.lineWidth = bhR * 0.15;
+    ctx.lineWidth = Math.max(0.5, bhR * 0.1);
     ctx.beginPath();
     ctx.ellipse(cx, cy, bhR * 1.6, bhR * 0.5, 0.4, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 1;
+    // Dark event horizon
+    ctx.fillStyle = '#040408';
+    ctx.beginPath();
+    ctx.arc(cx, cy, bhR, 0, Math.PI * 2);
+    ctx.fill();
+    // Photon ring (thin bright edge)
+    ctx.strokeStyle = 'rgba(255, 200, 120, 0.4)';
+    ctx.lineWidth = Math.max(0.5, bhR * 0.08);
+    ctx.beginPath();
+    ctx.arc(cx, cy, bhR * 1.05, 0, Math.PI * 2);
+    ctx.stroke();
+    // Relativistic jets (when large enough)
+    if (bhR > 15) {
+      var jetLen = bhR * 5;
+      var jetW = bhR * 0.3;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(0.4 + Math.PI / 2); // perpendicular to disk
+      // Top jet
+      var jetG = ctx.createLinearGradient(0, 0, 0, -jetLen);
+      jetG.addColorStop(0, 'rgba(150, 100, 255, 0.25)');
+      jetG.addColorStop(0.3, 'rgba(100, 80, 200, 0.12)');
+      jetG.addColorStop(1, 'rgba(80, 60, 160, 0)');
+      ctx.fillStyle = jetG;
+      ctx.beginPath();
+      ctx.moveTo(-jetW, 0); ctx.lineTo(-jetW * 0.2, -jetLen);
+      ctx.lineTo(jetW * 0.2, -jetLen); ctx.lineTo(jetW, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Bottom jet
+      var jetG2 = ctx.createLinearGradient(0, 0, 0, jetLen);
+      jetG2.addColorStop(0, 'rgba(150, 100, 255, 0.25)');
+      jetG2.addColorStop(0.3, 'rgba(100, 80, 200, 0.12)');
+      jetG2.addColorStop(1, 'rgba(80, 60, 160, 0)');
+      ctx.fillStyle = jetG2;
+      ctx.beginPath();
+      ctx.moveTo(-jetW, 0); ctx.lineTo(-jetW * 0.2, jetLen);
+      ctx.lineTo(jetW * 0.2, jetLen); ctx.lineTo(jetW, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     // Cygnus X-1: blue supergiant companion HDE 226868
     if (name === 'Cygnus X-1') {
       var compAngle = tSec * 0.08 + 2.0;
-      var compDist = bhR + 14;
+      var compDist = bhR * 1.8 + 10;
       var compX = cx + Math.cos(compAngle) * compDist;
       var compY = cy + Math.sin(compAngle) * compDist;
-      // blue supergiant companion
+      var compR = Math.max(2, bhR * 0.12);
       ctx.fillStyle = '#6688cc';
       ctx.beginPath();
-      ctx.arc(compX, compY, 2.0, 0, Math.PI * 2);
+      ctx.arc(compX, compY, compR, 0, Math.PI * 2);
       ctx.fill();
-      // companion glow
-      var compGlow = ctx.createRadialGradient(compX, compY, 0, compX, compY, 5);
+      var compGlow = ctx.createRadialGradient(compX, compY, 0, compX, compY, compR * 3);
       compGlow.addColorStop(0, 'rgba(102, 136, 204, 0.35)');
       compGlow.addColorStop(1, 'rgba(102, 136, 204, 0)');
       ctx.fillStyle = compGlow;
       ctx.beginPath();
-      ctx.arc(compX, compY, 5, 0, Math.PI * 2);
+      ctx.arc(compX, compY, compR * 3, 0, Math.PI * 2);
       ctx.fill();
-      // material stream from companion toward accretion disk
+      // Material stream spiraling from companion
       ctx.strokeStyle = 'rgba(102, 136, 204, 0.2)';
-      ctx.lineWidth = 0.8;
+      ctx.lineWidth = Math.max(0.8, bhR * 0.04);
       ctx.beginPath();
-      var streamSteps = 12;
-      for (var sti = 0; sti <= streamSteps; sti++) {
-        var stFrac = sti / streamSteps;
+      for (var sti = 0; sti <= 20; sti++) {
+        var stFrac = sti / 20;
         var stX = compX + (cx - compX) * stFrac;
         var stY = compY + (cy - compY) * stFrac;
-        // add curve to stream
-        var curveMag = Math.sin(stFrac * Math.PI) * 6;
-        var perpX = -(cy - compY) / compDist;
-        var perpY = (cx - compX) / compDist;
-        stX += perpX * curveMag;
-        stY += perpY * curveMag;
+        var curveMag = Math.sin(stFrac * Math.PI) * compDist * 0.3;
+        var pdx = -(cy - compY) / compDist;
+        var pdy = (cx - compX) / compDist;
+        stX += pdx * curveMag;
+        stY += pdy * curveMag;
         if (sti === 0) ctx.moveTo(stX, stY);
         else ctx.lineTo(stX, stY);
       }
@@ -3433,35 +3531,57 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Magnetars
   if (type === 'Magnetar') {
     var magR = Math.max(r, 3);
-    // intense glow
-    var magG = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR * 4);
-    magG.addColorStop(0, 'rgba(255, 100, 180, 0.6)');
-    magG.addColorStop(0.4, 'rgba(255, 68, 170, 0.2)');
+    var magIsSel = state.selected === obj;
+    if (magIsSel) magR = Math.max(magR, 25);
+    // Intense magnetosphere glow
+    var magG = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR * 5);
+    magG.addColorStop(0, 'rgba(255, 100, 180, 0.5)');
+    magG.addColorStop(0.2, 'rgba(255, 68, 170, 0.2)');
+    magG.addColorStop(0.5, 'rgba(255, 40, 140, 0.06)');
     magG.addColorStop(1, 'rgba(255, 68, 170, 0)');
     ctx.fillStyle = magG;
     ctx.beginPath();
-    ctx.arc(cx, cy, magR * 4, 0, Math.PI * 2);
+    ctx.arc(cx, cy, magR * 5, 0, Math.PI * 2);
     ctx.fill();
-    // bright core
-    ctx.fillStyle = color;
+    // Neutron star surface with hot spots
+    var magSG = ctx.createRadialGradient(cx - magR * 0.15, cy - magR * 0.15, 0, cx, cy, magR);
+    magSG.addColorStop(0, '#ffbbdd');
+    magSG.addColorStop(0.5, color);
+    magSG.addColorStop(1, 'rgba(120, 30, 60, 0.8)');
+    ctx.fillStyle = magSG;
     ctx.beginPath();
     ctx.arc(cx, cy, magR, 0, Math.PI * 2);
     ctx.fill();
-    // curved magnetic field lines from poles
-    ctx.strokeStyle = 'rgba(255, 130, 200, 0.4)';
-    ctx.lineWidth = 0.8;
-    for (var mfi = 0; mfi < 6; mfi++) {
-      var mfAngle = (mfi / 6) * Math.PI * 2;
-      var mfSign = mfi % 2 === 0 ? 1 : -1;
+    // Magnetic dipole field lines (8 lines arcing from pole to pole)
+    ctx.strokeStyle = 'rgba(255, 130, 200, 0.35)';
+    ctx.lineWidth = Math.max(0.8, magR * 0.06);
+    for (var mfi = 0; mfi < 8; mfi++) {
+      var mfSpread = (mfi / 8) * Math.PI * 2;
+      var mfHeight = magR * (2.5 + Math.sin(mfi * 1.7) * 0.8);
       ctx.beginPath();
-      for (var mft = 0; mft <= 20; mft++) {
-        var mfFrac = mft / 20;
-        var mfx = cx + Math.cos(mfAngle) * magR * (1 + mfFrac * 3);
-        var mfy = cy + Math.sin(mfAngle) * magR * (1 + mfFrac * 3) + Math.sin(mfFrac * Math.PI) * magR * 2 * mfSign;
+      for (var mft = 0; mft <= 24; mft++) {
+        var mfFrac = mft / 24;
+        // Dipole: field lines emerge from north pole, arc outward, return to south
+        var mfTheta = mfFrac * Math.PI;
+        var mfRad = magR + mfHeight * Math.sin(mfTheta);
+        var mfx = cx + Math.cos(mfSpread) * mfRad * Math.sin(mfTheta);
+        var mfy = cy - mfHeight * Math.cos(mfTheta) + Math.sin(mfSpread) * mfRad * 0.15;
         if (mft === 0) ctx.moveTo(mfx, mfy);
         else ctx.lineTo(mfx, mfy);
       }
       ctx.stroke();
+    }
+    // Flare burst (animated pulsing)
+    var flarePhase = Math.sin(tSec * 1.5) * 0.5 + 0.5;
+    if (flarePhase > 0.7) {
+      var flareAlpha = (flarePhase - 0.7) / 0.3 * 0.3;
+      var flareG = ctx.createRadialGradient(cx, cy, magR, cx, cy, magR * (4 + flarePhase * 3));
+      flareG.addColorStop(0, 'rgba(255, 200, 255, ' + flareAlpha + ')');
+      flareG.addColorStop(1, 'rgba(255, 100, 200, 0)');
+      ctx.fillStyle = flareG;
+      ctx.beginPath();
+      ctx.arc(cx, cy, magR * (4 + flarePhase * 3), 0, Math.PI * 2);
+      ctx.fill();
     }
     return;
   }
