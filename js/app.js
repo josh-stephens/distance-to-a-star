@@ -3256,47 +3256,100 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // ──── NEBULAE ────
 
-  // Planetary nebulae (Helix, Ring)
+  // Planetary nebulae (Helix, Ring) — shell structure with central white dwarf
   if (name === 'Helix Nebula' || name === 'Ring Nebula') {
     var pnR = Math.max(r, 5);
+    var pnSel = state.selected === obj;
+    if (pnSel) pnR = Math.max(pnR, 45);
     var pnOuter = name === 'Helix Nebula' ? pnR * 1.3 : pnR;
-    // ring/donut shape
+    // Outer diffuse shell
+    var pnOG = ctx.createRadialGradient(cx, cy, pnOuter * 0.5, cx, cy, pnOuter * 1.4);
+    pnOG.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    pnOG.addColorStop(0.3, color.replace(')', ', 0.06)').replace('rgb', 'rgba'));
+    pnOG.addColorStop(0.6, color.replace(')', ', 0.12)').replace('rgb', 'rgba'));
+    pnOG.addColorStop(0.85, color.replace(')', ', 0.04)').replace('rgb', 'rgba'));
+    pnOG.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pnOG;
+    ctx.beginPath();
+    ctx.arc(cx, cy, pnOuter * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Bright ring structure
     ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = pnOuter * 0.35;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = Math.max(1, pnOuter * 0.25);
     ctx.beginPath();
     ctx.arc(cx, cy, pnOuter * 0.8, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.globalAlpha = 0.25;
-    ctx.lineWidth = pnOuter * 0.6;
+    ctx.globalAlpha = 0.2;
+    ctx.lineWidth = Math.max(2, pnOuter * 0.45);
     ctx.beginPath();
     ctx.arc(cx, cy, pnOuter * 0.8, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 1;
-    // faint central star
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    // Central white dwarf
+    var wdR = Math.max(1.5, pnR * 0.04);
+    var wdG = ctx.createRadialGradient(cx, cy, 0, cx, cy, wdR * 4);
+    wdG.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+    wdG.addColorStop(0.3, 'rgba(200, 220, 255, 0.3)');
+    wdG.addColorStop(1, 'rgba(180, 200, 255, 0)');
+    ctx.fillStyle = wdG;
     ctx.beginPath();
-    ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, wdR * 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ddeeff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, wdR, 0, Math.PI * 2);
     ctx.fill();
     return;
   }
 
-  // Emission nebulae (Orion, Eagle, Carina)
+  // Emission nebulae (Orion, Eagle, Carina) — gas clouds with embedded stars
   if (name === 'Orion Nebula' || name === 'Eagle Nebula' || name === 'Carina Nebula') {
     var enR = Math.max(r, 5);
-    // 3-5 overlapping translucent circles for lumpy cloud
-    var enCount = name === 'Carina Nebula' ? 5 : (name === 'Orion Nebula' ? 4 : 3);
+    var enSel = state.selected === obj;
+    if (enSel) enR = Math.max(enR, 50);
+    // Multiple overlapping gas clouds with varying opacity for volume
+    var enCount = name === 'Carina Nebula' ? 7 : (name === 'Orion Nebula' ? 6 : 5);
     for (var eni = 0; eni < enCount; eni++) {
       var enAngle = nameHash(name, eni * 7) * Math.PI * 2;
-      var enDist = nameHash(name, eni * 13) * enR * 0.6;
-      var enSize = enR * (0.6 + nameHash(name, eni * 19) * 0.5);
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.fillStyle = color;
+      var enDist = nameHash(name, eni * 13) * enR * 0.5;
+      var enSize = enR * (0.5 + nameHash(name, eni * 19) * 0.6);
+      var enCx = cx + Math.cos(enAngle) * enDist;
+      var enCy = cy + Math.sin(enAngle) * enDist;
+      var enG = ctx.createRadialGradient(enCx, enCy, 0, enCx, enCy, enSize);
+      enG.addColorStop(0, color.replace(')', ', 0.25)').replace('rgb', 'rgba'));
+      enG.addColorStop(0.5, color.replace(')', ', 0.08)').replace('rgb', 'rgba'));
+      enG.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = enG;
       ctx.beginPath();
-      ctx.arc(cx + Math.cos(enAngle) * enDist, cy + Math.sin(enAngle) * enDist, enSize, 0, Math.PI * 2);
+      ctx.arc(enCx, enCy, enSize, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
+    }
+    // Dark dust lanes
+    if (enR > 20) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      for (var dli = 0; dli < 3; dli++) {
+        var dlA = nameHash(name, dli * 47 + 100) * Math.PI * 2;
+        var dlD = nameHash(name, dli * 53 + 100) * enR * 0.4;
+        var dlS = enR * (0.3 + nameHash(name, dli * 59 + 100) * 0.3);
+        ctx.beginPath();
+        ctx.ellipse(cx + Math.cos(dlA) * dlD, cy + Math.sin(dlA) * dlD, dlS, dlS * 0.3, dlA, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Embedded young stars
+    if (enR > 15) {
+      var starCount = Math.min(30, Math.round(enR * 0.4));
+      for (var esi = 0; esi < starCount; esi++) {
+        var esA = nameHash(name, esi * 67) * Math.PI * 2;
+        var esD = nameHash(name, esi * 71) * enR * 0.8;
+        var esSize = 0.5 + nameHash(name, esi * 73) * 1.0;
+        var esBright = 0.4 + nameHash(name, esi * 79) * 0.5;
+        ctx.fillStyle = 'rgba(255, 255, 240, ' + esBright + ')';
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(esA) * esD, cy + Math.sin(esA) * esD, esSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     return;
   }
@@ -3588,29 +3641,46 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
 
   // ──── CLUSTERS ────
 
-  // Globular clusters
+  // Globular clusters — scaled star distribution
   if (type.indexOf('Globular cluster') !== -1) {
     var gcR = Math.max(r, 4);
-    var gcCount = name === 'Palomar 5' ? 12 : (name === 'Omega Centauri' ? 25 : 18);
+    var gcSel = state.selected === obj;
+    if (gcSel) gcR = Math.max(gcR, 50);
+    // Core glow (unresolved stars)
+    var gcCoreG = ctx.createRadialGradient(cx, cy, 0, cx, cy, gcR * 1.2);
+    gcCoreG.addColorStop(0, 'rgba(255, 240, 200, 0.4)');
+    gcCoreG.addColorStop(0.3, 'rgba(255, 230, 180, 0.15)');
+    gcCoreG.addColorStop(0.7, 'rgba(255, 220, 160, 0.04)');
+    gcCoreG.addColorStop(1, 'rgba(255, 220, 160, 0)');
+    ctx.fillStyle = gcCoreG;
+    ctx.beginPath();
+    ctx.arc(cx, cy, gcR * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Individual stars — more when larger, King profile distribution
+    var gcCount = gcR < 10 ? 20 : Math.min(200, Math.round(gcR * 3));
     for (var gci = 0; gci < gcCount; gci++) {
       var gcAngle = nameHash(name, gci * 7) * Math.PI * 2;
-      // denser toward center
-      var gcDist = nameHash(name, gci * 13) * nameHash(name, gci * 19) * gcR * 2.5;
-      var gcSize = 0.5 + nameHash(name, gci * 31) * 1.0;
-      var gcBright = 0.3 + nameHash(name, gci * 37) * 0.5;
-      ctx.fillStyle = 'rgba(255, 240, 200, ' + gcBright + ')';
+      // King profile: square of random gives strong center concentration
+      var gcU = nameHash(name, gci * 13);
+      var gcDist = gcU * gcU * gcR * 1.5;
+      var gcSize = gcR > 30 ? (0.4 + nameHash(name, gci * 31) * 1.2) : (0.3 + nameHash(name, gci * 31) * 0.7);
+      // Color variation: mostly yellow-white, some orange giants
+      var gcHue = nameHash(name, gci * 43);
+      var gcCol = gcHue > 0.85 ? 'rgba(255, 180, 100, ' : (gcHue > 0.7 ? 'rgba(255, 220, 150, ' : 'rgba(255, 245, 220, ');
+      var gcBright = 0.3 + (1 - gcU) * 0.5; // brighter toward center
+      ctx.fillStyle = gcCol + gcBright + ')';
       ctx.beginPath();
       ctx.arc(cx + Math.cos(gcAngle) * gcDist, cy + Math.sin(gcAngle) * gcDist, gcSize, 0, Math.PI * 2);
       ctx.fill();
     }
     // Palomar 5 tidal tails
     if (name === 'Palomar 5') {
-      for (var pti = 0; pti < 5; pti++) {
-        var ptDist = gcR * 2.5 + pti * gcR * 0.8;
+      for (var pti = 0; pti < 8; pti++) {
+        var ptDist = gcR * 1.5 + pti * gcR * 0.4;
         var ptAngle = 0.3 + nameHash(name, pti * 41) * 0.3;
-        ctx.fillStyle = 'rgba(200, 190, 150, 0.25)';
+        ctx.fillStyle = 'rgba(200, 190, 150, 0.2)';
         ctx.beginPath();
-        ctx.arc(cx + ptDist, cy + Math.sin(ptAngle) * gcR * 0.5, 0.8, 0, Math.PI * 2);
+        ctx.arc(cx + ptDist, cy + Math.sin(ptAngle) * gcR * 0.3, 0.8, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -3743,60 +3813,160 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     return;
   }
 
-  // Elliptical galaxies (M87, IC 1101)
+  // Elliptical galaxies (M87, IC 1101) — structural with stellar haze
   if (type.indexOf('elliptical') !== -1 || type.indexOf('Elliptical') !== -1) {
     var elR = Math.max(r, 5);
-    var elScale = name === 'IC 1101' ? 1.5 : 1.0;
-    elR = elR * elScale;
-    // smooth elliptical gradient glow
-    var elG = ctx.createRadialGradient(cx, cy, 0, cx, cy, elR * 2);
-    elG.addColorStop(0, 'rgba(240, 220, 180, 0.5)');
-    elG.addColorStop(0.3, 'rgba(220, 200, 160, 0.25)');
-    elG.addColorStop(0.7, 'rgba(200, 180, 140, 0.08)');
-    elG.addColorStop(1, 'rgba(180, 160, 120, 0)');
+    var elSel = state.selected === obj;
+    if (elSel) elR = Math.max(elR, 50);
+    var elScale3 = name === 'IC 1101' ? 1.4 : 1.0;
+    elR = elR * elScale3;
+    var elAxis = 0.2 + nameHash(name, 1) * 0.3;
+    // Outer halo
+    var elG = ctx.createRadialGradient(cx, cy, 0, cx, cy, elR * 2.2);
+    elG.addColorStop(0, 'rgba(240, 220, 180, 0.45)');
+    elG.addColorStop(0.15, 'rgba(230, 210, 170, 0.3)');
+    elG.addColorStop(0.4, 'rgba(210, 190, 150, 0.12)');
+    elG.addColorStop(0.7, 'rgba(190, 170, 130, 0.03)');
+    elG.addColorStop(1, 'rgba(170, 150, 110, 0)');
     ctx.fillStyle = elG;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, elR * 2, elR * 1.4, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, elR * 2.2, elR * 2.2 * (0.6 + nameHash(name, 3) * 0.3), elAxis, 0, Math.PI * 2);
     ctx.fill();
+    // Resolved stars when large enough
+    if (elR > 20) {
+      var elStars = Math.min(120, Math.round(elR * 1.5));
+      for (var eli = 0; eli < elStars; eli++) {
+        var elSA = nameHash(name, eli * 7 + 200) * Math.PI * 2;
+        var elSU = nameHash(name, eli * 11 + 200);
+        var elSD = elSU * elSU * elR * 1.8;
+        var elSB = 0.15 + (1 - elSU) * 0.3;
+        ctx.fillStyle = 'rgba(255, 240, 200, ' + elSB + ')';
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(elSA) * elSD, cy + Math.sin(elSA) * elSD * 0.7, 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // M87 jet
+    if (name === 'M87' && elR > 15) {
+      var jetA = 0.6;
+      ctx.strokeStyle = 'rgba(150, 120, 255, 0.35)';
+      ctx.lineWidth = Math.max(1, elR * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(jetA) * elR * 2.5, cy + Math.sin(jetA) * elR * 2.5);
+      ctx.stroke();
+    }
     return;
   }
 
-  // Barred spiral (NGC 1300)
-  if (name === 'NGC 1300') {
-    var bsR = Math.max(r, 5);
-    // central bar
-    ctx.strokeStyle = 'rgba(180, 190, 240, 0.5)';
-    ctx.lineWidth = bsR * 0.4;
-    ctx.lineCap = 'round';
+  // Spiral galaxies (barred and unbarred) — volumetric arms with dust lanes
+  if (type.indexOf('spiral') !== -1 || type.indexOf('Spiral') !== -1 || type.indexOf('SA(') !== -1 || type.indexOf('SB(') !== -1) {
+    var sgR = Math.max(r, 5);
+    var sgSel = state.selected === obj;
+    if (sgSel) sgR = Math.max(sgR, 50);
+    var sgBarred = type.indexOf('arred') !== -1 || type.indexOf('SB') !== -1;
+    var sgInc = nameHash(name, 1) * 0.5 + 0.15; // inclination: 0.15-0.65 (ratio)
+    var sgRot = nameHash(name, 3) * Math.PI * 2;
+    var sgArms = sgBarred ? 2 : (nameHash(name, 5) > 0.5 ? 4 : 2);
+    // Disk halo glow
+    var sgDG = ctx.createRadialGradient(cx, cy, 0, cx, cy, sgR * 2);
+    sgDG.addColorStop(0, 'rgba(200, 190, 240, 0.2)');
+    sgDG.addColorStop(0.5, 'rgba(180, 170, 220, 0.06)');
+    sgDG.addColorStop(1, 'rgba(160, 150, 200, 0)');
+    ctx.fillStyle = sgDG;
     ctx.beginPath();
-    ctx.moveTo(cx - bsR * 0.8, cy);
-    ctx.lineTo(cx + bsR * 0.8, cy);
-    ctx.stroke();
-    // two curved spiral arms from bar ends
-    ctx.strokeStyle = 'rgba(170, 180, 230, 0.35)';
-    ctx.lineWidth = 1;
+    ctx.ellipse(cx, cy, sgR * 2, sgR * 2 * sgInc, sgRot * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Central bulge (yellow-warm)
+    var sgBG = ctx.createRadialGradient(cx, cy, 0, cx, cy, sgR * 0.35);
+    sgBG.addColorStop(0, 'rgba(255, 230, 170, 0.5)');
+    sgBG.addColorStop(0.6, 'rgba(240, 210, 150, 0.2)');
+    sgBG.addColorStop(1, 'rgba(220, 190, 130, 0)');
+    ctx.fillStyle = sgBG;
     ctx.beginPath();
-    for (var bst = 0; bst <= 20; bst++) {
-      var bsFrac = bst / 20;
-      var bsAngle = bsFrac * Math.PI * 1.2;
-      var bsRad = bsR * (0.8 + bsFrac * 1.2);
-      var bsx = cx + bsR * 0.8 + Math.cos(bsAngle) * bsRad * 0.3;
-      var bsy = cy - Math.sin(bsAngle) * bsRad * 0.4;
-      if (bst === 0) ctx.moveTo(bsx, bsy);
-      else ctx.lineTo(bsx, bsy);
+    ctx.ellipse(cx, cy, sgR * 0.35, sgR * 0.35 * sgInc, sgRot * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Bar (if barred spiral)
+    if (sgBarred) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(sgRot);
+      ctx.scale(1, sgInc);
+      ctx.fillStyle = 'rgba(240, 210, 150, 0.25)';
+      ctx.fillRect(-sgR * 0.5, -sgR * 0.08, sgR, sgR * 0.16);
+      ctx.restore();
     }
-    ctx.stroke();
-    ctx.beginPath();
-    for (var bst2 = 0; bst2 <= 20; bst2++) {
-      var bsFrac2 = bst2 / 20;
-      var bsAngle2 = bsFrac2 * Math.PI * 1.2;
-      var bsRad2 = bsR * (0.8 + bsFrac2 * 1.2);
-      var bsx2 = cx - bsR * 0.8 - Math.cos(bsAngle2) * bsRad2 * 0.3;
-      var bsy2 = cy + Math.sin(bsAngle2) * bsRad2 * 0.4;
-      if (bst2 === 0) ctx.moveTo(bsx2, bsy2);
-      else ctx.lineTo(bsx2, bsy2);
+    // Volumetric spiral arms: wide diffuse + narrow bright + dust lane
+    var sgB = 0.25;
+    var sgMaxT = 2.5 * Math.PI;
+    var sgA = sgR * 1.5 / Math.exp(sgB * sgMaxT);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(sgRot * 0.3);
+    ctx.scale(1, sgInc);
+    for (var sgArm = 0; sgArm < sgArms; sgArm++) {
+      var sgAOff = (sgArm / sgArms) * Math.PI * 2;
+      var sgSteps = sgR > 30 ? 60 : 30;
+      // Wide diffuse arm (volume)
+      ctx.strokeStyle = 'rgba(170, 180, 240, 0.08)';
+      ctx.lineWidth = Math.max(2, sgR * 0.12);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (var sgi = 0; sgi <= sgSteps; sgi++) {
+        var sgF = sgi / sgSteps;
+        var sgT = sgF * sgMaxT;
+        var sgRR = sgA * Math.exp(sgB * sgT);
+        var sgAA = sgT + sgAOff;
+        var sgX = Math.cos(sgAA) * sgRR;
+        var sgY = Math.sin(sgAA) * sgRR;
+        if (sgi === 0) ctx.moveTo(sgX, sgY);
+        else ctx.lineTo(sgX, sgY);
+      }
+      ctx.stroke();
+      // Bright arm core (blue-white star formation)
+      ctx.strokeStyle = 'rgba(190, 200, 255, 0.18)';
+      ctx.lineWidth = Math.max(1, sgR * 0.04);
+      ctx.beginPath();
+      for (var sgi2 = 0; sgi2 <= sgSteps; sgi2++) {
+        var sgF2 = sgi2 / sgSteps;
+        var sgT2 = sgF2 * sgMaxT;
+        var sgRR2 = sgA * Math.exp(sgB * sgT2);
+        var sgAA2 = sgT2 + sgAOff;
+        if (sgi2 === 0) ctx.moveTo(Math.cos(sgAA2) * sgRR2, Math.sin(sgAA2) * sgRR2);
+        else ctx.lineTo(Math.cos(sgAA2) * sgRR2, Math.sin(sgAA2) * sgRR2);
+      }
+      ctx.stroke();
+      // Dust lane (dark band along inner edge of arm)
+      if (sgR > 20) {
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.lineWidth = Math.max(0.5, sgR * 0.025);
+        ctx.beginPath();
+        for (var sgi3 = 0; sgi3 <= sgSteps; sgi3++) {
+          var sgF3 = sgi3 / sgSteps;
+          var sgT3 = sgF3 * sgMaxT;
+          var sgRR3 = sgA * Math.exp(sgB * sgT3) * 0.92; // inner edge offset
+          var sgAA3 = sgT3 + sgAOff;
+          if (sgi3 === 0) ctx.moveTo(Math.cos(sgAA3) * sgRR3, Math.sin(sgAA3) * sgRR3);
+          else ctx.lineTo(Math.cos(sgAA3) * sgRR3, Math.sin(sgAA3) * sgRR3);
+        }
+        ctx.stroke();
+      }
+      // Star-forming knots
+      if (sgR > 15) {
+        for (var sgK = 0; sgK < 5; sgK++) {
+          var sgKF = 0.2 + sgK * 0.15;
+          var sgKT = sgKF * sgMaxT;
+          var sgKR = sgA * Math.exp(sgB * sgKT);
+          var sgKA = sgKT + sgAOff;
+          var sgKS = Math.max(1, sgR * 0.02);
+          ctx.fillStyle = 'rgba(200, 220, 255, 0.25)';
+          ctx.beginPath();
+          ctx.arc(Math.cos(sgKA) * sgKR, Math.sin(sgKA) * sgKR, sgKS, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
-    ctx.stroke();
+    ctx.restore();
     return;
   }
 
