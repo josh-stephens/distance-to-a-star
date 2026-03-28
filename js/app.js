@@ -3259,8 +3259,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Planetary nebulae (Helix, Ring) — shell structure with central white dwarf
   if (name === 'Helix Nebula' || name === 'Ring Nebula') {
     var pnR = Math.max(r, 5);
-    var pnSel = state.selected === obj;
-    if (pnSel) pnR = Math.max(pnR, 45);
+    // Structure scales naturally with physRadius at appropriate zoom
     var pnOuter = name === 'Helix Nebula' ? pnR * 1.3 : pnR;
     // Outer diffuse shell
     var pnOG = ctx.createRadialGradient(cx, cy, pnOuter * 0.5, cx, cy, pnOuter * 1.4);
@@ -3306,8 +3305,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Emission nebulae (Orion, Eagle, Carina) — gas clouds with embedded stars
   if (name === 'Orion Nebula' || name === 'Eagle Nebula' || name === 'Carina Nebula') {
     var enR = Math.max(r, 5);
-    var enSel = state.selected === obj;
-    if (enSel) enR = Math.max(enR, 50);
+    // Structure scales naturally with physRadius at appropriate zoom
     // Multiple overlapping gas clouds with varying opacity for volume
     var enCount = name === 'Carina Nebula' ? 7 : (name === 'Orion Nebula' ? 6 : 5);
     for (var eni = 0; eni < enCount; eni++) {
@@ -3395,8 +3393,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   if (type.indexOf('Neutron star') >= 0 || type.indexOf('Pulsar') >= 0) {
     // Scale up when selected for structural detail
     var pulsR = Math.max(r, 2);
-    var isSel = state.selected === obj;
-    if (isSel) pulsR = Math.max(pulsR, 25);
+    // Structure scales naturally with physRadius at appropriate zoom
     // Magnetosphere glow
     if (pulsR > 8) {
       var pmG = ctx.createRadialGradient(cx, cy, pulsR * 0.3, cx, cy, pulsR * 2.5);
@@ -3457,8 +3454,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Black holes
   if (type.indexOf('black hole') >= 0 || type.indexOf('Black hole') >= 0) {
     var bhR = Math.max(r, 3);
-    var bhIsSel = state.selected === obj;
-    if (bhIsSel) bhR = Math.max(bhR, 35);
+    // Structure scales naturally with physRadius at appropriate zoom
     var bhScale2 = type.indexOf('Supermassive') >= 0 ? 1.3 : 1.0;
     bhR = bhR * bhScale2;
     // Gravitational lensing glow (photon sphere)
@@ -3584,8 +3580,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Magnetars
   if (type === 'Magnetar') {
     var magR = Math.max(r, 3);
-    var magIsSel = state.selected === obj;
-    if (magIsSel) magR = Math.max(magR, 25);
+    // Structure scales naturally with physRadius at appropriate zoom
     // Intense magnetosphere glow
     var magG = ctx.createRadialGradient(cx, cy, 0, cx, cy, magR * 5);
     magG.addColorStop(0, 'rgba(255, 100, 180, 0.5)');
@@ -3644,8 +3639,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Globular clusters — scaled star distribution
   if (type.indexOf('Globular cluster') !== -1) {
     var gcR = Math.max(r, 4);
-    var gcSel = state.selected === obj;
-    if (gcSel) gcR = Math.max(gcR, 50);
+    // Structure scales naturally with physRadius at appropriate zoom
     // Core glow (unresolved stars)
     var gcCoreG = ctx.createRadialGradient(cx, cy, 0, cx, cy, gcR * 1.2);
     gcCoreG.addColorStop(0, 'rgba(255, 240, 200, 0.4)');
@@ -3816,8 +3810,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Elliptical galaxies (M87, IC 1101) — structural with stellar haze
   if (type.indexOf('elliptical') !== -1 || type.indexOf('Elliptical') !== -1) {
     var elR = Math.max(r, 5);
-    var elSel = state.selected === obj;
-    if (elSel) elR = Math.max(elR, 50);
+    // Structure scales naturally with physRadius at appropriate zoom
     var elScale3 = name === 'IC 1101' ? 1.4 : 1.0;
     elR = elR * elScale3;
     var elAxis = 0.2 + nameHash(name, 1) * 0.3;
@@ -3862,8 +3855,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
   // Spiral galaxies (barred and unbarred) — volumetric arms with dust lanes
   if (type.indexOf('spiral') !== -1 || type.indexOf('Spiral') !== -1 || type.indexOf('SA(') !== -1 || type.indexOf('SB(') !== -1) {
     var sgR = Math.max(r, 5);
-    var sgSel = state.selected === obj;
-    if (sgSel) sgR = Math.max(sgR, 50);
+    // Structure scales naturally with physRadius at appropriate zoom
     var sgBarred = type.indexOf('arred') !== -1 || type.indexOf('SB') !== -1;
     var sgInc = nameHash(name, 1) * 0.5 + 0.15; // inclination: 0.15-0.65 (ratio)
     var sgRot = nameHash(name, 3) * Math.PI * 2;
