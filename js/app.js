@@ -8050,28 +8050,15 @@ function orbitToCamera() {
   var fx = orbitMode.focalX, fy = orbitMode.focalY, fz = orbitMode.focalZ;
 
   if (cam3d.trackTarget) {
-    // When tracking, position camera behind focal object relative to target.
-    // This keeps the focal object visible in the foreground while looking at the target.
+    // When tracking, orbit freely around focal point but always look at the target.
+    // User controls orbit yaw/pitch via drag; camera always points at track target.
     var tp = getLookTarget(cam3d.trackTarget);
     if (tp) {
-      var dx = tp.x - fx, dy = tp.y - fy, dz = tp.z - fz;
-      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > 1e-12) {
-        // Unit vector from focal → target
-        var ux = dx / d, uy = dy / d, uz = dz / d;
-        // Place camera behind focal object (opposite direction from target)
-        // Elevation produces ~Dec -8° when looking past focal object toward target
-        var elevAngle = 8 * DEG2RAD;
-        var zOff = (d + orbitMode.orbitDist) * Math.tan(elevAngle);
-        cam3d.px = fx - ux * orbitMode.orbitDist;
-        cam3d.py = fy - uy * orbitMode.orbitDist;
-        cam3d.pz = fz - uz * orbitMode.orbitDist + zOff;
-      } else {
-        // Target coincides with focal — fall back to orbit params
-        cam3d.px = fx + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
-        cam3d.py = fy + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
-        cam3d.pz = fz + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
-      }
+      // Position: free orbit around focal point (same as non-tracking)
+      cam3d.px = fx + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
+      cam3d.py = fy + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
+      cam3d.pz = fz + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+      // Look direction: always face the track target
       var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, tp.x, tp.y, tp.z);
       cam3d.yaw = angles.yaw;
       cam3d.pitch = angles.pitch;
@@ -8158,12 +8145,13 @@ function lookAtTarget(targetKey, duration) {
   updateTrackingUI();
 
   if (orbitMode.active) {
-    // Set orbit distance to 0.9× the focal-to-target distance so the focal
-    // object stays visible in the foreground while looking at the target
+    // Set orbit to start behind focal object relative to target, with slight elevation
     var fdx = pos.x - orbitMode.focalX, fdy = pos.y - orbitMode.focalY, fdz = pos.z - orbitMode.focalZ;
     var focalToTarget = Math.sqrt(fdx * fdx + fdy * fdy + fdz * fdz);
     if (focalToTarget > 1e-12) {
       orbitMode.orbitDist = focalToTarget * 0.9;
+      orbitMode.orbitYaw = Math.atan2(-fdy, -fdx);
+      orbitMode.orbitPitch = 0.14; // ~8° elevation
     }
     orbitToCamera();
     state.dirty = true;
