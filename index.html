@@ -392,8 +392,35 @@
     max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
     padding: 0 20px 0 33px;
   }
-  .glossary-entry.expanded .glossary-entry-long { max-height: 260px; }
+  .glossary-entry.expanded .glossary-entry-long { max-height: 500px; }
   .glossary-entry-long-text { font-size: 12px; line-height: 1.7; color: #9898b8; padding: 0 0 8px; }
+  .glossary-img-strip {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 8px;
+  }
+  .glossary-img-thumb { width: calc(50% - 3px); }
+  .glossary-img {
+    width: 100%; height: 80px; object-fit: cover; border-radius: 4px;
+    border: 1px solid #2a2a44; display: block; background: #12121e;
+  }
+  .glossary-img-thumb { cursor: pointer; }
+  .glossary-img-thumb:hover .glossary-img { border-color: #4a6a8a; }
+  .glossary-img-caption { font-size: 10px; color: #8898b8; margin-top: 3px; line-height: 1.3; }
+  .glossary-img-credit { font-size: 9px; color: #5a5a78; font-style: italic; }
+  .img-lightbox {
+    position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.88);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .img-lightbox img {
+    max-width: 90vw; max-height: 75vh; object-fit: contain;
+    border-radius: 6px; border: 1px solid #2a2a44;
+  }
+  .img-lightbox-caption {
+    margin-top: 10px; font-size: 13px; color: #b8c8e0; text-align: center;
+  }
+  .img-lightbox-credit {
+    font-size: 11px; color: #6a7a98; font-style: italic; margin-top: 2px;
+  }
   .glossary-goto {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
@@ -494,6 +521,8 @@
   <h3>&#x2709; Send Feedback</h3>
   <label for="fb-name">Name (optional)</label>
   <input type="text" id="fb-name" placeholder="Your name" autocomplete="off">
+  <label for="fb-contact">Email or contact info (optional, if you'd like a reply)</label>
+  <input type="text" id="fb-contact" placeholder="email@example.com" autocomplete="off">
   <label for="fb-msg">Message</label>
   <textarea id="fb-msg" placeholder="What did you think? Ideas, bugs, suggestions..."></textarea>
   <div class="feedback-actions">

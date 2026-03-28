@@ -216,13 +216,17 @@ var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 var W, H;
 
+// Adaptive performance: cap DPR and monitor FPS
+var dpr = Math.min(devicePixelRatio || 1, 2);
+var _perfFps = 60, _perfFrameCount = 0, _perfLastCheck = 0, _perfReduced = false;
+
 function resize() {
   var rect = canvas.getBoundingClientRect();
-  W = rect.width * devicePixelRatio;
-  H = rect.height * devicePixelRatio;
+  W = rect.width * dpr;
+  H = rect.height * dpr;
   canvas.width = W;
   canvas.height = H;
-  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.scale(dpr, dpr);
   state.dirty = true;
 }
 window.addEventListener('resize', resize);
@@ -253,14 +257,14 @@ function displayName(obj) {
 
 function getScale() {
   var vr = getViewRadius();
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   return Math.min(sw, sh) / (2 * vr);
 }
 
 function worldToScreen(wx, wy) {
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var scale = getScale();
   return { x: sw / 2 + (wx - state.panX) * scale, y: sh / 2 + (wy - state.panY) * scale };
 }
@@ -461,6 +465,64 @@ function updatePlanetPositions() {
       continue;
     }
     sat.dist = Math.sqrt(sat.wx3d * sat.wx3d + sat.wy3d * sat.wy3d);
+  }
+
+  // Lagrange points: compute from Earth's current position
+  var earthAngle = Math.atan2(earthY, earthX);
+  var earthR = Math.sqrt(earthX * earthX + earthY * earthY);
+  var l2Offset = 1.59e-8; // ~1.5M km in light-years
+
+  var lp1 = findObject('L1');
+  if (lp1) {
+    var l1R = earthR - l2Offset;
+    lp1.x = l1R * Math.cos(earthAngle);
+    lp1.y = l1R * Math.sin(earthAngle);
+    lp1.wx3d = lp1.x; lp1.wy3d = lp1.y; lp1.wz3d = earthZ;
+    lp1.dist = l1R;
+  }
+  var lp2 = findObject('L2');
+  if (lp2) {
+    var l2R = earthR + l2Offset;
+    lp2.x = l2R * Math.cos(earthAngle);
+    lp2.y = l2R * Math.sin(earthAngle);
+    lp2.wx3d = lp2.x; lp2.wy3d = lp2.y; lp2.wz3d = earthZ;
+    lp2.dist = l2R;
+  }
+  var lp3 = findObject('L3');
+  if (lp3) {
+    lp3.x = -earthR * Math.cos(earthAngle);
+    lp3.y = -earthR * Math.sin(earthAngle);
+    lp3.wx3d = lp3.x; lp3.wy3d = lp3.y; lp3.wz3d = earthZ;
+    lp3.dist = earthR;
+  }
+  var lp4 = findObject('L4');
+  if (lp4) {
+    lp4.x = earthR * Math.cos(earthAngle + Math.PI / 3);
+    lp4.y = earthR * Math.sin(earthAngle + Math.PI / 3);
+    lp4.wx3d = lp4.x; lp4.wy3d = lp4.y; lp4.wz3d = earthZ;
+    lp4.dist = earthR;
+  }
+  var lp5 = findObject('L5');
+  if (lp5) {
+    lp5.x = earthR * Math.cos(earthAngle - Math.PI / 3);
+    lp5.y = earthR * Math.sin(earthAngle - Math.PI / 3);
+    lp5.wx3d = lp5.x; lp5.wy3d = lp5.y; lp5.wz3d = earthZ;
+    lp5.dist = earthR;
+  }
+  // JWST: halo orbit around L2 (~6 month period, ~800,000 km radius)
+  var jwst = findObject('JWST');
+  if (jwst && lp2) {
+    var jwstPeriod = 182.5;
+    var jwstHaloR = 8.5e-11; // ~800,000 km in ly
+    var jwstAngle = (days / jwstPeriod) * Math.PI * 2;
+    // Visual minimum separation so JWST is always clickable apart from L2
+    var jwstVisR = Math.max(jwstHaloR, satMinSep(0.6, 0, 1.2, 1.4e-12));
+    jwst.x = lp2.x + jwstVisR * Math.cos(jwstAngle);
+    jwst.y = lp2.y + jwstVisR * Math.sin(jwstAngle);
+    jwst.wx3d = lp2.wx3d + jwstHaloR * Math.cos(jwstAngle);
+    jwst.wy3d = lp2.wy3d + jwstHaloR * Math.sin(jwstAngle);
+    jwst.wz3d = lp2.wz3d;
+    jwst.dist = lp2.dist;
   }
 }
 
@@ -1616,8 +1678,8 @@ function worldToScreen3D(wx, wy, wz) {
 
   if (viewZ <= 1e-12) return null; // behind camera
 
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var focalLen = 1 / Math.tan(cam3d.fov * DEG2RAD / 2);
   var halfW = sw / 2;
 
@@ -1630,8 +1692,8 @@ function worldToScreen3D(wx, wy, wz) {
 }
 
 function getVisibleObjects3D() {
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var m = 80;
   var result = [];
   updateFocusedConstellationStars();
@@ -1838,8 +1900,8 @@ function resetParallax() {
 
 function getVisibleObjects() {
   var vr = getViewRadius();
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var m = 80;
   return objects.filter(function(o) {
     // Always show the selected/navigated-to object
@@ -1858,8 +1920,8 @@ function getVisibleObjects() {
 // ─── Draw: starfield + twinkling ──────────────────────────────────────
 
 function drawStarfield(ts) {
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var vr = getViewRadius();
   var logVR = Math.log10(vr);
 
@@ -1915,8 +1977,8 @@ function drawWarpStreaks(ts) {
   if (!effects.warpStreaks) return;
   if (state.warpIntensity < 0.01) return;
 
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var cx = sw / 2;
   var cy = sh / 2;
   var intensity = state.warpIntensity;
@@ -1953,8 +2015,8 @@ function drawWarpStreaks(ts) {
 
 function drawAmbientParticles(ts) {
   if (!effects.ambientParticles) return;
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var tSec = (ts || 0) / 1000;
 
   for (var i = 0; i < ambientParticles.length; i++) {
@@ -1976,8 +2038,8 @@ function drawAmbientParticles(ts) {
 // ─── Draw: vignette ───────────────────────────────────────────────────
 
 function drawVignette() {
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   if (sw !== _vignetteW || sh !== _vignetteH) {
     _vignetteW = sw;
     _vignetteH = sh;
@@ -2071,8 +2133,8 @@ function drawRegions() {
     var rxPx = r.rx * scale;
     var ryPx = r.ry * scale;
     if (rxPx < 4 || ryPx < 4) return;
-    var sw = W / devicePixelRatio;
-    var sh = H / devicePixelRatio;
+    var sw = W / dpr;
+    var sh = H / dpr;
     if (rxPx > sw * 6 && ryPx > sh * 6) return;
 
     ctx.save();
@@ -2292,8 +2354,8 @@ function drawFlowParticles(ts) {
     var wy = omt * omt * src[1] + 2 * omt * t * my + t * t * flowTarget[1];
 
     var sp = worldToScreen(wx, wy);
-    var sw = W / devicePixelRatio;
-    var sh = H / devicePixelRatio;
+    var sw = W / dpr;
+    var sh = H / dpr;
     if (sp.x < -10 || sp.x > sw + 10 || sp.y < -10 || sp.y > sh + 10) continue;
 
     // Color gradient: cool blue -> warm orange
@@ -2382,6 +2444,88 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     }
     ctx.stroke();
     ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // ──── LAGRANGE POINTS ────
+
+  if (type === 'Lagrange point') {
+    var lps = Math.max(detailScale * 2.5, 3);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.7;
+    // Crosshair lines
+    ctx.beginPath();
+    ctx.moveTo(cx - lps, cy); ctx.lineTo(cx + lps, cy);
+    ctx.moveTo(cx, cy - lps); ctx.lineTo(cx, cy + lps);
+    ctx.stroke();
+    // Diamond outline
+    var ld = lps * 0.6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - ld);
+    ctx.lineTo(cx + ld, cy);
+    ctx.lineTo(cx, cy + ld);
+    ctx.lineTo(cx - ld, cy);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+
+  // ──── JWST ────
+
+  if (name === 'JWST') {
+    var jsc = Math.max(detailScale * 1.5, 2);
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Sunshield (kite shape behind mirror)
+    ctx.fillStyle = '#444455';
+    ctx.beginPath();
+    ctx.moveTo(-jsc * 2.5, jsc * 1);
+    ctx.lineTo(0, -jsc * 0.3);
+    ctx.lineTo(jsc * 2.5, jsc * 1);
+    ctx.lineTo(0, jsc * 3.5);
+    ctx.closePath();
+    ctx.fill();
+    // Primary mirror: gold hexagon with segment lines
+    var hexR = jsc * 1.4;
+    ctx.fillStyle = '#ddaa44';
+    ctx.strokeStyle = '#886622';
+    ctx.lineWidth = Math.max(0.5, jsc * 0.15);
+    ctx.beginPath();
+    var hi;
+    for (hi = 0; hi < 6; hi++) {
+      var ha = hi * Math.PI / 3 - Math.PI / 6;
+      var hx = hexR * Math.cos(ha);
+      var hy = -hexR * Math.sin(ha) - jsc * 0.2;
+      if (hi === 0) ctx.moveTo(hx, hy);
+      else ctx.lineTo(hx, hy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Segment lines (3 axes through center of hex)
+    ctx.beginPath();
+    for (hi = 0; hi < 3; hi++) {
+      var sa = hi * Math.PI / 3 - Math.PI / 6;
+      ctx.moveTo(hexR * Math.cos(sa), -hexR * Math.sin(sa) - jsc * 0.2);
+      ctx.lineTo(hexR * Math.cos(sa + Math.PI), -hexR * Math.sin(sa + Math.PI) - jsc * 0.2);
+    }
+    ctx.stroke();
+    // Secondary mirror support struts
+    ctx.strokeStyle = '#888899';
+    ctx.lineWidth = Math.max(0.3, jsc * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(0, -jsc * 0.2);
+    ctx.lineTo(0, -hexR * 1.5 - jsc * 0.2);
+    ctx.moveTo(-hexR * 0.5, -jsc * 0.2);
+    ctx.lineTo(hexR * 0.3, -hexR * 1.5 - jsc * 0.2);
+    ctx.moveTo(hexR * 0.5, -jsc * 0.2);
+    ctx.lineTo(-hexR * 0.3, -hexR * 1.5 - jsc * 0.2);
+    ctx.stroke();
     ctx.restore();
     return;
   }
@@ -3722,8 +3866,8 @@ function drawSunIndicator() {
   if (vr < 0.3) return;
 
   var sp = worldToScreen(0, 0);
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
   var margin = 40;
   var onScreen = sp.x > margin && sp.x < sw - margin && sp.y > margin && sp.y < sh - margin;
 
@@ -3825,8 +3969,8 @@ function drawReferenceDistances() {
   if (state.mode3d) return;
   var vr = getViewRadius();
   var scale = getScale();
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   var toShow = [];
   refDistances.forEach(function(ref) {
@@ -3968,8 +4112,8 @@ function drawCosmicFilaments() {
   if (vr < 50 * MLY) return;
 
   var scale = getScale();
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   // Fade in between 50 Mly and 100 Mly
   var fade = 1;
@@ -4244,8 +4388,8 @@ function drawObservableUniverse() {
   if (rPx < 30) return;
 
   var sp = worldToScreen(0, 0);
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   // Fade in between 200 Mly and 400 Mly
   var fade = 1;
@@ -4290,8 +4434,8 @@ function drawDarkMatterHalos() {
   if (vr < 200000 || vr > 30 * MLY) return;
 
   var scale = getScale();
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   // Fade in from 200,000 to 400,000; fade out from 20 Mly to 30 Mly
   var fade = 1;
@@ -4350,8 +4494,8 @@ function draw2D(ts) {
     state.dirty = true;
   }
 
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   ctx.clearRect(0, 0, sw, sh);
   ctx.fillStyle = '#0a0a12';
@@ -4564,8 +4708,8 @@ function drawGalaxy3D(x, y, r, color, alpha) {
 }
 
 function draw3D(ts) {
-  var sw = W / devicePixelRatio;
-  var sh = H / devicePixelRatio;
+  var sw = W / dpr;
+  var sh = H / dpr;
 
   // Animate camera if flying
   if (cam3dAnim.active) {
@@ -4681,6 +4825,28 @@ function draw3D(ts) {
 
   // Draw orbital planes behind objects
   drawOrbitalPlanes3D();
+
+  // Draw asteroid belt particles in 3D
+  (function() {
+    var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+    if (camDist > 0.01) return;
+    var alpha = camDist > 0.005 ? 1.0 - (camDist - 0.005) / 0.005 : 1.0;
+    alpha = Math.max(0, Math.min(1, alpha)) * 0.4;
+    if (alpha < 0.01) return;
+
+    ctx.save();
+    ctx.fillStyle = asteroidBeltConfig.color;
+    ctx.globalAlpha = alpha;
+    for (var ai = 0; ai < _asteroidCache.length; ai++) {
+      var ast = _asteroidCache[ai];
+      var sp = worldToScreen3D(ast.wx, ast.wy, 0);
+      if (!sp) continue;
+      if (sp.x < -50 || sp.x > sw + 50 || sp.y < -50 || sp.y > sh + 50) continue;
+      ctx.fillRect(sp.x - ast.sz * 0.5, sp.y - ast.sz * 0.5, ast.sz, ast.sz);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  })();
 
   // Draw objects (already depth sorted far→near)
   pendingLabels = [];
@@ -5099,6 +5265,19 @@ var lastFrameTime = 0;
 function animationLoop(ts) {
   requestAnimationFrame(animationLoop);
 
+  // Adaptive FPS monitoring — check every 30 frames
+  _perfFrameCount++;
+  if (ts - _perfLastCheck > 1000) {
+    _perfFps = _perfFrameCount * 1000 / (ts - _perfLastCheck);
+    _perfFrameCount = 0;
+    _perfLastCheck = ts;
+    if (_perfFps < 28 && !_perfReduced) {
+      _perfReduced = true;
+    } else if (_perfFps > 45 && _perfReduced) {
+      _perfReduced = false;
+    }
+  }
+
   // Guard against corrupted zoom state
   if (!isFinite(state.zoom)) state.zoom = Math.max(0, Math.min(1000, state.zoom || 0));
 
@@ -5109,8 +5288,10 @@ function animationLoop(ts) {
   }
   if (state.warpIntensity > 0.01) state.dirty = true;
 
-  // Always redraw for twinkling/ambient if effects on
-  if (effects.twinkling || effects.ambientParticles) state.dirty = true;
+  // Twinkling/ambient: throttle to every other frame when performance is reduced
+  if (effects.twinkling || effects.ambientParticles) {
+    if (!_perfReduced || (_perfFrameCount & 1) === 0) state.dirty = true;
+  }
 
   // Flow particles always animate when visible
   var vr = getViewRadius();
@@ -5281,7 +5462,7 @@ function drawLightPulse(ts) {
   // Draw elapsed time counter with opaque background
   var travelYears = lightPulse.travelTimeLy * ease;
   var timeStr = formatLightTravelElapsed(travelYears);
-  var sw = W / devicePixelRatio;
+  var sw = W / dpr;
   var labelText = 'Light travel time to ' + obj.name;
   ctx.font = 'bold 12px Space Mono, SF Mono, Menlo, monospace';
   var timeW = ctx.measureText(timeStr).width;
@@ -5382,7 +5563,7 @@ function drawLightPulse3D(ts) {
   }
 
   // Info box
-  var sw = W / devicePixelRatio;
+  var sw = W / dpr;
   var travelYears = lightPulse.travelTimeLy * ease;
   var timeStr = formatLightTravelElapsed(travelYears);
   var labelText = 'Light travel time to ' + obj.name;
@@ -5505,6 +5686,52 @@ function showInfo(obj) {
     pulseBtn.addEventListener('click', function() { startLightPulse(obj); });
     body.appendChild(pulseBtn);
   }
+
+  // Gallery: large stacked images with detailed captions
+  if (obj.gallery && obj.gallery.length) {
+    var galDiv = document.createElement('div');
+    galDiv.style.cssText = 'margin-top:20px;border-top:1px solid #1e1e30;padding-top:16px';
+    for (var gi = 0; gi < obj.gallery.length; gi++) {
+      (function(item) {
+        var card = document.createElement('div');
+        card.style.cssText = 'margin-bottom:16px';
+        var img = document.createElement('img');
+        img.src = item.src;
+        img.alt = item.title;
+        img.style.cssText = 'width:100%;border-radius:6px;border:1px solid #2a2a44;display:block;cursor:pointer';
+        img.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var overlay = document.createElement('div');
+          overlay.className = 'img-lightbox';
+          var fullImg = document.createElement('img');
+          fullImg.src = item.src;
+          fullImg.alt = item.title;
+          overlay.appendChild(fullImg);
+          var lbCap = document.createElement('div');
+          lbCap.className = 'img-lightbox-caption';
+          lbCap.textContent = item.title;
+          overlay.appendChild(lbCap);
+          overlay.addEventListener('click', function() { document.body.removeChild(overlay); });
+          document.body.appendChild(overlay);
+        });
+        card.appendChild(img);
+        var title = document.createElement('div');
+        title.style.cssText = 'font-size:12px;font-weight:600;color:#b8c8e0;margin-top:6px';
+        title.textContent = item.title;
+        card.appendChild(title);
+        var txt = document.createElement('div');
+        txt.style.cssText = 'font-size:11px;line-height:1.6;color:#8898b0;margin-top:4px';
+        txt.textContent = item.text;
+        card.appendChild(txt);
+        var cred = document.createElement('div');
+        cred.style.cssText = 'font-size:9px;color:#5a5a78;font-style:italic;margin-top:2px';
+        cred.textContent = 'NASA/ESA/CSA/STScI';
+        card.appendChild(cred);
+        galDiv.appendChild(card);
+      })(obj.gallery[gi]);
+    }
+    body.appendChild(galDiv);
+  }
 }
 
 function showRegionInfo(r) {
@@ -5526,7 +5753,7 @@ function showRegionInfo(r) {
 var _lastScaleLabel = '', _lastScaleTime = '', _lastZoomLabel = '';
 function updateUI() {
   var vr = getViewRadius();
-  var sw = W / devicePixelRatio, sh = H / devicePixelRatio;
+  var sw = W / dpr, sh = H / dpr;
   var scaleBarLy = (120 / Math.min(sw, sh)) * 2 * vr;
   var newScale = formatViewRadius(scaleBarLy);
   var newTime = lightTravelTime(scaleBarLy);
@@ -6131,7 +6358,8 @@ var glossaryObjMap = {
   "Exoplanets": "Proxima Centauri b",
   "Dark Matter Halos": "Andromeda (M31)",
   "Observable Universe": "Great Attractor",
-  "Constellations": "Betelgeuse"
+  "Constellations": "Betelgeuse",
+  "Lagrange Points": "L2"
 };
 
 function makeGotoButton(objName) {
@@ -6215,10 +6443,71 @@ function makeEntryEl(entry, idx) {
   longText.className = 'glossary-entry-long-text';
   longText.textContent = entry.long;
   longWrap.appendChild(longText);
+
+  // Image strip (lazy-loaded on expand)
+  if (entry.images && entry.images.length) {
+    var strip = document.createElement('div');
+    strip.className = 'glossary-img-strip';
+    for (var ii = 0; ii < entry.images.length; ii++) {
+      (function(imgData) {
+        var thumb = document.createElement('div');
+        thumb.className = 'glossary-img-thumb';
+        var img = document.createElement('img');
+        img.className = 'glossary-img';
+        img.alt = imgData.caption;
+        img.dataset.src = imgData.src;
+        thumb.appendChild(img);
+        var cap = document.createElement('div');
+        cap.className = 'glossary-img-caption';
+        cap.textContent = imgData.caption;
+        thumb.appendChild(cap);
+        if (imgData.credit) {
+          var cred = document.createElement('div');
+          cred.className = 'glossary-img-credit';
+          cred.textContent = imgData.credit;
+          thumb.appendChild(cred);
+        }
+        thumb.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var overlay = document.createElement('div');
+          overlay.className = 'img-lightbox';
+          var fullImg = document.createElement('img');
+          fullImg.src = imgData.src;
+          fullImg.alt = imgData.caption;
+          overlay.appendChild(fullImg);
+          var lbCap = document.createElement('div');
+          lbCap.className = 'img-lightbox-caption';
+          lbCap.textContent = imgData.caption;
+          overlay.appendChild(lbCap);
+          if (imgData.credit) {
+            var lbCred = document.createElement('div');
+            lbCred.className = 'img-lightbox-credit';
+            lbCred.textContent = imgData.credit;
+            overlay.appendChild(lbCred);
+          }
+          overlay.addEventListener('click', function() {
+            document.body.removeChild(overlay);
+          });
+          document.body.appendChild(overlay);
+        });
+        strip.appendChild(thumb);
+      })(entry.images[ii]);
+    }
+    longWrap.appendChild(strip);
+  }
+
   el.appendChild(longWrap);
 
   header.addEventListener('click', function() {
+    var wasExpanded = el.classList.contains('expanded');
     el.classList.toggle('expanded');
+    if (!wasExpanded) {
+      var imgs = el.querySelectorAll('img[data-src]');
+      for (var li = 0; li < imgs.length; li++) {
+        imgs[li].src = imgs[li].dataset.src;
+        imgs[li].removeAttribute('data-src');
+      }
+    }
   });
 
   return el;
@@ -6914,6 +7203,7 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   var cancelBtn = document.getElementById('fb-cancel');
   var sendBtn = document.getElementById('fb-send');
   var nameInput = document.getElementById('fb-name');
+  var contactInput = document.getElementById('fb-contact');
   var msgInput = document.getElementById('fb-msg');
   var statusEl = document.getElementById('fb-status');
 
@@ -6927,6 +7217,7 @@ document.getElementById('docs-btn').addEventListener('click', function() {
     popover.classList.remove('open');
     overlay.classList.remove('open');
     nameInput.value = '';
+    contactInput.value = '';
     msgInput.value = '';
     statusEl.textContent = '';
     sendBtn.disabled = false;
@@ -6944,7 +7235,9 @@ document.getElementById('docs-btn').addEventListener('click', function() {
     statusEl.style.color = '#7a7a96';
     statusEl.textContent = 'Sending...';
 
+    var contact = contactInput.value.trim();
     var payload = { name: nameInput.value.trim() || 'Anonymous', message: msg };
+    if (contact) payload.contact = contact;
 
     fetch('/api/feedback', {
       method: 'POST',
@@ -6979,6 +7272,14 @@ function updateHash() {
       hash += '&px=' + state.panX.toExponential(6) + '&py=' + state.panY.toExponential(6);
     }
     if (state.selected) hash += '&obj=' + encodeURIComponent(state.selected.name);
+    if (state.mode3d) {
+      hash += '&m=3d';
+      hash += '&cx=' + cam3d.px.toExponential(6) + '&cy=' + cam3d.py.toExponential(6) + '&cz=' + cam3d.pz.toExponential(6);
+      hash += '&cyw=' + cam3d.yaw.toFixed(4) + '&cpt=' + cam3d.pitch.toFixed(4);
+      if (orbitMode.active) {
+        hash += '&orb=1&od=' + orbitMode.orbitDist.toExponential(4) + '&fn=' + encodeURIComponent(orbitMode.focalName);
+      }
+    }
     if (window.location.hash !== '#' + hash) {
       history.replaceState(null, '', '#' + hash);
     }
@@ -7014,6 +7315,25 @@ function readHash() {
           state.panX = _hashObj.x;
           state.panY = _hashObj.y;
         }
+    }
+  }
+  if (params.m === '3d' && !state.mode3d) {
+    state.mode3d = true;
+    if (params.cx) cam3d.px = parseFloat(params.cx) || 0;
+    if (params.cy) cam3d.py = parseFloat(params.cy) || 0;
+    if (params.cz) cam3d.pz = parseFloat(params.cz) || 0;
+    if (params.cyw) cam3d.yaw = parseFloat(params.cyw) || 0;
+    if (params.cpt) cam3d.pitch = parseFloat(params.cpt) || 0;
+    if (params.orb === '1') {
+      orbitMode.active = true;
+      if (params.od) orbitMode.orbitDist = parseFloat(params.od) || 0.01;
+      if (params.fn) orbitMode.focalName = params.fn;
+      var fObj = findObject(params.fn);
+      if (fObj) {
+        orbitMode.focalX = fObj.wx3d || fObj.x || 0;
+        orbitMode.focalY = fObj.wy3d || fObj.y || 0;
+        orbitMode.focalZ = fObj.wz3d || 0;
+      }
     }
   }
   state.dirty = true;

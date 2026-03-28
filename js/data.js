@@ -359,6 +359,44 @@ var objects = [
     facts: [["Distance from Pluto", "19,571 km"], ["Orbital period", "6.39 days"], ["Diameter", "1,212 km"]],
     desc: "Pluto's largest moon, so big relative to Pluto that they orbit a common center of gravity above Pluto's surface. The pair are sometimes called a double dwarf planet. New Horizons revealed canyons, mountains, and a dark polar cap nicknamed Mordor." },
 
+  // Lagrange Points (positions computed dynamically in updatePlanetPositions)
+  { name: "L1", x: AU_IN_LY * 0.99, y: 0, dist: AU_IN_LY, radius: 0.6, color: "#5588aa", glow: "#5588aa22",
+    type: "Lagrange point", category: "solar", visRange: [0, 0.01],
+    facts: [["Location", "~1.5M km sunward of Earth"], ["Spacecraft", "SOHO, ACE, DSCOVR"], ["Stability", "Unstable -- requires station-keeping"]],
+    desc: "The first Sun-Earth Lagrange point, where gravity and orbital mechanics balance. Spacecraft here have an uninterrupted view of the Sun, making L1 ideal for solar observation and space weather monitoring." },
+  { name: "L2", x: AU_IN_LY * 1.01, y: 0, dist: AU_IN_LY, radius: 0.6, color: "#5588aa", glow: "#5588aa22",
+    type: "Lagrange point", category: "solar", visRange: [0, 0.01],
+    facts: [["Location", "~1.5M km anti-sunward of Earth"], ["Spacecraft", "JWST, Gaia, Planck, Euclid"], ["Stability", "Unstable -- requires station-keeping"]],
+    desc: "The second Sun-Earth Lagrange point, behind Earth from the Sun. JWST orbits here, where Earth, Sun, and Moon are all on one side, providing a stable thermal environment and unobstructed deep-space view." },
+  { name: "L3", x: -AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 0.5, color: "#5588aa", glow: "#5588aa22",
+    type: "Lagrange point", category: "solar", visRange: [0, 0.005],
+    facts: [["Location", "Opposite side of Sun from Earth"], ["Stability", "Unstable"], ["Note", "No spacecraft stationed here"]],
+    desc: "On the far side of the Sun from Earth -- the stuff of science fiction ('Counter-Earth'). In reality, slightly unstable and of limited practical use. No spacecraft has ever been sent here." },
+  { name: "L4", x: AU_IN_LY * 0.5, y: AU_IN_LY * 0.866, dist: AU_IN_LY, radius: 0.5, color: "#5588aa", glow: "#5588aa22",
+    type: "Lagrange point", category: "solar", visRange: [0, 0.01],
+    facts: [["Location", "60\u00b0 ahead of Earth in orbit"], ["Stability", "Stable (with Coriolis forces)"], ["Asteroids", "Earth Trojan 2010 TK7"]],
+    desc: "60 degrees ahead of Earth in its orbit. One of two gravitationally stable Lagrange points where objects can persist indefinitely. Earth's first Trojan asteroid, 2010 TK7, was discovered here in 2010." },
+  { name: "L5", x: AU_IN_LY * 0.5, y: -AU_IN_LY * 0.866, dist: AU_IN_LY, radius: 0.5, color: "#5588aa", glow: "#5588aa22",
+    type: "Lagrange point", category: "solar", visRange: [0, 0.01],
+    facts: [["Location", "60\u00b0 behind Earth in orbit"], ["Stability", "Stable (with Coriolis forces)"], ["Note", "Proposed site for future space habitats"]],
+    desc: "60 degrees behind Earth in its orbit. Like L4, gravitationally stable. The L5 Society (now part of the National Space Society) once advocated building space colonies at this point." },
+
+  // JWST (position computed dynamically at L2 in updatePlanetPositions)
+  { name: "JWST", x: AU_IN_LY * 1.01, y: 0, dist: AU_IN_LY, radius: 1.2, color: "#ddaa44", glow: "#ddaa4444",
+    type: "Space telescope", category: "solar", physRadius: 1.4e-12, visRange: [0, 0.01],
+    facts: [["Launched", "December 25, 2021"], ["Mirror", "6.5 m, 18 gold hexagonal segments"], ["Location", "Sun-Earth L2 (~1.5M km from Earth)"], ["Wavelength", "0.6--28.3 \u00b5m (near- to mid-infrared)"], ["Sunshield", "Tennis court-sized, 5 layers"]],
+    desc: "The James Webb Space Telescope orbits the Sun-Earth L2 point, using a 6.5-meter gold-coated mirror to peer deeper into the universe's past than any telescope before it. Its infrared vision reveals the first galaxies, stellar nurseries hidden in dust, and atmospheres of exoplanets.",
+    gallery: [
+      { src: "img/jwst-deep-field.jpg", title: "First Deep Field",
+        text: "Released July 12, 2022 -- humanity's deepest infrared view of the universe. The galaxy cluster SMACS 0723 acts as a gravitational lens, bending light from galaxies behind it that formed just 600 million years after the Big Bang. Thousands of galaxies appear in a patch of sky the size of a grain of sand held at arm's length." },
+      { src: "img/jwst-pillars.jpg", title: "Pillars of Creation",
+        text: "JWST's near-infrared camera cuts through the dust of the Eagle Nebula to reveal newborn stars hidden inside these towering columns of gas. The pillars are about 5 light-years tall. Some protostars are just a few hundred thousand years old -- cosmic infants compared to our 4.6-billion-year-old Sun." },
+      { src: "img/jwst-carina.jpg", title: "Cosmic Cliffs",
+        text: "The edge of a stellar nursery in the Carina Nebula, 7,600 light-years away. Intense UV radiation from young massive stars above the frame is sculpting these cliffs of gas and dust, triggering new star formation along the boundary. Hundreds of previously hidden jets and outflows from infant stars are visible for the first time." },
+      { src: "img/jwst-saturn.jpg", title: "Saturn in Near-Infrared",
+        text: "At 2.1 microns methane absorbs almost all sunlight, making Saturn's atmosphere appear dark while the rings -- mostly water ice with little methane -- shine brilliantly. Three of Saturn's moons are visible at left. This view is impossible from Earth's surface because our atmosphere blocks these wavelengths." }
+    ] },
+
   // Spacecraft
   { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
     type: "Spacecraft", category: "solar", visRange: [0, 4],
@@ -883,6 +921,17 @@ var glossaryData = [
   { name: "Neptune", cat: "Solar System", color: "#4466cc", short: "The windiest world", long: "The farthest planet from the Sun, Neptune hosts the fastest winds in the solar system at up to 2,100 km/h. Its largest moon Triton orbits backward, suggesting it was captured from the Kuiper Belt. Neptune was the first planet found by mathematical prediction rather than direct observation, discovered in 1846." },
   { name: "Pluto", cat: "Solar System", color: "#ccbbaa", short: "The demoted world", long: "Once the ninth planet, Pluto was reclassified as a dwarf planet in 2006 when the International Astronomical Union redefined what constitutes a planet. Orbiting in the Kuiper Belt at an average of 39.5 AU, it was visited by NASA's New Horizons spacecraft in 2015, revealing a world of nitrogen ice plains, mountains of water ice, and a thin atmosphere." },
   { name: "Charon", cat: "Solar System", color: "#aa9988", short: "Pluto's giant companion", long: "At 1,212 km across, Charon is more than half Pluto's diameter, making it the largest moon relative to its parent body in the solar system. The pair orbit each other around a point in space above Pluto's surface, leading some to call them a double dwarf planet. New Horizons revealed a surprisingly complex world with canyons, mountains, and a dark reddish polar cap informally named Mordor Macula." },
+
+  // Lagrange Points & JWST
+  { name: "Lagrange Points", cat: "Concepts", color: "#5588aa", short: "Gravitational balance points", long: "Five positions in any two-body orbital system where a small object can maintain a stable position relative to both large bodies. L1, L2, and L3 lie along the line connecting the two bodies and are unstable (requiring station-keeping). L4 and L5 form equilateral triangles with the two bodies and are stable. The Sun-Earth Lagrange points host major space observatories: SOHO at L1, JWST at L2." },
+  { name: "JWST", cat: "Solar System", color: "#ddaa44", short: "Infrared eye on the universe",
+    long: "The James Webb Space Telescope launched on December 25, 2021 and orbits the Sun-Earth L2 point, 1.5 million km from Earth. Its 6.5-meter primary mirror -- 18 gold-coated hexagonal beryllium segments -- collects infrared light with unprecedented sensitivity. A tennis court-sized sunshield keeps the instruments at -233\u00b0C. JWST has revealed the earliest galaxies ever seen, detailed atmospheric compositions of exoplanets, and star-forming regions in stunning clarity.",
+    images: [
+      { src: "img/jwst-deep-field.jpg", caption: "First Deep Field (SMACS 0723)", credit: "NASA/ESA/CSA/STScI" },
+      { src: "img/jwst-pillars.jpg", caption: "Pillars of Creation (Eagle Nebula)", credit: "NASA/ESA/CSA/STScI" },
+      { src: "img/jwst-carina.jpg", caption: "Carina Nebula 'Cosmic Cliffs'", credit: "NASA/ESA/CSA/STScI" },
+      { src: "img/jwst-saturn.jpg", caption: "Saturn in near-infrared", credit: "NASA/ESA/CSA/STScI" }
+    ] },
 
   // Spacecraft
   { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
