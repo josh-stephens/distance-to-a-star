@@ -12,6 +12,16 @@ var ORBIT_RADIUS_MULT = 5;    // orbit at 5× physRadius — object fills ~1/3 o
 var MIN_LOG = Math.log10(0.000000005); // ~0.0003 AU, close enough to see planet surface details
 var MAX_LOG = Math.log10(400 * MLY);
 
+// ─── Galactic dynamics ────────────────────────────────────────────────
+
+var GAL_CENTER_X = -26000;          // Sgr A* x-position in ly
+var GAL_CENTER_Y = 0;               // Sgr A* y-position in ly
+var GAL_V_CIRC = 7.33e-4;           // flat rotation curve: 220 km/s in ly/yr
+var GAL_PATTERN_SPEED = 9.07e-7;    // spiral arm pattern angular speed (rad/yr) — 28 km/s/kpc
+var GAL_Z_PERIOD = 64e6;            // Sun's vertical oscillation period (years)
+var GAL_SUN_Z = 65;                 // Sun's current height above midplane (ly)
+var GAL_SUN_Z_AMP = 250;            // Sun's vertical oscillation amplitude (ly)
+
 // ─── Effects settings ──────────────────────────────────────────────────
 
 var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: true, occlusion: false };
@@ -229,6 +239,20 @@ var properMotionData = {
   'Mizar':               { pmRA: 121.23,   pmDec: -22.01,  rv: -6.3 },
   'Alkaid':              { pmRA: -121.23,  pmDec: -15.56,  rv: -10.9 }
 };
+
+// Galaxy peculiar velocities (vx, vy, vz in ly/yr)
+// Converted from km/s: 1 km/s ≈ 1.057e-4 ly/yr
+var galaxyMotion = {
+  'Andromeda (M31)':          { vx: 0.00580, vy: 0.00773, vz: 0.00290 },
+  'Triangulum (M33)':         { vx: 0.00200, vy: 0.00350, vz: 0.00100 },
+  'Large Magellanic Cloud':   { vx: -0.01800, vy: 0.02300, vz: 0.01200 },
+  'Small Magellanic Cloud':   { vx: -0.00900, vy: 0.01100, vz: -0.01500 },
+  'Sagittarius Dwarf':        { vx: 0.01400, vy: -0.00300, vz: -0.01000 },
+  'Canis Major Dwarf':        { vx: 0.00500, vy: 0.01200, vz: -0.00300 }
+};
+
+// Hubble constant in ly/yr per ly (H0 ≈ 70 km/s/Mpc)
+var HUBBLE_RATE = 7.2e-12;
 
 // ─── Time state ──────────────────────────────────────────────────────
 
