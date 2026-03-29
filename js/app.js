@@ -1662,30 +1662,46 @@ function initObjects3D() {
 // Update stellar positions based on proper motion and radial velocity
 function updateStellarPositions() {
   var years = getSimDaysJ2000() / 365.25;
-  // Clamp to +/-50,000 yr: linear proper motion breaks at longer timescales
-  // (stars need galactic orbital motion for Myr+ accuracy — see #70)
-  var clampedYears = Math.max(-50000, Math.min(50000, years));
+  var absYears = Math.abs(years);
+
   for (var i = 0; i < objects.length; i++) {
     var o = objects[i];
+    if (o.category === 'solar') continue;
+    if (o._galR === undefined) continue;
+
+    // Galactic rotation: circular orbit around galactic center
+    var galAngle = o._galAngle0 + (years / o._galPeriod) * Math.PI * 2;
+    var gx = GAL_CENTER_X + o._galR * Math.cos(galAngle);
+    var gy = GAL_CENTER_Y + o._galR * Math.sin(galAngle);
+
+    // Vertical oscillation
+    var gz = o._zAmp * Math.sin(Math.PI * 2 * years / o._zPeriod + o._zPhase0);
+
+    // Proper motion blending: add linear PM delta for short timescales
+    var pmDx = 0, pmDy = 0, pmDz = 0;
     var pm = properMotionData[o.name];
-    if (!pm || o._baseRA === undefined) continue;
+    if (pm && o._baseRA !== undefined && absYears < 50000) {
+      var blend = absYears < 10000 ? 1.0 : (50000 - absYears) / 40000;
+      var newRA = o._baseRA + (pm.pmRA / 3600000 / Math.cos(o._baseDec * DEG2RAD)) * years;
+      var newDec = o._baseDec + (pm.pmDec / 3600000) * years;
+      var rvLyPerYr = pm.rv * 3.156e7 / 9.461e12;
+      var newDist = Math.max(0.01, o._baseDist + rvLyPerYr * years);
+      var cPM = raDecToXYZ(newRA, newDec, newDist);
+      var c0 = raDecToXYZ(o._baseRA, o._baseDec, o._baseDist);
+      pmDx = (cPM.x - c0.x) * blend;
+      pmDy = (cPM.y - c0.y) * blend;
+      pmDz = (cPM.z - c0.z) * blend;
+    }
 
-    // Apply proper motion (linear, clamped)
-    var newRA = o._baseRA + (pm.pmRA / 3600000 / Math.cos(o._baseDec * DEG2RAD)) * clampedYears;
-    var newDec = o._baseDec + (pm.pmDec / 3600000) * clampedYears;
-    // Radial velocity: rv km/s -> ly/yr
-    var rvLyPerYr = pm.rv * 3.156e7 / 9.461e12;
-    var newDist = Math.max(0.01, o._baseDist + rvLyPerYr * clampedYears);
-
-    // Update 3D position
-    var c = raDecToXYZ(newRA, newDec, newDist);
-    o.wx3d = c.x; o.wy3d = c.y; o.wz3d = c.z;
-
-    // Update 2D position (delta from J2000 baseline)
-    var c0 = raDecToXYZ(o._baseRA, o._baseDec, o._baseDist);
-    o.x = o._baseX + (c.x - c0.x);
-    o.y = o._baseY + (c.y - c0.y);
-    o.dist = newDist;
+    // Combine: galactic orbit delta from baseline + PM blend
+    var baseDx = gx - o._galBaseX;
+    var baseDy = gy - o._galBaseY;
+    o.x = o._galBaseX + baseDx + pmDx;
+    o.y = o._galBaseY + baseDy + pmDy;
+    o.wx3d = o.x;
+    o.wy3d = o.y;
+    o.wz3d = gz + pmDz;
+    o.dist = Math.sqrt(o.x * o.x + o.y * o.y);
   }
 }
 
