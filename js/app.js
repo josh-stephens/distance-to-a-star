@@ -85,6 +85,49 @@ function buildAsteroidCache() {
   }
 }
 
+var _galParticlesLocal = [];
+var _galParticlesGlobal = [];
+
+function buildGalacticParticleCache() {
+  _galParticlesLocal = [];
+  _galParticlesGlobal = [];
+
+  var sunGalR = Math.sqrt(GAL_CENTER_X * GAL_CENTER_X + GAL_CENTER_Y * GAL_CENTER_Y);
+  var sunGalAngle = Math.atan2(-GAL_CENTER_Y, -GAL_CENTER_X);
+
+  // Local particles (200): within 500 ly of Sun
+  for (var li = 0; li < 200; li++) {
+    var lh = hash3(li, 42);
+    var localR = sunGalR + (lh.a - 0.5) * 1000;
+    var localAngle = sunGalAngle + (lh.b - 0.5) * (1000 / sunGalR);
+    var localZ = (lh.c - 0.5) * 400;
+    _galParticlesLocal.push({
+      galR: Math.max(500, localR),
+      angle0: localAngle,
+      z: localZ,
+      period: galacticPeriod(Math.max(500, localR)),
+      brightness: 0.1 + lh.a * 0.35,
+      size: 0.3 + lh.b * 0.5
+    });
+  }
+
+  // Galactic particles (800): full disk
+  for (var gi = 0; gi < 800; gi++) {
+    var gh = hash3(gi, 77);
+    var diskR = 1000 + gh.a * 49000;
+    var diskAngle = gh.b * Math.PI * 2;
+    var diskZ = (gh.c - 0.5) * 1000 * (diskR > 30000 ? 1.5 : 1);
+    _galParticlesGlobal.push({
+      galR: diskR,
+      angle0: diskAngle,
+      z: diskZ,
+      period: galacticPeriod(diskR),
+      brightness: 0.08 + gh.a * 0.3,
+      size: 0.3 + gh.b * 0.4
+    });
+  }
+}
+
 // ─── Slider / View helpers ──────────────────────────────────────────
 
 function viewRadiusToSlider(vr) {
@@ -9058,6 +9101,7 @@ buildObjectNameIndex();
 initObjects3D();
 buildOrbitCache();
 buildAsteroidCache();
+buildGalacticParticleCache();
 initCam3dPresets();
 buildTourDropdown();
 buildGlossary();
