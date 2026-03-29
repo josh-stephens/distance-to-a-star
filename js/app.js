@@ -2512,6 +2512,76 @@ function drawGalacticParticles() {
   ctx.restore();
 }
 
+// ─── Draw: 3D galactic density field particles ────────────────────────
+
+function drawGalacticParticles3D() {
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  if (camDist > 250000) return;
+  var sw = W / dpr, sh = H / dpr;
+  var years = getSimDaysJ2000() / 365.25;
+
+  var armB = 0.22;
+  var armMaxTheta = 3.0 * Math.PI;
+  var armA = 52500 / Math.exp(armB * armMaxTheta);
+  var numArms = 4;
+  var patternAngle = GAL_PATTERN_SPEED * years;
+
+  ctx.save();
+
+  if (camDist < 2000) {
+    var localAlpha3 = camDist < 1000 ? 0.5 : 0.5 * (2000 - camDist) / 1000;
+    if (localAlpha3 > 0.01) {
+      for (var li = 0; li < _galParticlesLocal.length; li++) {
+        var lp = _galParticlesLocal[li];
+        var lAngle = lp.angle0 + (years / lp.period) * Math.PI * 2;
+        var lwx = GAL_CENTER_X + lp.galR * Math.cos(lAngle);
+        var lwy = GAL_CENTER_Y + lp.galR * Math.sin(lAngle);
+        var sp = worldToScreen3D(lwx, lwy, lp.z);
+        if (!sp) continue;
+        if (sp.x < -10 || sp.x > sw + 10 || sp.y < -10 || sp.y > sh + 10) continue;
+        ctx.globalAlpha = lp.brightness * localAlpha3;
+        ctx.fillStyle = '#dddccc';
+        ctx.fillRect(sp.x - lp.size * 0.5, sp.y - lp.size * 0.5, lp.size, lp.size);
+      }
+    }
+  }
+
+  if (camDist > 1000) {
+    var galAlpha3 = camDist > 2000 ? 0.4 : 0.4 * (camDist - 1000) / 1000;
+    if (camDist > 200000) galAlpha3 *= (250000 - camDist) / 50000;
+    if (galAlpha3 > 0.01) {
+      for (var ggi = 0; ggi < _galParticlesGlobal.length; ggi++) {
+        var gp = _galParticlesGlobal[ggi];
+        var gAngle = gp.angle0 + (years / gp.period) * Math.PI * 2;
+        var gwx = GAL_CENTER_X + gp.galR * Math.cos(gAngle);
+        var gwy = GAL_CENTER_Y + gp.galR * Math.sin(gAngle);
+        var sp3 = worldToScreen3D(gwx, gwy, gp.z);
+        if (!sp3) continue;
+        if (sp3.x < -10 || sp3.x > sw + 10 || sp3.y < -10 || sp3.y > sh + 10) continue;
+
+        var bright = gp.brightness;
+        var particleTheta = Math.log(Math.max(1, gp.galR / armA)) / armB;
+        var particleArmAngle = gAngle - particleTheta;
+        for (var ai = 0; ai < numArms; ai++) {
+          var armOff = (ai / numArms) * Math.PI * 2 + 0.82 + patternAngle;
+          var diff = particleArmAngle - armOff;
+          diff = diff - Math.floor((diff + Math.PI) / (Math.PI * 2)) * Math.PI * 2;
+          if (Math.abs(diff) < 0.26) { bright *= 2.5; break; }
+          else if (Math.abs(diff) < 0.44) { bright *= 1.5; break; }
+        }
+
+        ctx.globalAlpha = Math.min(1, bright) * galAlpha3;
+        ctx.fillStyle = bright > 0.3 ? '#dde0ee' : '#bbbbaa';
+        var sz = gp.size * (bright > 0.3 ? 1.3 : 1);
+        ctx.fillRect(sp3.x - sz * 0.5, sp3.y - sz * 0.5, sz, sz);
+      }
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 // ─── Draw: 3D spiral arms ──────────────────────────────────────────────
 
 function drawSpiralArms3D() {
@@ -5396,6 +5466,7 @@ function draw3D(ts) {
 
   // Draw Milky Way spiral arms in 3D
   drawSpiralArms3D();
+  drawGalacticParticles3D();
 
   // Draw orbital planes behind objects
   drawOrbitalPlanes3D();
