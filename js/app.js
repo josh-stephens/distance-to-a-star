@@ -1603,6 +1603,11 @@ function raDecToXYZ(raDeg, decDeg, dist) {
   };
 }
 
+function galacticPeriod(galR) {
+  if (galR < 100) return 1e12; // effectively stationary for objects near galactic center
+  return (2 * Math.PI * galR) / GAL_V_CIRC; // years
+}
+
 function initObjects3D() {
   // Compute initial Keplerian positions for planets
   updatePlanetPositions();
@@ -1634,6 +1639,23 @@ function initObjects3D() {
       o._baseX = o.x;
       o._baseY = o.y;
     }
+  }
+  // Compute galactic orbital parameters for all non-solar objects
+  for (var gi = 0; gi < objects.length; gi++) {
+    var go = objects[gi];
+    if (go.category === 'solar') continue; // planets use Keplerian
+    var gdx = go.x - GAL_CENTER_X;
+    var gdy = go.y - GAL_CENTER_Y;
+    go._galR = Math.sqrt(gdx * gdx + gdy * gdy);
+    go._galAngle0 = Math.atan2(gdy, gdx);
+    go._galPeriod = galacticPeriod(go._galR);
+    go._galBaseX = go.x;
+    go._galBaseY = go.y;
+    // Vertical oscillation: derive amplitude from current z-position
+    go._galZ0 = go.wz3d || 0;
+    go._zAmp = Math.max(Math.abs(go._galZ0), 50);
+    go._zPeriod = GAL_Z_PERIOD * Math.sqrt(go._galR / 26000);
+    go._zPhase0 = go._galZ0 >= 0 ? Math.asin(Math.min(1, go._galZ0 / go._zAmp)) : Math.asin(Math.max(-1, go._galZ0 / go._zAmp));
   }
 }
 
