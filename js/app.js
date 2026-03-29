@@ -106,8 +106,8 @@ function buildGalacticParticleCache() {
       angle0: localAngle,
       z: localZ,
       period: galacticPeriod(Math.max(500, localR)),
-      brightness: 0.1 + lh.a * 0.35,
-      size: 0.3 + lh.b * 0.5
+      brightness: 0.25 + lh.a * 0.5,
+      size: 0.6 + lh.b * 1.0
     });
   }
 
@@ -122,8 +122,8 @@ function buildGalacticParticleCache() {
       angle0: diskAngle,
       z: diskZ,
       period: galacticPeriod(diskR),
-      brightness: 0.08 + gh.a * 0.3,
-      size: 0.3 + gh.b * 0.4
+      brightness: 0.2 + gh.a * 0.45,
+      size: 0.5 + gh.b * 0.8
     });
   }
 }
@@ -2461,7 +2461,7 @@ function drawGalacticParticles() {
   ctx.save();
 
   if (vr < 2000) {
-    var localAlpha = vr < 1000 ? 0.5 : 0.5 * (2000 - vr) / 1000;
+    var localAlpha = vr < 1000 ? 0.7 : 0.7 * (2000 - vr) / 1000;
     if (_perfReduced && (_perfFrameCount & 1)) localAlpha = 0;
     if (localAlpha > 0.01) {
       for (var li = 0; li < _galParticlesLocal.length; li++) {
@@ -2479,7 +2479,7 @@ function drawGalacticParticles() {
   }
 
   if (vr > 1000) {
-    var galAlpha = vr > 2000 ? 0.4 : 0.4 * (vr - 1000) / 1000;
+    var galAlpha = vr > 2000 ? 0.6 : 0.6 * (vr - 1000) / 1000;
     if (vr > 200000) galAlpha *= (250000 - vr) / 50000;
     if (_perfReduced && (_perfFrameCount & 1)) galAlpha = 0;
     if (galAlpha > 0.01) {
@@ -2531,7 +2531,7 @@ function drawGalacticParticles3D() {
   ctx.save();
 
   if (camDist < 2000) {
-    var localAlpha3 = camDist < 1000 ? 0.5 : 0.5 * (2000 - camDist) / 1000;
+    var localAlpha3 = camDist < 1000 ? 0.7 : 0.7 * (2000 - camDist) / 1000;
     if (localAlpha3 > 0.01) {
       for (var li = 0; li < _galParticlesLocal.length; li++) {
         var lp = _galParticlesLocal[li];
@@ -2549,7 +2549,7 @@ function drawGalacticParticles3D() {
   }
 
   if (camDist > 1000) {
-    var galAlpha3 = camDist > 2000 ? 0.4 : 0.4 * (camDist - 1000) / 1000;
+    var galAlpha3 = camDist > 2000 ? 0.6 : 0.6 * (camDist - 1000) / 1000;
     if (camDist > 200000) galAlpha3 *= (250000 - camDist) / 50000;
     if (galAlpha3 > 0.01) {
       for (var ggi = 0; ggi < _galParticlesGlobal.length; ggi++) {
