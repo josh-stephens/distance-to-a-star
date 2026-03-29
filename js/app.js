@@ -7721,7 +7721,9 @@ function buildEffectsPanel() {
     { label: '100 yr/sec', val: 3155760000 },
     { label: '1 kyr/sec', val: 31557600000 },
     { label: '100 kyr/sec', val: 3155760000000 },
-    { label: '1 Myr/sec', val: 31557600000000 }
+    { label: '1 Myr/sec', val: 31557600000000 },
+    { label: '10 Myr/sec', val: 315576000000000 },
+    { label: '100 Myr/sec', val: 3155760000000000 }
   ];
   for (var ti = 0; ti < timeSpeeds.length; ti++) {
     var topt = document.createElement('option');
