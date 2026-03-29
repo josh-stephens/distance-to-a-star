@@ -2431,7 +2431,9 @@ function drawGalaxies() {
     var fade = 1;
     if (vr < 5000) fade = (vr - 2000) / 3000;
     if (vr > 200000) fade = (250000 - vr) / 50000;
-    drawSpiralArms(-26000, 0, scale, 4, 52500, 0.82, Math.min(1, fade) * 0.4);
+    var galYears = getSimDaysJ2000() / 365.25;
+    var armRot = 0.82 + GAL_PATTERN_SPEED * galYears;
+    drawSpiralArms(-26000, 0, scale, 4, 52500, armRot, Math.min(1, fade) * 0.4);
   }
 
   // Andromeda spiral at local/cosmic scale (2 major arms, tilted ~77° to us)
@@ -2595,7 +2597,8 @@ function drawSpiralArms3D() {
   if (alpha < 0.01) return;
 
   var galCX = -26000, galCY = 0, galCZ = 0;
-  var numArms = 4, armRadius = 52500, rotation = 0.82;
+  var numArms = 4, armRadius = 52500;
+  var rotation = 0.82 + GAL_PATTERN_SPEED * (getSimDaysJ2000() / 365.25);
   var b = 0.22;
   var maxTheta = 3.0 * Math.PI;
   var a = armRadius / Math.exp(b * maxTheta);
