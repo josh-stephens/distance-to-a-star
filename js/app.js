@@ -1705,6 +1705,40 @@ function updateStellarPositions() {
   }
 }
 
+function updateGalaxyMotion() {
+  var years = getSimDaysJ2000() / 365.25;
+  if (Math.abs(years) < 1000) return;
+
+  for (var i = 0; i < objects.length; i++) {
+    var o = objects[i];
+    var gm = galaxyMotion[o.name];
+    if (gm) {
+      o.x = (o._galBaseX || o.x) + gm.vx * years;
+      o.y = (o._galBaseY || o.y) + gm.vy * years;
+      o.wx3d = o.x;
+      o.wy3d = o.y;
+      o.wz3d = (o._galZ0 || 0) + gm.vz * years;
+      o.dist = Math.sqrt(o.x * o.x + o.y * o.y);
+      continue;
+    }
+    if ((o.category === 'cosmic' || o.category === 'local') && o.dist > 5e6) {
+      var dx = o._galBaseX || o.x;
+      var dy = o._galBaseY || o.y;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 0) {
+        var hubbleV = HUBBLE_RATE * d;
+        var expansion = hubbleV * years;
+        var scale = 1 + expansion / d;
+        o.x = dx * scale;
+        o.y = dy * scale;
+        o.wx3d = o.x;
+        o.wy3d = o.y;
+        o.dist = d * scale;
+      }
+    }
+  }
+}
+
 function worldToScreen3D(wx, wy, wz) {
   var dx = wx - cam3d.px;
   var dy = wy - cam3d.py;
@@ -4908,6 +4942,7 @@ function draw2D(ts) {
   if (!simTime.paused && simTime.multiplier !== 0) {
     updatePlanetPositions();
     updateStellarPositions();
+    updateGalaxyMotion();
   }
   // 2D follow: keep pan centered on the followed object
   if (state.follow) {
@@ -5183,6 +5218,7 @@ function draw3D(ts) {
   if (!simTime.paused && simTime.multiplier !== 0) {
     updatePlanetPositions();
     updateStellarPositions();
+    updateGalaxyMotion();
     // Track orbit focal point to moving object
     if (orbitMode.active && !orbitMode.focalAnim.active) {
       var _fobj = findObject(orbitMode.focalName);
