@@ -242,13 +242,15 @@ var properMotionData = {
 
 // Galaxy peculiar velocities (vx, vy, vz in ly/yr)
 // Converted from km/s: 1 km/s ≈ 1.057e-4 ly/yr
+// Galaxy motion: 'approach' = radial approach speed in ly/yr (collision model)
+// 'orbit' = circular orbit around MW {dist, period} in ly and years
 var galaxyMotion = {
-  'Andromeda (M31)':          { vx: 0.00580, vy: 0.00773, vz: 0.00290 },
-  'Triangulum (M33)':         { vx: 0.00200, vy: 0.00350, vz: 0.00100 },
-  'Large Magellanic Cloud':   { vx: -0.01800, vy: 0.02300, vz: 0.01200 },
-  'Small Magellanic Cloud':   { vx: -0.00900, vy: 0.01100, vz: -0.01500 },
-  'Sagittarius Dwarf':        { vx: 0.01400, vy: -0.00300, vz: -0.01000 },
-  'Canis Major Dwarf':        { vx: 0.00500, vy: 0.01200, vz: -0.00300 }
+  'Andromeda (M31)':          { approach: 0.01160 },          // 110 km/s, merger in ~4.5 Gyr
+  'Triangulum (M33)':         { approach: 0.00465 },          // 44 km/s toward MW
+  'Large Magellanic Cloud':   { orbit: { dist: 163000, period: 1.5e9 } },
+  'Small Magellanic Cloud':   { orbit: { dist: 200000, period: 2.0e9 } },
+  'Sagittarius Dwarf':        { orbit: { dist: 70000,  period: 0.9e9 } },
+  'Canis Major Dwarf':        { orbit: { dist: 42000,  period: 0.6e9 } }
 };
 
 // Hubble constant in ly/yr per ly (H0 ≈ 70 km/s/Mpc)

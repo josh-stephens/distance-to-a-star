@@ -371,6 +371,7 @@ function lightenHex(hex, factor) {
 // Returns simulation time in days since J2000
 // Uses simDaysAtEpoch to avoid overflow at extreme multipliers (>3e12)
 function getSimDaysJ2000() {
+  if (simTime.paused) return simTime.simDaysAtEpoch;
   var elapsedRealDays = (Date.now() - simTime.epoch) / 86400000;
   return simTime.simDaysAtEpoch + elapsedRealDays * simTime.multiplier;
 }
@@ -1756,14 +1757,33 @@ function updateGalaxyMotion() {
     var o = objects[i];
     var gm = galaxyMotion[o.name];
     if (gm) {
-      o.x = (o._galBaseX || o.x) + gm.vx * years;
-      o.y = (o._galBaseY || o.y) + gm.vy * years;
+      var bx = o._galBaseX || o.x;
+      var by = o._galBaseY || o.y;
+
+      if (gm.orbit) {
+        // Satellite galaxies: circular orbit around MW center (0,0)
+        var orbAngle0 = Math.atan2(by, bx);
+        var orbAngle = orbAngle0 + (years / gm.orbit.period) * Math.PI * 2;
+        o.x = gm.orbit.dist * Math.cos(orbAngle);
+        o.y = gm.orbit.dist * Math.sin(orbAngle);
+      } else if (gm.approach) {
+        // Approaching galaxies: move toward MW, clamp at merger
+        var adx = bx, ady = by;
+        var ad = Math.sqrt(adx * adx + ady * ady);
+        if (ad > 0) {
+          var newDist = Math.max(0, ad - gm.approach * years);
+          var aScale = newDist / ad;
+          o.x = bx * aScale;
+          o.y = by * aScale;
+        }
+      }
+
       o.wx3d = o.x;
       o.wy3d = o.y;
-      o.wz3d = (o._galZ0 || 0) + gm.vz * years;
       o.dist = Math.sqrt(o.x * o.x + o.y * o.y);
       continue;
     }
+    // Cosmic-scale: Hubble flow
     if ((o.category === 'cosmic' || o.category === 'local') && o.dist > 5e6) {
       var dx = o._galBaseX || o.x;
       var dy = o._galBaseY || o.y;
@@ -1771,12 +1791,12 @@ function updateGalaxyMotion() {
       if (d > 0) {
         var hubbleV = HUBBLE_RATE * d;
         var expansion = hubbleV * years;
-        var scale = 1 + expansion / d;
-        o.x = dx * scale;
-        o.y = dy * scale;
+        var hScale = 1 + expansion / d;
+        o.x = dx * hScale;
+        o.y = dy * hScale;
         o.wx3d = o.x;
         o.wy3d = o.y;
-        o.dist = d * scale;
+        o.dist = d * hScale;
       }
     }
   }
