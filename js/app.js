@@ -2462,9 +2462,9 @@ function drawGalacticParticles() {
 
   if (vr < 2000) {
     var localAlpha = vr < 1000 ? 0.7 : 0.7 * (2000 - vr) / 1000;
-    if (_perfReduced && (_perfFrameCount & 1)) localAlpha = 0;
     if (localAlpha > 0.01) {
       for (var li = 0; li < _galParticlesLocal.length; li++) {
+        if (_perfReduced && (li & 1)) continue; // half particles on slow devices
         var lp = _galParticlesLocal[li];
         var lAngle = lp.angle0 + (years / lp.period) * Math.PI * 2;
         var lwx = GAL_CENTER_X + lp.galR * Math.cos(lAngle);
@@ -2481,9 +2481,9 @@ function drawGalacticParticles() {
   if (vr > 1000) {
     var galAlpha = vr > 2000 ? 0.6 : 0.6 * (vr - 1000) / 1000;
     if (vr > 200000) galAlpha *= (250000 - vr) / 50000;
-    if (_perfReduced && (_perfFrameCount & 1)) galAlpha = 0;
     if (galAlpha > 0.01) {
       for (var ggi = 0; ggi < _galParticlesGlobal.length; ggi++) {
+        if (_perfReduced && (ggi & 1)) continue; // half particles on slow devices
         var gp = _galParticlesGlobal[ggi];
         var gAngle = gp.angle0 + (years / gp.period) * Math.PI * 2;
         var gwx = GAL_CENTER_X + gp.galR * Math.cos(gAngle);
@@ -2534,6 +2534,7 @@ function drawGalacticParticles3D() {
     var localAlpha3 = camDist < 1000 ? 0.7 : 0.7 * (2000 - camDist) / 1000;
     if (localAlpha3 > 0.01) {
       for (var li = 0; li < _galParticlesLocal.length; li++) {
+        if (_perfReduced && (li & 1)) continue;
         var lp = _galParticlesLocal[li];
         var lAngle = lp.angle0 + (years / lp.period) * Math.PI * 2;
         var lwx = GAL_CENTER_X + lp.galR * Math.cos(lAngle);
@@ -2553,6 +2554,7 @@ function drawGalacticParticles3D() {
     if (camDist > 200000) galAlpha3 *= (250000 - camDist) / 50000;
     if (galAlpha3 > 0.01) {
       for (var ggi = 0; ggi < _galParticlesGlobal.length; ggi++) {
+        if (_perfReduced && (ggi & 1)) continue;
         var gp = _galParticlesGlobal[ggi];
         var gAngle = gp.angle0 + (years / gp.period) * Math.PI * 2;
         var gwx = GAL_CENTER_X + gp.galR * Math.cos(gAngle);
