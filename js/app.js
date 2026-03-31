@@ -1746,11 +1746,17 @@ function updateStellarPositions() {
     // 2D map positions (flat galactic plane projection)
     o.x = o._galBaseX + baseDx + pmDx;
     o.y = o._galBaseY + baseDy + pmDy;
-    // 3D positions: apply same delta to celestial sphere positions (from RA/Dec)
-    o.wx3d = o._galBase3dX + baseDx + pmDx;
-    o.wy3d = o._galBase3dY + baseDy + pmDy;
-    o.wz3d = (o._galBase3dZ || 0) + gz + pmDz;
-    o.dist = Math.sqrt(o.x * o.x + o.y * o.y);
+    // 3D positions: PM uses RA/Dec (correct 3D), galactic rotation as
+    // rotation around galactic z-axis (preserves celestial geometry)
+    var galDeltaAngle = (years / o._galPeriod) * Math.PI * 2;
+    var cosDA = Math.cos(galDeltaAngle), sinDA = Math.sin(galDeltaAngle);
+    var bx3 = o._galBase3dX - GAL_CENTER_X;
+    var by3 = o._galBase3dY - GAL_CENTER_Y;
+    o.wx3d = GAL_CENTER_X + bx3 * cosDA - by3 * sinDA + pmDx;
+    o.wy3d = GAL_CENTER_Y + bx3 * sinDA + by3 * cosDA + pmDy;
+    o.wz3d = (o._galBase3dZ || 0) + pmDz;
+    // dist: compute from 3D position (not 2D map coords)
+    o.dist = Math.sqrt(o.wx3d * o.wx3d + o.wy3d * o.wy3d + o.wz3d * o.wz3d);
   }
 }
 
