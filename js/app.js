@@ -1695,6 +1695,9 @@ function initObjects3D() {
     go._galPeriod = galacticPeriod(go._galR);
     go._galBaseX = go.x;
     go._galBaseY = go.y;
+    go._galBase3dX = go.wx3d;
+    go._galBase3dY = go.wy3d;
+    go._galBase3dZ = go.wz3d;
     // Vertical oscillation: derive amplitude from current z-position
     go._galZ0 = go.wz3d || 0;
     go._zAmp = Math.max(Math.abs(go._galZ0), 50);
@@ -1740,11 +1743,13 @@ function updateStellarPositions() {
     // Combine: galactic orbit delta from baseline + PM blend
     var baseDx = gx - o._galBaseX;
     var baseDy = gy - o._galBaseY;
+    // 2D map positions (flat galactic plane projection)
     o.x = o._galBaseX + baseDx + pmDx;
     o.y = o._galBaseY + baseDy + pmDy;
-    o.wx3d = o.x;
-    o.wy3d = o.y;
-    o.wz3d = gz + pmDz;
+    // 3D positions: apply same delta to celestial sphere positions (from RA/Dec)
+    o.wx3d = o._galBase3dX + baseDx + pmDx;
+    o.wy3d = o._galBase3dY + baseDy + pmDy;
+    o.wz3d = (o._galBase3dZ || 0) + gz + pmDz;
     o.dist = Math.sqrt(o.x * o.x + o.y * o.y);
   }
 }
