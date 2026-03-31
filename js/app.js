@@ -514,7 +514,7 @@ function updatePlanetPositions() {
   // Lagrange points: compute from Earth's current position
   var earthAngle = Math.atan2(earthY, earthX);
   var earthR = Math.sqrt(earthX * earthX + earthY * earthY);
-  var l2Offset = 1.59e-8; // ~1.5M km in light-years
+  var l2Offset = 1.59e-7; // ~1.5M km in light-years
 
   var lp1 = findObject('L1');
   if (lp1) {
@@ -557,7 +557,7 @@ function updatePlanetPositions() {
   var jwst = findObject('JWST');
   if (jwst && lp2) {
     var jwstPeriod = 182.5;
-    var jwstHaloR = 8.5e-11; // ~800,000 km in ly
+    var jwstHaloR = 8.5e-8; // ~800,000 km in ly
     var jwstAngle = (days / jwstPeriod) * Math.PI * 2;
     // Visual minimum separation so JWST is always clickable apart from L2
     var jwstVisR = Math.max(jwstHaloR, satMinSep(0.6, 0, 1.2, 1.4e-12));
