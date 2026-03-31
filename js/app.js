@@ -2461,7 +2461,7 @@ function drawGalaxies() {
     var fade2 = 1;
     if (vr < 600000) fade2 = (vr - 300000) / 300000;
     if (vr > 15e6) fade2 = (20e6 - vr) / 5e6;
-    drawSpiralArms(-1.5e6, -2.0e6, scale, 2, 110000, -0.4, Math.min(1, fade2) * 0.3, 1.0, 0.4);
+    drawSpiralArms(1.41e6, 2.11e6, scale, 2, 110000, -0.4, Math.min(1, fade2) * 0.3, 1.0, 0.4);
   }
 }
 
