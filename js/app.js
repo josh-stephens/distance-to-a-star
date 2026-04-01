@@ -553,19 +553,30 @@ function updatePlanetPositions() {
     lp5.wx3d = lp5.x; lp5.wy3d = lp5.y; lp5.wz3d = earthZ;
     lp5.dist = earthR;
   }
-  // JWST: halo orbit around L2 (~6 month period, ~800,000 km radius)
+  // JWST: halo orbit around L2 (~6 month period, perpendicular to Sun-Earth line)
+  // Real orbit is in a plane roughly normal to the ecliptic at L2:
+  // ~250,000 km cross-track (y'), ~800,000 km above/below ecliptic (z)
   var jwst = findObject('JWST');
   if (jwst && lp2) {
     var jwstPeriod = 182.5;
-    var jwstHaloR = 8.5e-8; // ~800,000 km in ly
+    var jwstHaloY = 2.65e-8; // ~250,000 km cross-track amplitude in ly
+    var jwstHaloZ = 8.5e-8;  // ~800,000 km vertical amplitude in ly
     var jwstAngle = (days / jwstPeriod) * Math.PI * 2;
-    // Visual minimum separation so JWST is always clickable apart from L2
-    var jwstVisR = Math.max(jwstHaloR, satMinSep(0.6, 0, 1.2, 1.4e-12));
-    jwst.x = lp2.x + jwstVisR * Math.cos(jwstAngle);
-    jwst.y = lp2.y + jwstVisR * Math.sin(jwstAngle);
-    jwst.wx3d = lp2.wx3d + jwstHaloR * Math.cos(jwstAngle);
-    jwst.wy3d = lp2.wy3d + jwstHaloR * Math.sin(jwstAngle);
-    jwst.wz3d = lp2.wz3d;
+    // Cross-track offset: perpendicular to Sun-Earth line in the ecliptic
+    var perpX = -Math.sin(earthAngle);
+    var perpY = Math.cos(earthAngle);
+    var crossTrack = jwstHaloY * Math.cos(jwstAngle);
+    var vertOffset = jwstHaloZ * Math.sin(jwstAngle);
+    // Visual minimum separation for 2D clickability
+    var jwstVisR = Math.max(Math.sqrt(jwstHaloY * jwstHaloY + jwstHaloZ * jwstHaloZ), satMinSep(0.6, 0, 1.2, 1.4e-12));
+    var visScale = jwstVisR / Math.max(1e-15, Math.sqrt(crossTrack * crossTrack + vertOffset * vertOffset));
+    if (visScale < 1) visScale = 1;
+    jwst.x = lp2.x + perpX * crossTrack * visScale;
+    jwst.y = lp2.y + perpY * crossTrack * visScale;
+    // 3D: real orbital offsets (cross-track in ecliptic + vertical)
+    jwst.wx3d = lp2.wx3d + perpX * crossTrack;
+    jwst.wy3d = lp2.wy3d + perpY * crossTrack;
+    jwst.wz3d = (lp2.wz3d || 0) + vertOffset;
     jwst.dist = lp2.dist;
   }
 }
