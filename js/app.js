@@ -2066,12 +2066,22 @@ function getVisibleObjects() {
   return objects.filter(function(o) {
     // Always show the selected/navigated-to object
     if (state.selected === o) {
+      o._visFade = 1.0;
       var sp2 = worldToScreen(o.x, o.y);
       return sp2.x > -m && sp2.x < sw + m && sp2.y > -m && sp2.y < sh + m;
     }
     var range = o.visRange || catRanges[o.category];
     if (!range) return false;
     if (vr < range[0] * 0.99 || vr > range[1] * 1.01) return false;
+    // Smooth fade at range boundaries (15% fade zone)
+    var fade = 1.0;
+    var span = range[1] - range[0];
+    var fadeZone = span * 0.15;
+    if (fadeZone > 0) {
+      if (vr < range[0] + fadeZone) fade = Math.max(0, (vr - range[0]) / fadeZone);
+      if (vr > range[1] - fadeZone) fade = Math.max(0, (range[1] - vr) / fadeZone);
+    }
+    o._visFade = fade;
     var sp = worldToScreen(o.x, o.y);
     return sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m;
   });
@@ -2488,6 +2498,7 @@ function drawGalaxies() {
 }
 
 function drawGalacticParticles() {
+  if (!effects.galacticParticles) return;
   var vr = getViewRadius();
   if (vr > 250000) return;
   var scale = getScale();
@@ -2559,6 +2570,7 @@ function drawGalacticParticles() {
 // ─── Draw: 3D galactic density field particles ────────────────────────
 
 function drawGalacticParticles3D() {
+  if (!effects.galacticParticles) return;
   var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
   if (camDist > 250000) return;
   var sw = W / dpr, sh = H / dpr;
@@ -2625,6 +2637,108 @@ function drawGalacticParticles3D() {
   }
 
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ─── Draw: Milky Way band in 3D ────────────────────────────────────────
+
+function drawMilkyWayBand3D() {
+  // Only visible when camera is inside the galaxy
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  var camFromGC = Math.sqrt((cam3d.px - GAL_CENTER_X) * (cam3d.px - GAL_CENTER_X) + cam3d.py * cam3d.py);
+  if (camFromGC > 50000) return;
+  // Fade out as camera moves away from the galactic disk
+  var bandAlpha = 1.0;
+  if (camFromGC > 20000) bandAlpha *= (50000 - camFromGC) / 30000;
+  // Also fade based on camera z-height above galactic plane
+  var camZ = Math.abs(cam3d.pz);
+  if (camZ > 2000) bandAlpha *= Math.max(0, (5000 - camZ) / 3000);
+  if (bandAlpha < 0.01) return;
+
+  var sw = W / dpr, sh = H / dpr;
+  var bandDist = 80000; // distance to place band points (ly)
+  var SAMPLES = 72;
+  var bandWidth = 0.26; // ~15 degrees in radians
+
+  ctx.save();
+
+  // Sample points along the galactic plane (great circle at z=0)
+  // The galactic plane in our coords is the x-y plane
+  for (var si = 0; si < SAMPLES; si++) {
+    var angle = (si / SAMPLES) * Math.PI * 2;
+    var nextAngle = ((si + 1) / SAMPLES) * Math.PI * 2;
+
+    // Two points on the galactic plane
+    var wx1 = cam3d.px + bandDist * Math.cos(angle);
+    var wy1 = cam3d.py + bandDist * Math.sin(angle);
+    var wx2 = cam3d.px + bandDist * Math.cos(nextAngle);
+    var wy2 = cam3d.py + bandDist * Math.sin(nextAngle);
+
+    // Project center points
+    var sp1 = worldToScreen3D(wx1, wy1, 0);
+    var sp2 = worldToScreen3D(wx2, wy2, 0);
+    if (!sp1 || !sp2) continue;
+
+    // Also project points above/below for band width
+    var sp1up = worldToScreen3D(wx1, wy1, bandDist * bandWidth);
+    var sp1dn = worldToScreen3D(wx1, wy1, -bandDist * bandWidth);
+    var sp2up = worldToScreen3D(wx2, wy2, bandDist * bandWidth);
+    var sp2dn = worldToScreen3D(wx2, wy2, -bandDist * bandWidth);
+    if (!sp1up || !sp1dn || !sp2up || !sp2dn) continue;
+
+    // Brightness: brighter toward galactic center (Sgr A*)
+    var dirToGC = Math.atan2(-cam3d.py + GAL_CENTER_Y, -cam3d.px + GAL_CENTER_X);
+    var angleDiff = angle - dirToGC;
+    angleDiff = angleDiff - Math.floor((angleDiff + Math.PI) / (Math.PI * 2)) * Math.PI * 2;
+    var gcBright = 1.0 + 2.0 * Math.max(0, Math.cos(angleDiff)); // 1-3x toward GC
+
+    var segAlpha = bandAlpha * 0.06 * gcBright;
+
+    // Draw filled quad for this segment of the band
+    ctx.fillStyle = 'rgba(200, 195, 220, ' + Math.min(0.25, segAlpha) + ')';
+    ctx.beginPath();
+    ctx.moveTo(sp1up.x, sp1up.y);
+    ctx.lineTo(sp2up.x, sp2up.y);
+    ctx.lineTo(sp2dn.x, sp2dn.y);
+    ctx.lineTo(sp1dn.x, sp1dn.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Brighter core band (narrower, more luminous)
+    var sp1cu = worldToScreen3D(wx1, wy1, bandDist * bandWidth * 0.3);
+    var sp1cd = worldToScreen3D(wx1, wy1, -bandDist * bandWidth * 0.3);
+    var sp2cu = worldToScreen3D(wx2, wy2, bandDist * bandWidth * 0.3);
+    var sp2cd = worldToScreen3D(wx2, wy2, -bandDist * bandWidth * 0.3);
+    if (sp1cu && sp1cd && sp2cu && sp2cd) {
+      ctx.fillStyle = 'rgba(220, 215, 235, ' + Math.min(0.15, segAlpha * 1.5) + ')';
+      ctx.beginPath();
+      ctx.moveTo(sp1cu.x, sp1cu.y);
+      ctx.lineTo(sp2cu.x, sp2cu.y);
+      ctx.lineTo(sp2cd.x, sp2cd.y);
+      ctx.lineTo(sp1cd.x, sp1cd.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Dark dust lane (very narrow stripe along midplane)
+    if (gcBright > 1.5) {
+      var sp1d1 = worldToScreen3D(wx1, wy1, bandDist * 0.015);
+      var sp1d2 = worldToScreen3D(wx1, wy1, -bandDist * 0.015);
+      var sp2d1 = worldToScreen3D(wx2, wy2, bandDist * 0.015);
+      var sp2d2 = worldToScreen3D(wx2, wy2, -bandDist * 0.015);
+      if (sp1d1 && sp1d2 && sp2d1 && sp2d2) {
+        ctx.fillStyle = 'rgba(5, 5, 12, ' + Math.min(0.12, segAlpha * 0.8) + ')';
+        ctx.beginPath();
+        ctx.moveTo(sp1d1.x, sp1d1.y);
+        ctx.lineTo(sp2d1.x, sp2d1.y);
+        ctx.lineTo(sp2d2.x, sp2d2.y);
+        ctx.lineTo(sp1d2.x, sp1d2.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
   ctx.restore();
 }
 
@@ -4378,6 +4492,8 @@ function drawObject(obj, sp, ts) {
   var sel = state.selected === obj;
   var r = obj.radius;
   var gi = effects.glowIntensity;
+  var visFade = obj._visFade !== undefined ? obj._visFade : 1.0;
+  if (visFade < 1) { ctx.save(); ctx.globalAlpha = visFade; }
 
   // Display radius: modest cosmetic scaling for visibility at wide zoom,
   // transitioning to accurate physical size as you zoom in.
@@ -4445,11 +4561,13 @@ function drawObject(obj, sp, ts) {
     x: sp.x,
     y: sp.y + labelOffset + 16,
     sel: sel,
+    alpha: visFade,
     priority: (sel ? 10000 : 0) + obj.radius + (obj.dist === 0 ? 100 : 0)
   });
 
   // Draw type-specific visual detail on top of the base glow
   drawObjectDetail(obj, sp.x, sp.y, dr, ts);
+  if (visFade < 1) ctx.restore();
 }
 
 function drawLabels() {
@@ -5496,6 +5614,9 @@ function draw3D(ts) {
 
   // Background starfield (reuse 2D)
   drawStarfield(ts);
+
+  // Milky Way band (behind everything else)
+  drawMilkyWayBand3D();
 
   // Get visible objects and their projections
   var visible = getVisibleObjects3D();
@@ -7646,7 +7767,8 @@ function buildEffectsPanel() {
     { key: 'ambientParticles', label: 'Ambient particles' },
     { key: 'orbits', label: 'Orbit lines' },
     { key: 'orbitalPlanes', label: 'Orbital planes (3D)' },
-    { key: 'occlusion', label: 'Shadows/occlusion' }
+    { key: 'occlusion', label: 'Shadows/occlusion' },
+    { key: 'galacticParticles', label: 'Background stars' }
   ];
 
   checks.forEach(function(c) {

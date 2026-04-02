@@ -24,7 +24,7 @@ var GAL_SUN_Z_AMP = 250;            // Sun's vertical oscillation amplitude (ly)
 
 // ─── Effects settings ──────────────────────────────────────────────────
 
-var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: true, occlusion: false };
+var effects = { twinkling: true, warpStreaks: true, glowIntensity: 1.0, flowLines: true, ambientParticles: true, orbits: true, overlayStyle: 'albedo', orbitalPlanes: true, occlusion: false, galacticParticles: true };
 
 // ─── Overlay layer definitions ────────────────────────────────────────
 
