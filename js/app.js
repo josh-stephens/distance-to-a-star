@@ -2066,12 +2066,22 @@ function getVisibleObjects() {
   return objects.filter(function(o) {
     // Always show the selected/navigated-to object
     if (state.selected === o) {
+      o._visFade = 1.0;
       var sp2 = worldToScreen(o.x, o.y);
       return sp2.x > -m && sp2.x < sw + m && sp2.y > -m && sp2.y < sh + m;
     }
     var range = o.visRange || catRanges[o.category];
     if (!range) return false;
     if (vr < range[0] * 0.99 || vr > range[1] * 1.01) return false;
+    // Smooth fade at range boundaries (15% fade zone)
+    var fade = 1.0;
+    var span = range[1] - range[0];
+    var fadeZone = span * 0.15;
+    if (fadeZone > 0) {
+      if (vr < range[0] + fadeZone) fade = Math.max(0, (vr - range[0]) / fadeZone);
+      if (vr > range[1] - fadeZone) fade = Math.max(0, (range[1] - vr) / fadeZone);
+    }
+    o._visFade = fade;
     var sp = worldToScreen(o.x, o.y);
     return sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m;
   });
@@ -2488,6 +2498,7 @@ function drawGalaxies() {
 }
 
 function drawGalacticParticles() {
+  if (!effects.galacticParticles) return;
   var vr = getViewRadius();
   if (vr > 250000) return;
   var scale = getScale();
@@ -2559,6 +2570,7 @@ function drawGalacticParticles() {
 // ─── Draw: 3D galactic density field particles ────────────────────────
 
 function drawGalacticParticles3D() {
+  if (!effects.galacticParticles) return;
   var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
   if (camDist > 250000) return;
   var sw = W / dpr, sh = H / dpr;
@@ -4378,6 +4390,8 @@ function drawObject(obj, sp, ts) {
   var sel = state.selected === obj;
   var r = obj.radius;
   var gi = effects.glowIntensity;
+  var visFade = obj._visFade !== undefined ? obj._visFade : 1.0;
+  if (visFade < 1) { ctx.save(); ctx.globalAlpha = visFade; }
 
   // Display radius: modest cosmetic scaling for visibility at wide zoom,
   // transitioning to accurate physical size as you zoom in.
@@ -4445,11 +4459,13 @@ function drawObject(obj, sp, ts) {
     x: sp.x,
     y: sp.y + labelOffset + 16,
     sel: sel,
+    alpha: visFade,
     priority: (sel ? 10000 : 0) + obj.radius + (obj.dist === 0 ? 100 : 0)
   });
 
   // Draw type-specific visual detail on top of the base glow
   drawObjectDetail(obj, sp.x, sp.y, dr, ts);
+  if (visFade < 1) ctx.restore();
 }
 
 function drawLabels() {
@@ -7646,7 +7662,8 @@ function buildEffectsPanel() {
     { key: 'ambientParticles', label: 'Ambient particles' },
     { key: 'orbits', label: 'Orbit lines' },
     { key: 'orbitalPlanes', label: 'Orbital planes (3D)' },
-    { key: 'occlusion', label: 'Shadows/occlusion' }
+    { key: 'occlusion', label: 'Shadows/occlusion' },
+    { key: 'galacticParticles', label: 'Background stars' }
   ];
 
   checks.forEach(function(c) {
