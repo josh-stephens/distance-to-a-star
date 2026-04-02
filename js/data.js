@@ -423,6 +423,12 @@ var objects = [
         text: "At 2.1 microns methane absorbs almost all sunlight, making Saturn's atmosphere appear dark while the rings -- mostly water ice with little methane -- shine brilliantly. Three of Saturn's moons are visible at left. This view is impossible from Earth's surface because our atmosphere blocks these wavelengths." }
     ] },
 
+  // Lunar Gateway (position computed dynamically in updatePlanetPositions)
+  { name: "Lunar Gateway", x: AU_IN_LY * 1.1, y: 0.15 * AU_IN_LY, dist: AU_IN_LY, radius: 0.8, color: "#ccddee", glow: "#ccddee33",
+    type: "Space station (planned)", category: "solar", physRadius: 1e-14, visRange: [0, 0.01],
+    facts: [["Orbit", "Near-rectilinear halo orbit (NRHO) around Moon"], ["Range from Moon", "~1,500 to ~70,000 km"], ["Period", "~6.5 days"], ["Program", "NASA Artemis"], ["Purpose", "Staging point for lunar surface missions"]],
+    desc: "A planned small space station in lunar orbit, part of NASA's Artemis program. The Gateway will orbit the Moon in a highly elliptical near-rectilinear halo orbit, serving as a staging point for crewed lunar landings and a testbed for deep-space habitation technology." },
+
   // Spacecraft
   { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
     type: "Spacecraft", category: "solar", visRange: [0, 4],
@@ -959,7 +965,8 @@ var glossaryData = [
       { src: "img/jwst-saturn.jpg", caption: "Saturn in near-infrared", credit: "NASA/ESA/CSA/STScI" }
     ] },
 
-  // Spacecraft
+  // Spacecraft & Stations
+  { name: "Lunar Gateway", cat: "Solar System", color: "#ccddee", short: "Artemis lunar station", long: "A planned modular space station in a near-rectilinear halo orbit around the Moon, part of NASA's Artemis program to return humans to the lunar surface. The Gateway's highly elliptical orbit sweeps from about 1,500 km above the Moon's north pole to 70,000 km above the south pole every 6.5 days. This unique orbit requires minimal fuel to maintain and provides access to the entire lunar surface. The station will serve as a staging point for crewed lunar landers, a deep-space habitation testbed, and eventually a waypoint for missions to Mars." },
   { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
   { name: "Voyager 2", cat: "Solar System", color: "#55ddff", short: "Grand Tour of the giants", long: "Launched August 20, 1977 -- 16 days before Voyager 1 -- Voyager 2 is the only spacecraft to visit all four giant planets: Jupiter, Saturn, Uranus, and Neptune. Its Neptune flyby in 1989 revealed active geysers on Triton. It crossed the heliopause into interstellar space in November 2018 at roughly 140 AU from the Sun. Unlike Voyager 1, its plasma science instrument still works, providing unique data about the interstellar medium." },
 

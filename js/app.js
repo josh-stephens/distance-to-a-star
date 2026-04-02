@@ -511,6 +511,32 @@ function updatePlanetPositions() {
     sat.dist = Math.sqrt(sat.wx3d * sat.wx3d + sat.wy3d * sat.wy3d);
   }
 
+  // Lunar Gateway: NRHO around the Moon (~6.5 day period, 1,500-70,000 km range)
+  var gateway = findObject('Lunar Gateway');
+  if (gateway) {
+    var moon = findObject('Moon');
+    if (moon) {
+      var gwPeriod = 6.5; // days
+      var gwAngle = (days / gwPeriod) * Math.PI * 2;
+      // NRHO is highly elliptical: near pass ~1,500 km, far ~70,000 km
+      // Approximate as ellipse with semi-major ~35,750 km, ecc ~0.958
+      var gwSMA = 3.78e-9; // ~35,750 km in ly
+      var gwEcc = 0.958;
+      var gwR = gwSMA * (1 - gwEcc * gwEcc) / (1 + gwEcc * Math.cos(gwAngle));
+      // NRHO is nearly polar relative to Moon — offset mostly perpendicular to ecliptic
+      var gwVisR = Math.max(gwR, satMinSep(1.8, 1.84e-10, 0.8, 1e-14));
+      // 2D: visual separation from Moon
+      gwAngle = gwAngle + Math.PI * 0.5; // offset so it doesn't overlap Moon label
+      gateway.x = moon.x + gwVisR * Math.cos(gwAngle);
+      gateway.y = moon.y + gwVisR * Math.sin(gwAngle);
+      // 3D: mostly in z (polar orbit around Moon)
+      gateway.wx3d = moon.wx3d + gwR * 0.2 * Math.cos(gwAngle);
+      gateway.wy3d = moon.wy3d + gwR * 0.2 * Math.sin(gwAngle);
+      gateway.wz3d = (moon.wz3d || 0) + gwR * Math.sin(gwAngle);
+      gateway.dist = moon.dist || AU_IN_LY;
+    }
+  }
+
   // Lagrange points: compute from Earth's current position
   var earthAngle = Math.atan2(earthY, earthX);
   var earthR = Math.sqrt(earthX * earthX + earthY * earthY);
