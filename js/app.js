@@ -2073,12 +2073,13 @@ function getVisibleObjects() {
     var range = o.visRange || catRanges[o.category];
     if (!range) return false;
     if (vr < range[0] * 0.99 || vr > range[1] * 1.01) return false;
-    // Smooth fade at range boundaries (15% fade zone)
+    // Smooth fade at far boundary (15% zone). Near edge only fades
+    // when range[0] > 0 — objects visible from vr=0 stay fully opaque.
     var fade = 1.0;
     var span = range[1] - range[0];
     var fadeZone = span * 0.15;
     if (fadeZone > 0) {
-      if (vr < range[0] + fadeZone) fade = Math.max(0, (vr - range[0]) / fadeZone);
+      if (range[0] > 0.01 && vr < range[0] + fadeZone) fade = Math.max(0, (vr - range[0]) / fadeZone);
       if (vr > range[1] - fadeZone) fade = Math.max(0, (range[1] - vr) / fadeZone);
     }
     o._visFade = fade;
@@ -2643,99 +2644,78 @@ function drawGalacticParticles3D() {
 // ─── Draw: Milky Way band in 3D ────────────────────────────────────────
 
 function drawMilkyWayBand3D() {
-  // Only visible when camera is inside the galaxy
-  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
   var camFromGC = Math.sqrt((cam3d.px - GAL_CENTER_X) * (cam3d.px - GAL_CENTER_X) + cam3d.py * cam3d.py);
   if (camFromGC > 50000) return;
-  // Fade out as camera moves away from the galactic disk
   var bandAlpha = 1.0;
   if (camFromGC > 20000) bandAlpha *= (50000 - camFromGC) / 30000;
-  // Also fade based on camera z-height above galactic plane
   var camZ = Math.abs(cam3d.pz);
   if (camZ > 2000) bandAlpha *= Math.max(0, (5000 - camZ) / 3000);
   if (bandAlpha < 0.01) return;
 
   var sw = W / dpr, sh = H / dpr;
-  var bandDist = 80000; // distance to place band points (ly)
-  var SAMPLES = 72;
-  var bandWidth = 0.26; // ~15 degrees in radians
+  var bandDist = 80000;
+  var SAMPLES = 48;
+  var dirToGC = Math.atan2(GAL_CENTER_Y - cam3d.py, GAL_CENTER_X - cam3d.px);
 
   ctx.save();
 
-  // Sample points along the galactic plane (great circle at z=0)
-  // The galactic plane in our coords is the x-y plane
+  // Draw soft glowing circles along the galactic midplane
   for (var si = 0; si < SAMPLES; si++) {
     var angle = (si / SAMPLES) * Math.PI * 2;
-    var nextAngle = ((si + 1) / SAMPLES) * Math.PI * 2;
+    var wx = cam3d.px + bandDist * Math.cos(angle);
+    var wy = cam3d.py + bandDist * Math.sin(angle);
+    var sp = worldToScreen3D(wx, wy, 0);
+    if (!sp) continue;
 
-    // Two points on the galactic plane
-    var wx1 = cam3d.px + bandDist * Math.cos(angle);
-    var wy1 = cam3d.py + bandDist * Math.sin(angle);
-    var wx2 = cam3d.px + bandDist * Math.cos(nextAngle);
-    var wy2 = cam3d.py + bandDist * Math.sin(nextAngle);
-
-    // Project center points
-    var sp1 = worldToScreen3D(wx1, wy1, 0);
-    var sp2 = worldToScreen3D(wx2, wy2, 0);
-    if (!sp1 || !sp2) continue;
-
-    // Also project points above/below for band width
-    var sp1up = worldToScreen3D(wx1, wy1, bandDist * bandWidth);
-    var sp1dn = worldToScreen3D(wx1, wy1, -bandDist * bandWidth);
-    var sp2up = worldToScreen3D(wx2, wy2, bandDist * bandWidth);
-    var sp2dn = worldToScreen3D(wx2, wy2, -bandDist * bandWidth);
-    if (!sp1up || !sp1dn || !sp2up || !sp2dn) continue;
-
-    // Brightness: brighter toward galactic center (Sgr A*)
-    var dirToGC = Math.atan2(-cam3d.py + GAL_CENTER_Y, -cam3d.px + GAL_CENTER_X);
+    // Brightness toward galactic center
     var angleDiff = angle - dirToGC;
     angleDiff = angleDiff - Math.floor((angleDiff + Math.PI) / (Math.PI * 2)) * Math.PI * 2;
-    var gcBright = 1.0 + 2.0 * Math.max(0, Math.cos(angleDiff)); // 1-3x toward GC
+    var gcBright = 0.6 + 2.4 * Math.max(0, Math.cos(angleDiff));
 
-    var segAlpha = bandAlpha * 0.06 * gcBright;
+    // Apparent band half-width in pixels (from angular extent)
+    var spUp = worldToScreen3D(wx, wy, bandDist * 0.25);
+    if (!spUp) continue;
+    var bandR = Math.abs(spUp.y - sp.y);
+    if (bandR < 3) bandR = 3;
+    if (bandR > sh) continue;
 
-    // Draw filled quad for this segment of the band
-    ctx.fillStyle = 'rgba(200, 195, 220, ' + Math.min(0.25, segAlpha) + ')';
+    // Outer diffuse glow (gaussian-like via radial gradient)
+    var outerA = bandAlpha * 0.04 * gcBright;
+    var gOuter = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, bandR * 1.8);
+    gOuter.addColorStop(0, 'rgba(200, 195, 215, ' + Math.min(0.18, outerA * 1.5) + ')');
+    gOuter.addColorStop(0.3, 'rgba(195, 190, 210, ' + Math.min(0.12, outerA) + ')');
+    gOuter.addColorStop(0.7, 'rgba(180, 175, 200, ' + Math.min(0.04, outerA * 0.3) + ')');
+    gOuter.addColorStop(1, 'rgba(160, 155, 185, 0)');
+    ctx.fillStyle = gOuter;
     ctx.beginPath();
-    ctx.moveTo(sp1up.x, sp1up.y);
-    ctx.lineTo(sp2up.x, sp2up.y);
-    ctx.lineTo(sp2dn.x, sp2dn.y);
-    ctx.lineTo(sp1dn.x, sp1dn.y);
-    ctx.closePath();
+    ctx.arc(sp.x, sp.y, bandR * 1.8, 0, Math.PI * 2);
     ctx.fill();
 
-    // Brighter core band (narrower, more luminous)
-    var sp1cu = worldToScreen3D(wx1, wy1, bandDist * bandWidth * 0.3);
-    var sp1cd = worldToScreen3D(wx1, wy1, -bandDist * bandWidth * 0.3);
-    var sp2cu = worldToScreen3D(wx2, wy2, bandDist * bandWidth * 0.3);
-    var sp2cd = worldToScreen3D(wx2, wy2, -bandDist * bandWidth * 0.3);
-    if (sp1cu && sp1cd && sp2cu && sp2cd) {
-      ctx.fillStyle = 'rgba(220, 215, 235, ' + Math.min(0.15, segAlpha * 1.5) + ')';
-      ctx.beginPath();
-      ctx.moveTo(sp1cu.x, sp1cu.y);
-      ctx.lineTo(sp2cu.x, sp2cu.y);
-      ctx.lineTo(sp2cd.x, sp2cd.y);
-      ctx.lineTo(sp1cd.x, sp1cd.y);
-      ctx.closePath();
-      ctx.fill();
-    }
+    // Bright core (narrower, warmer toward GC)
+    var coreA = bandAlpha * 0.06 * gcBright;
+    var coreR = bandR * 0.4;
+    var warmR = Math.round(200 + gcBright * 18);
+    var warmG = Math.round(195 + gcBright * 12);
+    var warmB = Math.round(210 - gcBright * 10);
+    var gCore = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, coreR);
+    gCore.addColorStop(0, 'rgba(' + warmR + ',' + warmG + ',' + warmB + ',' + Math.min(0.2, coreA) + ')');
+    gCore.addColorStop(0.5, 'rgba(' + warmR + ',' + warmG + ',' + warmB + ',' + Math.min(0.08, coreA * 0.4) + ')');
+    gCore.addColorStop(1, 'rgba(' + warmR + ',' + warmG + ',' + warmB + ',0)');
+    ctx.fillStyle = gCore;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, coreR, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Dark dust lane (very narrow stripe along midplane)
-    if (gcBright > 1.5) {
-      var sp1d1 = worldToScreen3D(wx1, wy1, bandDist * 0.015);
-      var sp1d2 = worldToScreen3D(wx1, wy1, -bandDist * 0.015);
-      var sp2d1 = worldToScreen3D(wx2, wy2, bandDist * 0.015);
-      var sp2d2 = worldToScreen3D(wx2, wy2, -bandDist * 0.015);
-      if (sp1d1 && sp1d2 && sp2d1 && sp2d2) {
-        ctx.fillStyle = 'rgba(5, 5, 12, ' + Math.min(0.12, segAlpha * 0.8) + ')';
-        ctx.beginPath();
-        ctx.moveTo(sp1d1.x, sp1d1.y);
-        ctx.lineTo(sp2d1.x, sp2d1.y);
-        ctx.lineTo(sp2d2.x, sp2d2.y);
-        ctx.lineTo(sp1d2.x, sp1d2.y);
-        ctx.closePath();
-        ctx.fill();
-      }
+    // Dust lane: thin dark stripe at midplane (only toward GC)
+    if (gcBright > 1.5 && bandR > 10) {
+      var dustA = bandAlpha * 0.08 * (gcBright - 1.5) / 1.5;
+      var gDust = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, bandR * 0.12);
+      gDust.addColorStop(0, 'rgba(5, 5, 10, ' + Math.min(0.15, dustA) + ')');
+      gDust.addColorStop(1, 'rgba(5, 5, 10, 0)');
+      ctx.fillStyle = gDust;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, bandR * 0.12, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
