@@ -349,6 +349,54 @@ var artemisIITrajectory = [
   [240, 0, 0]
 ];
 
+// ─── Apollo mission trajectories ─────────────────────────────────────
+// Waypoints: [hours_from_launch, distance_from_earth_km, angle_offset_rad]
+
+// Launch J2000 epochs
+var apollo8LaunchJ2000 = (Date.UTC(1968, 11, 21, 12, 51, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo10LaunchJ2000 = (Date.UTC(1969, 4, 18, 16, 49, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo11LaunchJ2000 = (Date.UTC(1969, 6, 16, 13, 32, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo12LaunchJ2000 = (Date.UTC(1969, 10, 14, 16, 22, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo13LaunchJ2000 = (Date.UTC(1970, 3, 11, 19, 13, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo14LaunchJ2000 = (Date.UTC(1971, 0, 31, 21, 3, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo15LaunchJ2000 = (Date.UTC(1971, 6, 26, 13, 34, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo16LaunchJ2000 = (Date.UTC(1972, 3, 16, 17, 54, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+var apollo17LaunchJ2000 = (Date.UTC(1972, 11, 7, 5, 33, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000;
+
+// Shared landing mission trajectory (Apollo 11, 12, 14, 15, 16, 17)
+var apolloLandingTraj = [
+  [0, 300, 0], [1, 300, 0.02], [2, 300, 0.04],
+  [3, 1000, 0], [6, 50000, 0], [12, 120000, 0],
+  [24, 220000, 0], [48, 340000, 0], [66, 380000, 0],
+  [69, 384400, 0], [120, 384400, 0], [168, 384400, 0],
+  [171, 384400, 0.05], [192, 300000, 0.20],
+  [216, 180000, 0.32], [234, 50000, 0.38],
+  [238, 5000, 0.40], [240, 0, 0]
+];
+
+// Apollo 8 flyby trajectory (no landing, 6 days)
+var apollo8Traj = [
+  [0, 300, 0], [1, 300, 0.02], [2, 300, 0.04],
+  [3, 1000, 0], [6, 50000, 0], [12, 120000, 0],
+  [24, 220000, 0], [48, 340000, 0], [66, 380000, 0],
+  [69, 384400, 0], [89, 384400, 0],
+  [92, 384400, 0.05], [108, 300000, 0.20],
+  [120, 200000, 0.30], [132, 100000, 0.36],
+  [140, 20000, 0.40], [144, 0, 0]
+];
+
+// Apollo 13 abort trajectory (free-return, no orbit, 6 days)
+var apollo13Traj = [
+  [0, 300, 0], [1, 300, 0.02], [2, 300, 0.04],
+  [3, 1000, 0], [6, 50000, 0], [12, 120000, 0],
+  [24, 220000, 0], [48, 340000, 0],
+  [56, 380000, 0], [59, 400171, 0],
+  [62, 390000, 0.08], [72, 350000, 0.18],
+  [96, 270000, 0.28], [120, 160000, 0.36],
+  [132, 80000, 0.40], [140, 15000, 0.42],
+  [143, 0, 0]
+];
+
 // ─── Objects ──────────────────────────────────────────────────────────
 
 var objects = [
@@ -449,6 +497,44 @@ var objects = [
     type: "Crewed spacecraft", category: "solar", physRadius: 2e-14, visRange: [0, 0.01],
     facts: [["Launched", "April 1, 2026 22:35 UTC"], ["Crew", "Reid Wiseman, Victor Glover, Christina Koch, Jeremy Hansen"], ["Mission", "10-day crewed lunar flyby"], ["Closest to Moon", "6,513 km (far side)"], ["Farthest from Earth", "406,841 km"]],
     desc: "NASA's Artemis II mission -- the first crewed flight beyond low Earth orbit since Apollo 17 in 1972. Four astronauts aboard the Orion spacecraft fly a free-return trajectory around the Moon, reaching 406,841 km from Earth before splashing down in the Pacific." },
+
+  // Apollo lunar missions (positions computed from trajectory in updatePlanetPositions)
+  { name: "Apollo 8", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "December 21, 1968"], ["Crew", "Borman, Lovell, Anders"], ["Mission", "6-day lunar orbit (no landing)"], ["Achievement", "First humans to orbit the Moon"]],
+    desc: "The first crewed spacecraft to leave low Earth orbit and orbit the Moon. On Christmas Eve 1968, the crew read from Genesis while humanity saw Earth as a whole world for the first time." },
+  { name: "Apollo 10", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "May 18, 1969"], ["Crew", "Stafford, Young, Cernan"], ["Mission", "8-day lunar orbit (no landing)"], ["Achievement", "Dress rehearsal for lunar landing"]],
+    desc: "The full dress rehearsal for the Moon landing. The lunar module descended to within 15.6 km of the surface -- close enough to scout the Apollo 11 landing site -- before returning to the command module." },
+  { name: "Apollo 11", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "July 16, 1969"], ["Crew", "Armstrong, Aldrin, Collins"], ["Landing site", "Sea of Tranquility"], ["Surface time", "21 hours 36 minutes"]],
+    desc: "One small step for man, one giant leap for mankind. The first crewed Moon landing. Armstrong and Aldrin spent 21 hours on the surface while Collins orbited above." },
+  { name: "Apollo 12", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "November 14, 1969"], ["Crew", "Conrad, Bean, Gordon"], ["Landing site", "Ocean of Storms"], ["Achievement", "Precision landing near Surveyor 3"]],
+    desc: "Demonstrated pinpoint landing capability by touching down just 183 meters from the Surveyor 3 probe, which had landed two years earlier. The crew retrieved parts of Surveyor 3 and returned them to Earth." },
+  { name: "Apollo 13", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "April 11, 1970"], ["Crew", "Lovell, Swigert, Haise"], ["Mission", "Aborted -- free-return trajectory"], ["Farthest from Earth", "400,171 km"]],
+    desc: "NASA's 'successful failure.' An oxygen tank explosion forced the crew to use the lunar module as a lifeboat. They swung around the far side of the Moon at 400,171 km from Earth -- the farthest humans have ever traveled -- and returned safely." },
+  { name: "Apollo 14", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "January 31, 1971"], ["Crew", "Shepard, Mitchell, Roosa"], ["Landing site", "Fra Mauro"], ["Achievement", "Longest EVA distance on foot"]],
+    desc: "Alan Shepard, America's first astronaut in space, returned to flight and walked on the Moon. He famously hit two golf balls on the lunar surface. The crew explored the Fra Mauro highlands, the original target of Apollo 13." },
+  { name: "Apollo 15", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "July 26, 1971"], ["Crew", "Scott, Irwin, Worden"], ["Landing site", "Hadley Rille"], ["Achievement", "First use of lunar rover"]],
+    desc: "The first extended scientific mission and the first to carry the Lunar Roving Vehicle. David Scott performed the famous hammer-and-feather experiment at Hadley Rille, confirming Galileo's theory in the lunar vacuum." },
+  { name: "Apollo 16", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "April 16, 1972"], ["Crew", "Young, Duke, Mattingly"], ["Landing site", "Descartes Highlands"], ["Achievement", "Highest landing site elevation"]],
+    desc: "Explored the lunar highlands at the highest elevation of any Apollo landing site. John Young and Charles Duke drove the rover at record speed while Ken Mattingly conducted extensive observations from orbit." },
+  { name: "Apollo 17", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1, color: "#dddddd", glow: "#dddddd33",
+    type: "Crewed spacecraft", category: "solar", visRange: [0, 0.01],
+    facts: [["Launched", "December 7, 1972"], ["Crew", "Cernan, Schmitt, Evans"], ["Landing site", "Taurus-Littrow"], ["Achievement", "Last humans on the Moon"]],
+    desc: "The final Apollo mission and the last time humans set foot on the Moon. Harrison Schmitt, the only professional geologist to walk on the Moon, discovered orange soil -- evidence of ancient volcanic activity. Gene Cernan's final footprints remain undisturbed on the lunar surface." },
 
   // Spacecraft
   { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
@@ -988,6 +1074,7 @@ var glossaryData = [
 
   // Spacecraft
   { name: "Orion (Artemis II)", cat: "Solar System", color: "#ff9944", short: "First crewed Moon flight since 1972", long: "Launched April 1, 2026, Artemis II carries four astronauts on a 10-day free-return trajectory around the Moon -- the first crewed flight beyond low Earth orbit since Apollo 17 in December 1972. Commander Reid Wiseman, pilot Victor Glover, mission specialists Christina Koch and Jeremy Hansen fly the Orion spacecraft to within 6,513 km of the lunar far side, reaching 406,841 km from Earth. The mission tests Orion's life support, navigation, and heat shield at lunar-return velocities before Artemis III attempts a crewed landing." },
+  { name: "Apollo Program", cat: "Solar System", color: "#dddddd", short: "Humanity's first steps on another world", long: "NASA's Apollo program sent 24 humans to the Moon between 1968 and 1972. Apollo 8 (1968) made the first crewed lunar orbit, giving humanity the iconic Earthrise photograph. Apollo 10 (1969) rehearsed every step of a landing except the landing itself. Apollo 11 (July 1969) achieved the first crewed Moon landing when Neil Armstrong and Buzz Aldrin walked on the Sea of Tranquility. Apollo 12 demonstrated precision landing near Surveyor 3. Apollo 13 (1970) survived an in-flight explosion and returned safely in history's most celebrated rescue. Apollo 14 sent Alan Shepard back to space to walk on the Moon. Apollos 15, 16, and 17 carried the Lunar Roving Vehicle for extended scientific exploration of Hadley Rille, the Descartes Highlands, and Taurus-Littrow. In total, twelve humans walked on the Moon. Gene Cernan left the last footprints in December 1972, and no human returned to the Moon until Artemis II in 2026." },
   { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
   { name: "Voyager 2", cat: "Solar System", color: "#55ddff", short: "Grand Tour of the giants", long: "Launched August 20, 1977 -- 16 days before Voyager 1 -- Voyager 2 is the only spacecraft to visit all four giant planets: Jupiter, Saturn, Uranus, and Neptune. Its Neptune flyby in 1989 revealed active geysers on Triton. It crossed the heliopause into interstellar space in November 2018 at roughly 140 AU from the Sun. Unlike Voyager 1, its plasma science instrument still works, providing unique data about the interstellar medium." },
 

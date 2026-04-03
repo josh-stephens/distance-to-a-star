@@ -516,7 +516,16 @@ function updatePlanetPositions() {
   // Mission trajectory system: position time-bounded spacecraft from trajectory data
   // Each mission has: launchJ2000 (days), trajectory (waypoints), objectName
   var missions = [
-    { name: 'Orion (Artemis II)', launchJ2000: artemisIILaunchJ2000, traj: artemisIITrajectory }
+    { name: 'Orion (Artemis II)', launchJ2000: artemisIILaunchJ2000, traj: artemisIITrajectory },
+    { name: 'Apollo 8', launchJ2000: apollo8LaunchJ2000, traj: apollo8Traj },
+    { name: 'Apollo 10', launchJ2000: apollo10LaunchJ2000, traj: apollo8Traj },
+    { name: 'Apollo 11', launchJ2000: apollo11LaunchJ2000, traj: apolloLandingTraj },
+    { name: 'Apollo 12', launchJ2000: apollo12LaunchJ2000, traj: apolloLandingTraj },
+    { name: 'Apollo 13', launchJ2000: apollo13LaunchJ2000, traj: apollo13Traj },
+    { name: 'Apollo 14', launchJ2000: apollo14LaunchJ2000, traj: apolloLandingTraj },
+    { name: 'Apollo 15', launchJ2000: apollo15LaunchJ2000, traj: apolloLandingTraj },
+    { name: 'Apollo 16', launchJ2000: apollo16LaunchJ2000, traj: apolloLandingTraj },
+    { name: 'Apollo 17', launchJ2000: apollo17LaunchJ2000, traj: apolloLandingTraj }
   ];
   var moonObj = findObject('Moon');
   var moonAngle2 = moonObj ? Math.atan2(moonObj.wy3d - earthY, moonObj.wx3d - earthX) : 0;
@@ -7350,7 +7359,8 @@ var glossaryObjMap = {
   "Dark Matter Halos": "Andromeda (M31)",
   "Observable Universe": "Great Attractor",
   "Constellations": "Betelgeuse",
-  "Lagrange Points": "L2"
+  "Lagrange Points": "L2",
+  "Apollo Program": "Apollo 11"
 };
 
 function makeGotoButton(objName) {
