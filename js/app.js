@@ -513,40 +513,43 @@ function updatePlanetPositions() {
 
 
 
-  // Artemis II Orion: interpolate position from trajectory based on real time
-  var orion = findObject('Orion (Artemis II)');
-  if (orion && typeof artemisIILaunchJ2000 !== 'undefined' && typeof artemisIITrajectory !== 'undefined') {
-    // Use sim time so Orion moves at whatever time speed the user sets
-    var missionDays = days - artemisIILaunchJ2000;
-    var missionHrs = missionDays * 24;
-    var traj = artemisIITrajectory;
-    if (missionHrs >= 0 && missionHrs <= traj[traj.length - 1][0]) {
-      // Find bracketing waypoints and interpolate
-      var wp0 = traj[0], wp1 = traj[1];
-      for (var ti = 0; ti < traj.length - 1; ti++) {
-        if (traj[ti + 1][0] >= missionHrs) { wp0 = traj[ti]; wp1 = traj[ti + 1]; break; }
-      }
-      var tFrac = (wp1[0] - wp0[0]) > 0 ? (missionHrs - wp0[0]) / (wp1[0] - wp0[0]) : 0;
-      var distKm = wp0[1] + (wp1[1] - wp0[1]) * tFrac;
-      var angOff = wp0[2] + (wp1[2] - wp0[2]) * tFrac;
-      var distLy = distKm * KM_IN_LY;
-      // Position along Earth-Moon direction with angular offset
-      var moonObj = findObject('Moon');
-      var moonAngle2 = moonObj ? Math.atan2(moonObj.wy3d - earthY, moonObj.wx3d - earthX) : 0;
-      var orionAngle = moonAngle2 + angOff;
-      orion.x = earthX + distLy * Math.cos(orionAngle);
-      orion.y = earthY + distLy * Math.sin(orionAngle);
-      orion.wx3d = earthX + distLy * Math.cos(orionAngle);
-      orion.wy3d = earthY + distLy * Math.sin(orionAngle);
-      orion.wz3d = earthZ;
-      orion.dist = Math.sqrt(orion.x * orion.x + orion.y * orion.y);
-    } else if (missionHrs < 0) {
-      // Pre-launch: at Kennedy Space Center (same as Earth)
-      orion.x = earthX; orion.y = earthY;
-      orion.wx3d = earthX; orion.wy3d = earthY; orion.wz3d = earthZ;
-      orion.dist = AU_IN_LY;
+  // Mission trajectory system: position time-bounded spacecraft from trajectory data
+  // Each mission has: launchJ2000 (days), trajectory (waypoints), objectName
+  var missions = [
+    { name: 'Orion (Artemis II)', launchJ2000: artemisIILaunchJ2000, traj: artemisIITrajectory }
+  ];
+  var moonObj = findObject('Moon');
+  var moonAngle2 = moonObj ? Math.atan2(moonObj.wy3d - earthY, moonObj.wx3d - earthX) : 0;
+  for (var mi = 0; mi < missions.length; mi++) {
+    var msn = missions[mi];
+    var msnObj = findObject(msn.name);
+    if (!msnObj || !msn.traj) continue;
+    var msnHrs = (days - msn.launchJ2000) * 24;
+    var msnEnd = msn.traj[msn.traj.length - 1][0];
+    if (msnHrs < 0 || msnHrs > msnEnd) {
+      // Outside mission window: hide by placing off-map
+      msnObj._missionActive = false;
+      msnObj.x = 1e12; msnObj.y = 1e12;
+      msnObj.wx3d = 1e12; msnObj.wy3d = 1e12; msnObj.wz3d = 1e12;
+      continue;
     }
-    // Post-mission: object stays at last position (splashdown)
+    msnObj._missionActive = true;
+    // Interpolate trajectory
+    var mwp0 = msn.traj[0], mwp1 = msn.traj[1];
+    for (var mti = 0; mti < msn.traj.length - 1; mti++) {
+      if (msn.traj[mti + 1][0] >= msnHrs) { mwp0 = msn.traj[mti]; mwp1 = msn.traj[mti + 1]; break; }
+    }
+    var mFrac = (mwp1[0] - mwp0[0]) > 0 ? (msnHrs - mwp0[0]) / (mwp1[0] - mwp0[0]) : 0;
+    var mDistKm = mwp0[1] + (mwp1[1] - mwp0[1]) * mFrac;
+    var mAngOff = mwp0[2] + (mwp1[2] - mwp0[2]) * mFrac;
+    var mDistLy = mDistKm * KM_IN_LY;
+    var mAngle = moonAngle2 + mAngOff;
+    msnObj.x = earthX + mDistLy * Math.cos(mAngle);
+    msnObj.y = earthY + mDistLy * Math.sin(mAngle);
+    msnObj.wx3d = earthX + mDistLy * Math.cos(mAngle);
+    msnObj.wy3d = earthY + mDistLy * Math.sin(mAngle);
+    msnObj.wz3d = earthZ;
+    msnObj.dist = Math.sqrt(msnObj.x * msnObj.x + msnObj.y * msnObj.y);
   }
 
   // Lagrange points: compute from Earth's current position
@@ -1897,6 +1900,7 @@ function getVisibleObjects3D() {
   updateFocusedConstellationStars();
   for (var i = 0; i < objects.length; i++) {
     var o = objects[i];
+    if (o._missionActive === false) continue;
     var sp = worldToScreen3D(o.wx3d, o.wy3d, o.wz3d);
     if (!sp) continue;
     if (sp.x > -m && sp.x < sw + m && sp.y > -m && sp.y < sh + m) {
@@ -2102,6 +2106,8 @@ function getVisibleObjects() {
   var sh = H / dpr;
   var m = 80;
   return objects.filter(function(o) {
+    // Time-bounded missions: hide outside mission window
+    if (o._missionActive === false) return false;
     // Always show the selected/navigated-to object
     if (state.selected === o) {
       o._visFade = 1.0;
