@@ -511,30 +511,42 @@ function updatePlanetPositions() {
     sat.dist = Math.sqrt(sat.wx3d * sat.wx3d + sat.wy3d * sat.wy3d);
   }
 
-  // Lunar Gateway: NRHO around the Moon (~6.5 day period, 1,500-70,000 km range)
-  var gateway = findObject('Lunar Gateway');
-  if (gateway) {
-    var moon = findObject('Moon');
-    if (moon) {
-      var gwPeriod = 6.5; // days
-      var gwAngle = (days / gwPeriod) * Math.PI * 2;
-      // NRHO is highly elliptical: near pass ~1,500 km, far ~70,000 km
-      // Approximate as ellipse with semi-major ~35,750 km, ecc ~0.958
-      var gwSMA = 3.78e-9; // ~35,750 km in ly
-      var gwEcc = 0.958;
-      var gwR = gwSMA * (1 - gwEcc * gwEcc) / (1 + gwEcc * Math.cos(gwAngle));
-      // NRHO is nearly polar relative to Moon — offset mostly perpendicular to ecliptic
-      var gwVisR = Math.max(gwR, satMinSep(1.8, 1.84e-10, 0.8, 1e-14));
-      // 2D: visual separation from Moon
-      gwAngle = gwAngle + Math.PI * 0.5; // offset so it doesn't overlap Moon label
-      gateway.x = moon.x + gwVisR * Math.cos(gwAngle);
-      gateway.y = moon.y + gwVisR * Math.sin(gwAngle);
-      // 3D: mostly in z (polar orbit around Moon)
-      gateway.wx3d = moon.wx3d + gwR * 0.2 * Math.cos(gwAngle);
-      gateway.wy3d = moon.wy3d + gwR * 0.2 * Math.sin(gwAngle);
-      gateway.wz3d = (moon.wz3d || 0) + gwR * Math.sin(gwAngle);
-      gateway.dist = moon.dist || AU_IN_LY;
+
+
+  // Artemis II Orion: interpolate position from trajectory based on real time
+  var orion = findObject('Orion (Artemis II)');
+  if (orion && typeof artemisIILaunch !== 'undefined' && typeof artemisIITrajectory !== 'undefined') {
+    // Use real wall-clock time (not sim time) for the live mission
+    var missionMs = Date.now() - artemisIILaunch;
+    var missionHrs = missionMs / 3600000;
+    var traj = artemisIITrajectory;
+    if (missionHrs >= 0 && missionHrs <= traj[traj.length - 1][0]) {
+      // Find bracketing waypoints and interpolate
+      var wp0 = traj[0], wp1 = traj[1];
+      for (var ti = 0; ti < traj.length - 1; ti++) {
+        if (traj[ti + 1][0] >= missionHrs) { wp0 = traj[ti]; wp1 = traj[ti + 1]; break; }
+      }
+      var tFrac = (wp1[0] - wp0[0]) > 0 ? (missionHrs - wp0[0]) / (wp1[0] - wp0[0]) : 0;
+      var distKm = wp0[1] + (wp1[1] - wp0[1]) * tFrac;
+      var angOff = wp0[2] + (wp1[2] - wp0[2]) * tFrac;
+      var distLy = distKm * KM_IN_LY;
+      // Position along Earth-Moon direction with angular offset
+      var moonObj = findObject('Moon');
+      var moonAngle2 = moonObj ? Math.atan2(moonObj.wy3d - earthY, moonObj.wx3d - earthX) : 0;
+      var orionAngle = moonAngle2 + angOff;
+      orion.x = earthX + distLy * Math.cos(orionAngle);
+      orion.y = earthY + distLy * Math.sin(orionAngle);
+      orion.wx3d = earthX + distLy * Math.cos(orionAngle);
+      orion.wy3d = earthY + distLy * Math.sin(orionAngle);
+      orion.wz3d = earthZ;
+      orion.dist = Math.sqrt(orion.x * orion.x + orion.y * orion.y);
+    } else if (missionHrs < 0) {
+      // Pre-launch: at Kennedy Space Center (same as Earth)
+      orion.x = earthX; orion.y = earthY;
+      orion.wx3d = earthX; orion.wy3d = earthY; orion.wz3d = earthZ;
+      orion.dist = AU_IN_LY;
     }
+    // Post-mission: object stays at last position (splashdown)
   }
 
   // Lagrange points: compute from Earth's current position

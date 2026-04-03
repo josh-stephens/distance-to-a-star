@@ -328,6 +328,27 @@ var regions = [
     minVR: 80 * MLY, maxVR: 600 * MLY, desc: "~520 Mly -- 'immense heaven'" }
 ];
 
+// ─── Artemis II trajectory ────────────────────────────────────────────
+// Waypoints: [hours_from_launch, distance_from_earth_km, angle_offset_from_moon_direction_rad]
+// Launch: Apr 1 2026 22:35 UTC. TLI ~T+24h. Lunar flyby ~T+96h. Splashdown ~T+240h.
+var artemisIILaunch = Date.UTC(2026, 3, 1, 22, 35, 0);
+var artemisIITrajectory = [
+  [0, 400, 0], [0.5, 400, 0.02], [1, 2200, 0.05],
+  [2, 10000, 0.08], [6, 40000, 0.12], [12, 70000, 0.10], [18, 50000, 0.06], [23, 10000, 0.03],
+  [24, 10000, 0.02], [26, 30000, 0.01], [30, 80000, 0],
+  [36, 140000, 0], [48, 220000, 0], [60, 290000, 0],
+  [72, 340000, 0], [84, 370000, 0],
+  [90, 390000, 0], [94, 400000, 0], [96, 406841, 0],
+  [98, 404000, 0.05], [100, 398000, 0.12],
+  [108, 370000, 0.20], [120, 330000, 0.28],
+  [132, 290000, 0.34], [144, 250000, 0.38],
+  [156, 210000, 0.40], [168, 175000, 0.38],
+  [180, 140000, 0.34], [192, 105000, 0.28],
+  [204, 70000, 0.20], [216, 40000, 0.12],
+  [228, 15000, 0.06], [238, 2000, 0.02],
+  [240, 0, 0]
+];
+
 // ─── Objects ──────────────────────────────────────────────────────────
 
 var objects = [
@@ -423,11 +444,11 @@ var objects = [
         text: "At 2.1 microns methane absorbs almost all sunlight, making Saturn's atmosphere appear dark while the rings -- mostly water ice with little methane -- shine brilliantly. Three of Saturn's moons are visible at left. This view is impossible from Earth's surface because our atmosphere blocks these wavelengths." }
     ] },
 
-  // Lunar Gateway (position computed dynamically in updatePlanetPositions)
-  { name: "Lunar Gateway", x: AU_IN_LY * 1.1, y: 0.15 * AU_IN_LY, dist: AU_IN_LY, radius: 0.8, color: "#ccddee", glow: "#ccddee33",
-    type: "Space station (planned)", category: "solar", physRadius: 1e-14, visRange: [0, 0.01],
-    facts: [["Orbit", "Near-rectilinear halo orbit (NRHO) around Moon"], ["Range from Moon", "~1,500 to ~70,000 km"], ["Period", "~6.5 days"], ["Program", "NASA Artemis"], ["Purpose", "Staging point for lunar surface missions"]],
-    desc: "A planned small space station in lunar orbit, part of NASA's Artemis program. The Gateway will orbit the Moon in a highly elliptical near-rectilinear halo orbit, serving as a staging point for crewed lunar landings and a testbed for deep-space habitation technology." },
+  // Artemis II Orion (position computed from trajectory in updatePlanetPositions)
+  { name: "Orion (Artemis II)", x: AU_IN_LY, y: 0, dist: AU_IN_LY, radius: 1.2, color: "#ff9944", glow: "#ff994444",
+    type: "Crewed spacecraft", category: "solar", physRadius: 2e-14, visRange: [0, 0.01],
+    facts: [["Launched", "April 1, 2026 22:35 UTC"], ["Crew", "Reid Wiseman, Victor Glover, Christina Koch, Jeremy Hansen"], ["Mission", "10-day crewed lunar flyby"], ["Closest to Moon", "6,513 km (far side)"], ["Farthest from Earth", "406,841 km"]],
+    desc: "NASA's Artemis II mission -- the first crewed flight beyond low Earth orbit since Apollo 17 in 1972. Four astronauts aboard the Orion spacecraft fly a free-return trajectory around the Moon, reaching 406,841 km from Earth before splashing down in the Pacific." },
 
   // Spacecraft
   { name: "Voyager 1", x: -80 * AU_IN_LY, y: 140 * AU_IN_LY, dist: 165 * AU_IN_LY, radius: 1.5, color: "#55ff88", glow: "#55ff8844",
@@ -965,8 +986,8 @@ var glossaryData = [
       { src: "img/jwst-saturn.jpg", caption: "Saturn in near-infrared", credit: "NASA/ESA/CSA/STScI" }
     ] },
 
-  // Spacecraft & Stations
-  { name: "Lunar Gateway", cat: "Solar System", color: "#ccddee", short: "Artemis lunar station", long: "A planned modular space station in a near-rectilinear halo orbit around the Moon, part of NASA's Artemis program to return humans to the lunar surface. The Gateway's highly elliptical orbit sweeps from about 1,500 km above the Moon's north pole to 70,000 km above the south pole every 6.5 days. This unique orbit requires minimal fuel to maintain and provides access to the entire lunar surface. The station will serve as a staging point for crewed lunar landers, a deep-space habitation testbed, and eventually a waypoint for missions to Mars." },
+  // Spacecraft
+  { name: "Orion (Artemis II)", cat: "Solar System", color: "#ff9944", short: "First crewed Moon flight since 1972", long: "Launched April 1, 2026, Artemis II carries four astronauts on a 10-day free-return trajectory around the Moon -- the first crewed flight beyond low Earth orbit since Apollo 17 in December 1972. Commander Reid Wiseman, pilot Victor Glover, mission specialists Christina Koch and Jeremy Hansen fly the Orion spacecraft to within 6,513 km of the lunar far side, reaching 406,841 km from Earth. The mission tests Orion's life support, navigation, and heat shield at lunar-return velocities before Artemis III attempts a crewed landing." },
   { name: "Voyager 1", cat: "Solar System", color: "#55ff88", short: "Humanity's farthest traveler", long: "Launched September 5, 1977, Voyager 1 is the most distant human-made object at roughly 165 AU from the Sun. It crossed the heliopause into interstellar space in August 2012. Its golden record carries 115 images, greetings in 55 languages, and 90 minutes of music. Despite traveling at 17 km/s, it would take 73,000 years to reach the nearest star. Its radio signal, traveling at light speed, takes over 22 hours to reach Earth." },
   { name: "Voyager 2", cat: "Solar System", color: "#55ddff", short: "Grand Tour of the giants", long: "Launched August 20, 1977 -- 16 days before Voyager 1 -- Voyager 2 is the only spacecraft to visit all four giant planets: Jupiter, Saturn, Uranus, and Neptune. Its Neptune flyby in 1989 revealed active geysers on Triton. It crossed the heliopause into interstellar space in November 2018 at roughly 140 AU from the Sun. Unlike Voyager 1, its plasma science instrument still works, providing unique data about the interstellar medium." },
 
