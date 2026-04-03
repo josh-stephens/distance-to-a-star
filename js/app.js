@@ -3110,6 +3110,64 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     return;
   }
 
+  // ──── ARTEMIS II ORION ────
+
+  if (name === 'Orion (Artemis II)') {
+    var osc = Math.max(detailScale * 2, 2);
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Service module (cylinder)
+    var smW = osc * 2.5, smH = osc * 4;
+    ctx.fillStyle = '#667788';
+    ctx.fillRect(-smW * 0.5, -smH * 0.2, smW, smH);
+    // Solar arrays (two rectangular panels)
+    ctx.fillStyle = '#334466';
+    ctx.strokeStyle = '#556688';
+    ctx.lineWidth = Math.max(0.3, osc * 0.08);
+    // Left array
+    ctx.fillRect(-smW * 0.5 - osc * 4, smH * 0.1, osc * 3.8, osc * 1.2);
+    ctx.strokeRect(-smW * 0.5 - osc * 4, smH * 0.1, osc * 3.8, osc * 1.2);
+    // Right array
+    ctx.fillRect(smW * 0.5 + osc * 0.2, smH * 0.1, osc * 3.8, osc * 1.2);
+    ctx.strokeRect(smW * 0.5 + osc * 0.2, smH * 0.1, osc * 3.8, osc * 1.2);
+    // Solar panel lines
+    ctx.strokeStyle = '#445566';
+    ctx.lineWidth = Math.max(0.2, osc * 0.04);
+    var panelSegs = 4;
+    for (var psi = 1; psi < panelSegs; psi++) {
+      var psX = osc * 3.8 * psi / panelSegs;
+      ctx.beginPath();
+      ctx.moveTo(-smW * 0.5 - osc * 4 + psX, smH * 0.1);
+      ctx.lineTo(-smW * 0.5 - osc * 4 + psX, smH * 0.1 + osc * 1.2);
+      ctx.moveTo(smW * 0.5 + osc * 0.2 + psX, smH * 0.1);
+      ctx.lineTo(smW * 0.5 + osc * 0.2 + psX, smH * 0.1 + osc * 1.2);
+      ctx.stroke();
+    }
+    // Capsule (conical — wider at base, narrow at top)
+    ctx.fillStyle = '#ccbbaa';
+    ctx.beginPath();
+    ctx.moveTo(-smW * 0.55, -smH * 0.2);
+    ctx.lineTo(smW * 0.55, -smH * 0.2);
+    ctx.lineTo(smW * 0.2, -smH * 0.2 - osc * 3);
+    ctx.lineTo(-smW * 0.2, -smH * 0.2 - osc * 3);
+    ctx.closePath();
+    ctx.fill();
+    // Heat shield (dark band at base of capsule)
+    ctx.fillStyle = '#443322';
+    ctx.fillRect(-smW * 0.55, -smH * 0.2 - osc * 0.4, smW * 1.1, osc * 0.4);
+    // Window band
+    ctx.fillStyle = '#223344';
+    ctx.fillRect(-smW * 0.3, -smH * 0.2 - osc * 2, smW * 0.6, osc * 0.5);
+    // Docking adapter at top
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillRect(-smW * 0.12, -smH * 0.2 - osc * 3 - osc * 0.5, smW * 0.24, osc * 0.5);
+    // NASA orange accent on service module
+    ctx.fillStyle = '#ff9944';
+    ctx.fillRect(-smW * 0.5, smH * 0.7, smW, osc * 0.3);
+    ctx.restore();
+    return;
+  }
+
   // ──── SUPERNOVA REMNANTS ────
 
   if (name === "Tycho's SN Remnant" || name === "Kepler's SN Remnant" || name === 'SN 1987A') {
@@ -6561,6 +6619,57 @@ function showInfo(obj) {
     pulseBtn.addEventListener('mouseout', function() { this.style.background = '#16162a'; this.style.color = '#88aabb'; });
     pulseBtn.addEventListener('click', function() { startLightPulse(obj); });
     body.appendChild(pulseBtn);
+  }
+
+  // Artemis II live mission phase indicator
+  if (obj.name === 'Orion (Artemis II)' && typeof artemisIILaunch !== 'undefined') {
+    var phaseDiv = document.createElement('div');
+    phaseDiv.style.cssText = 'margin-top:16px;padding:12px;background:rgba(255,153,68,0.06);border-left:3px solid #ff9944;border-radius:0 6px 6px 0';
+    var phaseLabel = document.createElement('div');
+    phaseLabel.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#ff9944;margin-bottom:6px';
+    phaseLabel.textContent = 'Live Mission Status';
+    var phaseText = document.createElement('div');
+    phaseText.id = 'artemis-phase';
+    phaseText.style.cssText = 'font-size:12px;color:#c8c8e0;line-height:1.5';
+    phaseDiv.appendChild(phaseLabel);
+    phaseDiv.appendChild(phaseText);
+    body.appendChild(phaseDiv);
+    // Update phase every second
+    function updateArtemisPhase() {
+      var el = document.getElementById('artemis-phase');
+      if (!el) return;
+      var hrs = (Date.now() - artemisIILaunch) / 3600000;
+      var d = Math.floor(hrs / 24);
+      var h = Math.floor(hrs % 24);
+      var met = 'T+' + d + 'd ' + h + 'h';
+      var phase = '';
+      var distKm = 0;
+      var traj = artemisIITrajectory;
+      // Interpolate distance
+      if (hrs >= 0 && hrs <= traj[traj.length - 1][0]) {
+        for (var ti = 0; ti < traj.length - 1; ti++) {
+          if (traj[ti + 1][0] >= hrs) {
+            var f = (hrs - traj[ti][0]) / (traj[ti + 1][0] - traj[ti][0]);
+            distKm = Math.round(traj[ti][1] + (traj[ti + 1][1] - traj[ti][1]) * f);
+            break;
+          }
+        }
+      }
+      if (hrs < 0) phase = 'Pre-launch';
+      else if (hrs < 1) phase = 'Ascent & orbit insertion';
+      else if (hrs < 24) phase = 'High Earth orbit (TLI in ' + Math.round(24 - hrs) + 'h)';
+      else if (hrs < 25) phase = 'Translunar injection burn';
+      else if (hrs < 90) phase = 'Outbound coast to Moon';
+      else if (hrs < 100) phase = 'Lunar flyby';
+      else if (hrs < 230) phase = 'Return coast to Earth';
+      else if (hrs < 240) phase = 'Reentry & splashdown approach';
+      else phase = 'Mission complete -- splashdown';
+      var distStr = distKm > 0 ? (distKm > 10000 ? Math.round(distKm / 1000) + 'k' : distKm.toLocaleString()) + ' km from Earth' : '';
+      el.textContent = met + ' -- ' + phase + (distStr ? '\n' + distStr : '');
+      el.style.whiteSpace = 'pre-line';
+      if (hrs >= 0 && hrs <= 240) setTimeout(updateArtemisPhase, 5000);
+    }
+    updateArtemisPhase();
   }
 
   // Gallery: large stacked images with detailed captions
