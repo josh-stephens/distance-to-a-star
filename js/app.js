@@ -515,10 +515,10 @@ function updatePlanetPositions() {
 
   // Artemis II Orion: interpolate position from trajectory based on real time
   var orion = findObject('Orion (Artemis II)');
-  if (orion && typeof artemisIILaunch !== 'undefined' && typeof artemisIITrajectory !== 'undefined') {
-    // Use real wall-clock time (not sim time) for the live mission
-    var missionMs = Date.now() - artemisIILaunch;
-    var missionHrs = missionMs / 3600000;
+  if (orion && typeof artemisIILaunchJ2000 !== 'undefined' && typeof artemisIITrajectory !== 'undefined') {
+    // Use sim time so Orion moves at whatever time speed the user sets
+    var missionDays = days - artemisIILaunchJ2000;
+    var missionHrs = missionDays * 24;
     var traj = artemisIITrajectory;
     if (missionHrs >= 0 && missionHrs <= traj[traj.length - 1][0]) {
       // Find bracketing waypoints and interpolate
@@ -6622,12 +6622,12 @@ function showInfo(obj) {
   }
 
   // Artemis II live mission phase indicator
-  if (obj.name === 'Orion (Artemis II)' && typeof artemisIILaunch !== 'undefined') {
+  if (obj.name === 'Orion (Artemis II)' && typeof artemisIILaunchJ2000 !== 'undefined') {
     var phaseDiv = document.createElement('div');
     phaseDiv.style.cssText = 'margin-top:16px;padding:12px;background:rgba(255,153,68,0.06);border-left:3px solid #ff9944;border-radius:0 6px 6px 0';
     var phaseLabel = document.createElement('div');
     phaseLabel.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#ff9944;margin-bottom:6px';
-    phaseLabel.textContent = 'Live Mission Status';
+    phaseLabel.textContent = 'Mission Status';
     var phaseText = document.createElement('div');
     phaseText.id = 'artemis-phase';
     phaseText.style.cssText = 'font-size:12px;color:#c8c8e0;line-height:1.5';
@@ -6638,7 +6638,7 @@ function showInfo(obj) {
     function updateArtemisPhase() {
       var el = document.getElementById('artemis-phase');
       if (!el) return;
-      var hrs = (Date.now() - artemisIILaunch) / 3600000;
+      var hrs = (getSimDaysJ2000() - artemisIILaunchJ2000) * 24;
       var d = Math.floor(hrs / 24);
       var h = Math.floor(hrs % 24);
       var met = 'T+' + d + 'd ' + h + 'h';

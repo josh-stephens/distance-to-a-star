@@ -331,7 +331,7 @@ var regions = [
 // ─── Artemis II trajectory ────────────────────────────────────────────
 // Waypoints: [hours_from_launch, distance_from_earth_km, angle_offset_from_moon_direction_rad]
 // Launch: Apr 1 2026 22:35 UTC. TLI ~T+24h. Lunar flyby ~T+96h. Splashdown ~T+240h.
-var artemisIILaunch = Date.UTC(2026, 3, 1, 22, 35, 0);
+var artemisIILaunchJ2000 = (Date.UTC(2026, 3, 1, 22, 35, 0) - Date.UTC(2000, 0, 1, 12, 0, 0)) / 86400000; // J2000 days
 var artemisIITrajectory = [
   [0, 400, 0], [0.5, 400, 0.02], [1, 2200, 0.05],
   [2, 10000, 0.08], [6, 40000, 0.12], [12, 70000, 0.10], [18, 50000, 0.06], [23, 10000, 0.03],
