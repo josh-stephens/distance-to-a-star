@@ -7208,7 +7208,7 @@ var tourEngine = {
 
 // ─── Tour dropdown ────────────────────────────────────────────────────
 
-var tourIds = ['paleblue', 'starlovers', 'extreme', 'lifecycle', 'ladder', 'constellations', 'exoworlds', 'monsters'];
+var tourIds = ['paleblue', 'starlovers', 'extreme', 'lifecycle', 'ladder', 'constellations', 'exoworlds', 'monsters', 'artemis2'];
 
 function buildTourDropdown() {
   var dd = document.getElementById('tour-dropdown');
