@@ -1289,6 +1289,32 @@ var tourDefs = {
       { vr: 30 * MLY, target: "M87", title: "The 6.5-Billion-Solar-Mass Monster", body: "The supermassive black hole at the heart of galaxy M87 \u2014 1,600 times more massive than Sagittarius A*. In 2019, the Event Horizon Telescope captured its shadow: the first direct image of a black hole. Its relativistic jet, powered by matter spiraling in, extends 5,000 light-years \u2014 a beam of plasma traveling at nearly light speed.", scale: "53.8 Mly from Earth", dwell: 14000 },
       { vr: 150 * MLY, target: "Great Attractor", title: "The Invisible Force", body: "Something equivalent to 10 quadrillion Suns is pulling hundreds of thousands of galaxies \u2014 including ours \u2014 toward it at 600 km/s. Hidden behind the Milky Way's dusty plane, the Great Attractor's true nature remains uncertain. It may be a vast supercluster of galaxies, or something we haven't yet imagined. The ultimate cosmic monster may be the one we can't see.", scale: "250 Mly from Earth", dwell: 14000 }
     ]
+  },
+  artemis2: {
+    name: "Artemis II: Return to the Moon",
+    desc: "Follow humanity's return to lunar space in real time",
+    steps: [
+      { vr: 0.00004, target: "Earth", simTimeJ2000: artemisIILaunchJ2000 - 0.01, timeSpeed: 3600,
+        title: "T-Minus", body: "April 1, 2026. Kennedy Space Center, Launch Complex 39B. The same pad that launched Apollo missions half a century ago. Four astronauts -- Reid Wiseman, Victor Glover, Christina Koch, and Jeremy Hansen -- sit atop the most powerful rocket ever flown. No human has left low Earth orbit since December 1972.", scale: "Kennedy Space Center", dwell: 12000 },
+      { vr: 0.00004, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 0.05, timeSpeed: 3600,
+        title: "Liftoff", body: "SLS hurls Orion into a 2,200 km orbit. The crew completes one full orbit in 90 minutes, then the upper stage fires again to raise the orbit to 70,000 km -- higher than any human has been since Apollo. Time is running at 1 hour per second.", scale: "Low Earth orbit", dwell: 15000 },
+      { vr: 0.00004, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 0.8, timeSpeed: 7200,
+        title: "High Earth Orbit", body: "For nearly 24 hours, Orion circles Earth in a long elliptical orbit, peaking at 70,000 km -- almost a fifth of the way to the Moon. The crew tests navigation and life support systems. Pilot Victor Glover performs formation flying with the spent upper stage.", scale: "~70,000 km altitude", dwell: 12000 },
+      { vr: 0.00004, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 1.0, timeSpeed: 7200,
+        title: "Translunar Injection", body: "T+24 hours. The service module engine fires for 5 minutes and 49 seconds, accelerating Orion to 40,000 km/h -- escape velocity. Earth's gravity releases its grip. The Moon is three days away. There is no turning back... although the free-return trajectory ensures the crew will loop around the Moon and return to Earth even without another engine burn.", scale: "TLI burn", dwell: 14000 },
+      { vr: 0.0001, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 2.0, timeSpeed: 14400,
+        title: "Outbound Coast", body: "The spacecraft coasts through cislunar space, climbing away from Earth at 4 hours per second. Watch the distance grow. Earth shrinks behind them. Christina Koch, the first woman to fly beyond LEO, photographs the receding blue marble. The crew is further from home than any human since Gene Cernan in 1972.", scale: "Cislunar space", dwell: 15000 },
+      { vr: 0.0001, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 3.5, timeSpeed: 7200,
+        title: "The Moon Grows", body: "Day 4. The Moon fills the window. The crew can see features with the naked eye that no human eyes have seen since Apollo. Orion is now 380,000 km from Earth -- further than any crewed spacecraft has traveled since 1972. Jeremy Hansen becomes the first Canadian to fly beyond Earth orbit.", scale: "Approaching lunar flyby", dwell: 14000 },
+      { vr: 0.00004, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 4.0, timeSpeed: 3600,
+        title: "Lunar Flyby", body: "Closest approach: 6,513 km above the far side of the Moon. For 20 minutes, the crew is behind the Moon with no radio contact with Earth -- completely alone in the universe. They see what only 24 humans before them have seen: Earthrise from behind the Moon. Maximum distance from Earth: 406,841 km.", scale: "6,513 km from lunar far side", dwell: 16000 },
+      { vr: 0.0001, target: "Orion (Artemis II)", simTimeJ2000: artemisIILaunchJ2000 + 5.0, timeSpeed: 14400,
+        title: "Heading Home", body: "The free-return trajectory bends Orion around the Moon and back toward Earth. No engine burn needed -- gravity and orbital mechanics do the work. The crew spends the return coast conducting experiments and preparing for the most dangerous part of the mission: reentry.", scale: "Return coast", dwell: 14000 },
+      { vr: 0.00004, target: "Earth", simTimeJ2000: artemisIILaunchJ2000 + 9.5, timeSpeed: 3600,
+        title: "Reentry", body: "Day 10. Orion hits Earth's atmosphere at 40,000 km/h -- faster than any crewed vehicle since Apollo. The heat shield, the largest ever built, endures temperatures of 2,800\u00b0C. This is the real test: Artemis II proves the heat shield works at lunar-return velocity, clearing the way for Artemis III to land on the Moon.", scale: "40,000 km/h reentry", dwell: 14000 },
+      { vr: 0.00004, target: "Earth", simTimeJ2000: artemisIILaunchJ2000 + 10.0, timeSpeed: 1,
+        title: "Splashdown", body: "The Pacific Ocean off San Diego. After 10 days and 685,000 miles, Orion's parachutes deploy and the capsule splashes down. For the first time in over half a century, humans have traveled to the Moon and back. The path is open. Artemis III will land. The next footprint on the Moon is coming.", scale: "Pacific Ocean, San Diego", dwell: 16000 }
+    ]
   }
 };
 

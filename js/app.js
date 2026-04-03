@@ -6921,6 +6921,16 @@ var tourEngine = {
     var narrationEl = document.getElementById('narration');
     narrationEl.classList.remove('visible');
 
+    // Set simulation time and speed if step specifies them
+    if (wp.simTimeJ2000 !== undefined) {
+      simTime.simDaysAtEpoch = wp.simTimeJ2000;
+      simTime.epoch = Date.now();
+    }
+    if (wp.timeSpeed !== undefined) {
+      simTime.multiplier = wp.timeSpeed;
+      simTime.paused = false;
+    }
+
     // Handle 3D sky view steps
     if (wp.sky3d) {
       var self = this;
