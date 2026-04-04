@@ -8397,10 +8397,18 @@ function panTowardTargetOnZoomIn(prevZoom, newZoom) {
   var dx = state.panX - targetX;
   var dy = state.panY - targetY;
   var dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 0.001) return;
+  if (dist < 1e-15) return;
   var vr = sliderToViewRadius(newZoom);
   var ratio = dist / vr;
   if (ratio < 0.1) return;
+  // If the selected object is more than 2x the view radius away, snap to it
+  // — gentle pull can't keep up at extreme zoom differences
+  if (state.selected && ratio > 2) {
+    state.panX = targetX;
+    state.panY = targetY;
+    updateRecenterBtn();
+    return;
+  }
   var zoomDelta = prevZoom - newZoom;
   var pull = Math.min(0.15, zoomDelta * 0.006) * Math.min(1, ratio * 0.3);
   state.panX -= dx * pull;
