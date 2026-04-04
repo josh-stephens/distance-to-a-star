@@ -1914,7 +1914,7 @@ function worldToScreen3D(wx, wy, wz) {
   // Forward vector: (cosP*cosY, cosP*sinY, sinP)
   var viewZ = dx * (_cosP * _cosY) + dy * (_cosP * _sinY) + dz * _sinP;
 
-  if (viewZ <= 1e-12) return null; // behind camera
+  if (viewZ <= 1e-20) return null; // behind camera
 
   var sw = W / dpr;
   var sh = H / dpr;
