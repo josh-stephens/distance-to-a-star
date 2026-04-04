@@ -538,30 +538,35 @@ function updatePlanetPositions() {
     if (msnHrs < 0 || msnHrs > msnEnd) {
       // Outside mission window: hide by placing off-map
       msnObj._missionActive = false;
-      msnObj.x = 1e12; msnObj.y = 1e12;
-      msnObj.wx3d = 1e12; msnObj.wy3d = 1e12; msnObj.wz3d = 1e12;
-      continue;
-    }
-    msnObj._missionActive = true;
-    // Interpolate trajectory
-    var mwp0 = msn.traj[0], mwp1 = msn.traj[1];
-    for (var mti = 0; mti < msn.traj.length - 1; mti++) {
-      if (msn.traj[mti + 1][0] >= msnHrs) { mwp0 = msn.traj[mti]; mwp1 = msn.traj[mti + 1]; break; }
-    }
-    var mFrac = (mwp1[0] - mwp0[0]) > 0 ? (msnHrs - mwp0[0]) / (mwp1[0] - mwp0[0]) : 0;
-    var mDistKm = mwp0[1] + (mwp1[1] - mwp0[1]) * mFrac;
-    var mAngOff = mwp0[2] + (mwp1[2] - mwp0[2]) * mFrac;
-    var mDistLy = mDistKm * KM_IN_LY;
-    var mAngle = moonAngle2 + mAngOff;
-    msnObj.x = earthX + mDistLy * Math.cos(mAngle);
-    msnObj.y = earthY + mDistLy * Math.sin(mAngle);
-    msnObj.wx3d = earthX + mDistLy * Math.cos(mAngle);
-    msnObj.wy3d = earthY + mDistLy * Math.sin(mAngle);
-    msnObj.wz3d = earthZ;
-    msnObj.dist = Math.sqrt(msnObj.x * msnObj.x + msnObj.y * msnObj.y);
-    // Auto-follow when selected (keeps pan centered on moving spacecraft)
-    if (state.selected === msnObj) {
-      state.follow = msnObj;
+      // If selected, keep visible at Earth (for inspection even post-mission)
+      if (state.selected === msnObj) {
+        msnObj.x = earthX; msnObj.y = earthY;
+        msnObj.wx3d = earthX; msnObj.wy3d = earthY; msnObj.wz3d = earthZ;
+        msnObj.dist = AU_IN_LY;
+      } else {
+        msnObj.x = 1e12; msnObj.y = 1e12;
+        msnObj.wx3d = 1e12; msnObj.wy3d = 1e12; msnObj.wz3d = 1e12;
+        continue;
+      }
+    } else {
+      // Active mission: interpolate current position
+      msnObj._missionActive = true;
+      var mwp0 = msn.traj[0], mwp1 = msn.traj[1];
+      for (var mti = 0; mti < msn.traj.length - 1; mti++) {
+        if (msn.traj[mti + 1][0] >= msnHrs) { mwp0 = msn.traj[mti]; mwp1 = msn.traj[mti + 1]; break; }
+      }
+      var mFrac = (mwp1[0] - mwp0[0]) > 0 ? (msnHrs - mwp0[0]) / (mwp1[0] - mwp0[0]) : 0;
+      var mDistKm = mwp0[1] + (mwp1[1] - mwp0[1]) * mFrac;
+      var mAngOff = mwp0[2] + (mwp1[2] - mwp0[2]) * mFrac;
+      var mDistLy = mDistKm * KM_IN_LY;
+      var mAngle = moonAngle2 + mAngOff;
+      msnObj.x = earthX + mDistLy * Math.cos(mAngle);
+      msnObj.y = earthY + mDistLy * Math.sin(mAngle);
+      msnObj.wx3d = earthX + mDistLy * Math.cos(mAngle);
+      msnObj.wy3d = earthY + mDistLy * Math.sin(mAngle);
+      msnObj.wz3d = earthZ;
+      msnObj.dist = Math.sqrt(msnObj.x * msnObj.x + msnObj.y * msnObj.y);
+      if (state.selected === msnObj) state.follow = msnObj;
     }
     // Pre-compute full trajectory path with fine interpolation for line rendering
     msnObj._trajPoints = [];
@@ -2358,7 +2363,8 @@ function drawMissionTrajectories() {
 
   for (var oi = 0; oi < objects.length; oi++) {
     var obj = objects[oi];
-    if (!obj._trajPoints || !obj._missionActive) continue;
+    if (!obj._trajPoints) continue;
+    if (!obj._missionActive && state.selected !== obj) continue;
     var pts = obj._trajPoints;
     // Use object color, semi-transparent
     ctx.strokeStyle = obj.color.replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', '');
@@ -5499,6 +5505,17 @@ function draw2D(ts) {
     state.panX = state.follow.x;
     state.panY = state.follow.y;
     state.dirty = true;
+  }
+  // Keep pan centered on selected object at close zoom (prevents pop-off
+  // for dynamically positioned objects like spacecraft and satellites)
+  if (state.selected && !state.follow) {
+    var selDx = state.panX - state.selected.x;
+    var selDy = state.panY - state.selected.y;
+    var selDist = Math.sqrt(selDx * selDx + selDy * selDy);
+    if (selDist > vr * 0.5) {
+      state.panX = state.selected.x;
+      state.panY = state.selected.y;
+    }
   }
 
   var sw = W / dpr;
