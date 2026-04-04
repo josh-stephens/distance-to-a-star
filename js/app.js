@@ -563,15 +563,23 @@ function updatePlanetPositions() {
     if (state.selected === msnObj) {
       state.follow = msnObj;
     }
-    // Pre-compute full trajectory path for line rendering
+    // Pre-compute full trajectory path with fine interpolation for line rendering
     msnObj._trajPoints = [];
-    for (var tpi = 0; tpi < msn.traj.length; tpi++) {
-      var twp = msn.traj[tpi];
-      var tpDistLy = twp[1] * KM_IN_LY;
-      var tpAngle = moonAngle2 + twp[2];
+    var TRAJ_INTERP = 200; // total interpolated points for smooth lines at any zoom
+    var msnDuration = msn.traj[msn.traj.length - 1][0];
+    for (var tpi = 0; tpi <= TRAJ_INTERP; tpi++) {
+      var tpH = (tpi / TRAJ_INTERP) * msnDuration;
+      // Find bracketing waypoints
+      var ta0 = msn.traj[0], ta1 = msn.traj[1];
+      for (var tai = 0; tai < msn.traj.length - 1; tai++) {
+        if (msn.traj[tai + 1][0] >= tpH) { ta0 = msn.traj[tai]; ta1 = msn.traj[tai + 1]; break; }
+      }
+      var tpF = (ta1[0] - ta0[0]) > 0 ? (tpH - ta0[0]) / (ta1[0] - ta0[0]) : 0;
+      var tpDist = (ta0[1] + (ta1[1] - ta0[1]) * tpF) * KM_IN_LY;
+      var tpAng = moonAngle2 + ta0[2] + (ta1[2] - ta0[2]) * tpF;
       msnObj._trajPoints.push({
-        x: earthX + tpDistLy * Math.cos(tpAngle),
-        y: earthY + tpDistLy * Math.sin(tpAngle)
+        x: earthX + tpDist * Math.cos(tpAng),
+        y: earthY + tpDist * Math.sin(tpAng)
       });
     }
   }
@@ -8462,9 +8470,8 @@ function panTowardTargetOnZoomIn(prevZoom, newZoom) {
   var vr = sliderToViewRadius(newZoom);
   var ratio = dist / vr;
   if (ratio < 0.1) return;
-  // If the selected object is more than 2x the view radius away, snap to it
-  // — gentle pull can't keep up at extreme zoom differences
-  if (state.selected && ratio > 2) {
+  // Always snap to selected object when it's off-center relative to zoom
+  if (state.selected && ratio > 0.5) {
     state.panX = targetX;
     state.panY = targetY;
     updateRecenterBtn();
