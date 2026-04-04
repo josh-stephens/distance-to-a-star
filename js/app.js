@@ -8751,18 +8751,20 @@ function navigateToObject(objName) {
 
   var range = obj.visRange || catRanges[obj.category];
   if (!range) return;
-  var rangeLo = range[0], rangeHi = Math.min(range[1], 400 * MLY);
-  var targetVR = Math.sqrt(rangeLo * rangeHi);
-  if (obj.dist === 0 && obj.category === 'solar') targetVR = 0.00004;
-
-  // If geometric mean is zero or nonsensical, compute from object distance
-  if (targetVR < 0.000001 || isNaN(targetVR)) {
-    if (obj.dist > 0) {
-      targetVR = obj.dist * 4; // frame with object at ~quarter of view
-    } else {
-      targetVR = 0.00004; // default solar system view
-    }
+  // Zoom to frame the object: use physRadius if available (shows structure),
+  // otherwise use distance-based framing
+  var targetVR;
+  if (obj.physRadius && obj.physRadius > 1e-6) {
+    // Zoom close enough to see the object's physical extent
+    targetVR = obj.physRadius * 8;
+  } else if (obj.dist > 0) {
+    targetVR = obj.dist * 0.5; // frame with object filling half the view
+  } else {
+    targetVR = 0.00004;
   }
+  // Clamp to visibility range (don't zoom beyond where the object exists)
+  var rangeLo = range[0], rangeHi = Math.min(range[1], 400 * MLY);
+  targetVR = Math.max(rangeLo * 1.1, Math.min(rangeHi * 0.9, targetVR));
   // Clamp solar system objects to reasonable minimum
   if (obj.category === 'solar' && obj.dist > 0) {
     // Inner planets (Mercury, Venus, Earth, Mars): zoom in close to show just that region

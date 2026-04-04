@@ -271,12 +271,12 @@ var simTime = {
 var catRanges = {
   solar: [0, 0.3],
   stellar: [0.3, 2000],
-  nebula: [50, 150000],
-  cluster: [200, 200000],
-  exotic: [50, 250000],
-  galaxy: [200, 250000],
-  local: [8000, 15e6],
-  cosmic: [2e6, 400 * MLY]
+  nebula: [5, 150000],
+  cluster: [10, 200000],
+  exotic: [5, 250000],
+  galaxy: [20, 250000],
+  local: [500, 15e6],
+  cosmic: [50000, 400 * MLY]
 };
 
 // ─── Presets ──────────────────────────────────────────────────────────
