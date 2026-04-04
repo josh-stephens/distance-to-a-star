@@ -2394,6 +2394,47 @@ function drawMissionTrajectories() {
   ctx.restore();
 }
 
+function drawMissionTrajectories3D() {
+  if (!effects.missionTrajectories) return;
+  var camDist = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+  if (camDist > 0.01) return;
+  var sw = W / dpr, sh = H / dpr;
+
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+
+  for (var oi = 0; oi < objects.length; oi++) {
+    var obj = objects[oi];
+    if (!obj._trajPoints) continue;
+    if (!obj._missionActive && state.selected !== obj) continue;
+    var pts = obj._trajPoints;
+    if (obj.color[0] === '#') {
+      var hex = obj.color;
+      var r2 = parseInt(hex.slice(1, 3), 16);
+      var g2 = parseInt(hex.slice(3, 5), 16);
+      var b2 = parseInt(hex.slice(5, 7), 16);
+      ctx.strokeStyle = 'rgba(' + r2 + ',' + g2 + ',' + b2 + ',0.35)';
+    }
+    ctx.beginPath();
+    var started = false;
+    for (var pi = 0; pi < pts.length; pi++) {
+      var sp = worldToScreen3D(pts[pi].x, pts[pi].y, 0);
+      if (!sp) { started = false; continue; }
+      if (sp.x < -200 || sp.x > sw + 200 || sp.y < -200 || sp.y > sh + 200) {
+        started = false; continue;
+      }
+      if (!started) { ctx.moveTo(sp.x, sp.y); started = true; }
+      else ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 function drawAsteroidBelt() {
   if (!effects.orbits) return;
   var vr = getViewRadius();
@@ -5859,6 +5900,7 @@ function draw3D(ts) {
 
   // Draw orbital planes behind objects
   drawOrbitalPlanes3D();
+  drawMissionTrajectories3D();
 
   // Draw asteroid belt particles in 3D
   (function() {
