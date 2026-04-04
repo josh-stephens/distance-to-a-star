@@ -1902,10 +1902,23 @@ function updateGalaxyMotion() {
   }
 }
 
+// Camera-relative rendering origin. Set each frame to the orbit focal point
+// (or camera position) to avoid floating-point precision loss when subtracting
+// large world coordinates. All positions are shifted by this origin before
+// projection, keeping the math in small-number space. This is what enables
+// true-scale rendering from galaxy clusters (millions of ly) down to
+// spacecraft (meters). See memory/relative_camera_rendering.md.
+var _cam3dOriginX = 0, _cam3dOriginY = 0, _cam3dOriginZ = 0;
+// Camera position relative to the origin (set in draw3D before rendering)
+var _cam3dRelX = 0, _cam3dRelY = 0, _cam3dRelZ = 0;
+
 function worldToScreen3D(wx, wy, wz) {
-  var dx = wx - cam3d.px;
-  var dy = wy - cam3d.py;
-  var dz = wz - cam3d.pz;
+  // Subtract the rendering origin FIRST (small numbers), then subtract
+  // the relative camera position (also small). This avoids catastrophic
+  // cancellation from subtracting two large nearly-equal coordinates.
+  var dx = (wx - _cam3dOriginX) - _cam3dRelX;
+  var dy = (wy - _cam3dOriginY) - _cam3dRelY;
+  var dz = (wz - _cam3dOriginZ) - _cam3dRelZ;
 
   // Right vector: (-sinY, cosY, 0)
   var viewX = dx * (-_sinY) + dy * _cosY;
@@ -5866,6 +5879,28 @@ function draw3D(ts) {
     }
   }
 
+  // Set camera-relative rendering origin to avoid floating-point precision loss.
+  // When orbiting, the origin is the focal point. The camera offset is computed
+  // directly from orbit geometry (small numbers) — NOT from subtracting large
+  // world coordinates, which loses precision at close zoom.
+  if (orbitMode.active) {
+    _cam3dOriginX = orbitMode.focalX;
+    _cam3dOriginY = orbitMode.focalY;
+    _cam3dOriginZ = orbitMode.focalZ;
+    // Compute camera offset directly from orbit parameters (full precision)
+    var _orbCosP = Math.cos(orbitMode.orbitPitch);
+    _cam3dRelX = orbitMode.orbitDist * _orbCosP * Math.cos(orbitMode.orbitYaw);
+    _cam3dRelY = orbitMode.orbitDist * _orbCosP * Math.sin(orbitMode.orbitYaw);
+    _cam3dRelZ = orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+  } else {
+    _cam3dOriginX = cam3d.px;
+    _cam3dOriginY = cam3d.py;
+    _cam3dOriginZ = cam3d.pz;
+    _cam3dRelX = 0;
+    _cam3dRelY = 0;
+    _cam3dRelZ = 0;
+  }
+
   // Cache camera trig for worldToScreen3D
   _cosY = Math.cos(cam3d.yaw); _sinY = Math.sin(cam3d.yaw);
   _cosP = Math.cos(cam3d.pitch); _sinP = Math.sin(cam3d.pitch);
@@ -9246,12 +9281,16 @@ function orbitToCamera() {
   }
 
   // Default: orbit around focal point using orbit yaw/pitch
-  cam3d.px = fx + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
-  cam3d.py = fy + orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
-  cam3d.pz = fz + orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
-  var angles = computeLookAngles(cam3d.px, cam3d.py, cam3d.pz, fx, fy, fz);
-  cam3d.yaw = angles.yaw;
-  cam3d.pitch = angles.pitch;
+  var orbOffX = orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.cos(orbitMode.orbitYaw);
+  var orbOffY = orbitMode.orbitDist * Math.cos(orbitMode.orbitPitch) * Math.sin(orbitMode.orbitYaw);
+  var orbOffZ = orbitMode.orbitDist * Math.sin(orbitMode.orbitPitch);
+  cam3d.px = fx + orbOffX;
+  cam3d.py = fy + orbOffY;
+  cam3d.pz = fz + orbOffZ;
+  // Compute look angles from orbit offset directly (avoids precision loss
+  // from subtracting large world coordinates in computeLookAngles)
+  cam3d.yaw = Math.atan2(-orbOffY, -orbOffX);
+  cam3d.pitch = Math.atan2(-orbOffZ, Math.sqrt(orbOffX * orbOffX + orbOffY * orbOffY));
 }
 
 function cameraToOrbit(fx, fy, fz) {
