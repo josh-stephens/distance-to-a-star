@@ -559,6 +559,21 @@ function updatePlanetPositions() {
     msnObj.wy3d = earthY + mDistLy * Math.sin(mAngle);
     msnObj.wz3d = earthZ;
     msnObj.dist = Math.sqrt(msnObj.x * msnObj.x + msnObj.y * msnObj.y);
+    // Auto-follow when selected (keeps pan centered on moving spacecraft)
+    if (state.selected === msnObj) {
+      state.follow = msnObj;
+    }
+    // Pre-compute full trajectory path for line rendering
+    msnObj._trajPoints = [];
+    for (var tpi = 0; tpi < msn.traj.length; tpi++) {
+      var twp = msn.traj[tpi];
+      var tpDistLy = twp[1] * KM_IN_LY;
+      var tpAngle = moonAngle2 + twp[2];
+      msnObj._trajPoints.push({
+        x: earthX + tpDistLy * Math.cos(tpAngle),
+        y: earthY + tpDistLy * Math.sin(tpAngle)
+      });
+    }
   }
 
   // Lagrange points: compute from Earth's current position
@@ -2318,6 +2333,50 @@ function drawOrbits() {
   }
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawMissionTrajectories() {
+  if (!effects.missionTrajectories) return;
+  var vr = getViewRadius();
+  if (vr > 0.01) return; // only at solar system scale
+  var scale = getScale();
+  var sw = W / dpr, sh = H / dpr;
+
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+
+  for (var oi = 0; oi < objects.length; oi++) {
+    var obj = objects[oi];
+    if (!obj._trajPoints || !obj._missionActive) continue;
+    var pts = obj._trajPoints;
+    // Use object color, semi-transparent
+    ctx.strokeStyle = obj.color.replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', '');
+    // Convert hex to rgba if needed
+    if (obj.color[0] === '#') {
+      var hex = obj.color;
+      var r2 = parseInt(hex.slice(1, 3), 16);
+      var g2 = parseInt(hex.slice(3, 5), 16);
+      var b2 = parseInt(hex.slice(5, 7), 16);
+      ctx.strokeStyle = 'rgba(' + r2 + ',' + g2 + ',' + b2 + ',0.35)';
+    }
+    ctx.beginPath();
+    var started = false;
+    for (var pi = 0; pi < pts.length; pi++) {
+      var sp = worldToScreen(pts[pi].x, pts[pi].y);
+      if (sp.x < -200 || sp.x > sw + 200 || sp.y < -200 || sp.y > sh + 200) {
+        started = false;
+        continue;
+      }
+      if (!started) { ctx.moveTo(sp.x, sp.y); started = true; }
+      else ctx.lineTo(sp.x, sp.y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -5447,6 +5506,7 @@ function draw2D(ts) {
   drawRegions();
   drawOrbits();
   drawAsteroidBelt();
+  drawMissionTrajectories();
   drawConstellationLines();
   drawGalaxies();
   drawGalacticParticles();
@@ -7966,7 +8026,8 @@ function buildEffectsPanel() {
     { key: 'orbits', label: 'Orbit lines' },
     { key: 'orbitalPlanes', label: 'Orbital planes (3D)' },
     { key: 'occlusion', label: 'Shadows/occlusion' },
-    { key: 'galacticParticles', label: 'Background stars' }
+    { key: 'galacticParticles', label: 'Background stars' },
+    { key: 'missionTrajectories', label: 'Mission trajectories' }
   ];
 
   checks.forEach(function(c) {
