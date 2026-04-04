@@ -2020,7 +2020,12 @@ function computeVisibilityScore(obj, camDist) {
   // Returns 0-1 score; 0 = invisible, 1 = fully visible
 
   // Sol is ALWAYS the anchor — max score, always visible from anywhere
-  if (obj.name === 'Sun (You Are Here)') return 1.0;
+  if (obj.name === 'Sun (You Are Here)') {
+    // Hide when camera is close enough for the real Sun to be visible
+    var camFromOrigin3 = Math.sqrt(cam3d.px * cam3d.px + cam3d.py * cam3d.py + cam3d.pz * cam3d.pz);
+    if (camFromOrigin3 < 100) return 0;
+    return 1.0;
+  }
 
   // Selected or hovered objects always fully visible
   if (state.selected === obj || state.hoverObj === obj) return 1.0;
