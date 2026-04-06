@@ -7901,9 +7901,9 @@ document.getElementById('glossary-close').addEventListener('click', function() {
       var matchShort = entry.dataset.searchShort.indexOf(query) !== -1;
       var matchLong = entry.dataset.searchLong.indexOf(query) !== -1;
       var vis = matchName || matchShort || matchLong;
-      // Mark entry with filter match but keep hidden — category click reveals
+      // Mark entry and show matches immediately within their categories
       entry.dataset.filterMatch = vis ? '1' : '0';
-      entry.style.display = 'none';
+      entry.style.display = vis ? '' : 'none';
 
       if (vis) {
         var pc = entry.dataset.cat;
@@ -7919,10 +7919,12 @@ document.getElementById('glossary-close').addEventListener('click', function() {
       if (catHasVisible[catName]) {
         catLabels[ck].style.display = '';
         // Show match count instead of total
-        var countEl = catLabels[ck].querySelector('.glossary-cat-count');
-        if (countEl) countEl.textContent = catMatchCounts[catName];
-        // Collapse so user clicks to see matches
-        collapseCategory(catLabels[ck]);
+        var countEl2 = catLabels[ck].querySelector('.glossary-cat-count');
+        if (countEl2) countEl2.textContent = catMatchCounts[catName];
+        // Expand to show matching entries
+        catLabels[ck].classList.remove('collapsed');
+        var arrow2 = catLabels[ck].querySelector('.glossary-cat-arrow');
+        if (arrow2) arrow2.textContent = 'v';
       } else {
         catLabels[ck].style.display = 'none';
       }
