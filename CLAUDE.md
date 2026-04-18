@@ -24,29 +24,39 @@ Files load via `<script>` tags in order, sharing globals. No modules (ES5 constr
 ## Data Architecture (`js/data.js`)
 - `AU_IN_LY`, `MLY`, `KM_IN_LY`, `MIN_LOG`, `MAX_LOG` — Unit constants
 - `ORBIT_CLOSE_KM`, `ORBIT_FAR_KM`, `ORBIT_RADIUS_MULT` — 3D orbit distance constants
+- `GAL_CENTER_X/Y`, `GAL_V_CIRC`, `GAL_PATTERN_SPEED`, `GAL_Z_PERIOD` — Galactic dynamics constants
+- `galaxyMotion{}` — Peculiar velocities (approach/orbit) for Local Group galaxies
+- `HUBBLE_RATE` — Hubble constant in ly/yr/ly
 - `asteroidBeltConfig` — Belt inner/outer AU, count, color, Kirkwood gap positions
 - `orbitalPlaneData{}` — Keplerian elements (sma, ecc, inc, lan, aop, M0, period) for planets + Ceres
 - `rotationData{}` — Sidereal rotation periods and axial tilts
 - `properMotionData{}` — Proper motions (pmRA, pmDec, rv) for 27 nearby stars
+- `artemisIILaunchJ2000`, `artemisIITrajectory[]` — Artemis II mission trajectory data
+- `apolloLandingTraj[]`, `apollo8Traj[]`, `apollo13Traj[]` — Shared Apollo trajectory profiles
 - `objects[]` — Celestial objects with position, distance, category, visual properties, facts
-- `glossaryData[]` — Educational entries with name, category, color, short/long descriptions
+- `glossaryData[]` — Educational entries with name, category, color, short/long descriptions, optional `images[]`
 - `regions[]` — Structural regions (orbits, arms, clusters) with visibility ranges
 - `refDistances[]` — Reference distance comparisons (Earth→Sun through Local Group diameter)
-- `tourDefs{}` — Guided tour definitions with steps, narration, zoom targets
+- `tourDefs{}` — Guided tour definitions with steps, narration, zoom targets (steps support `simTimeJ2000`, `timeSpeed`)
 - `catRanges{}` — Category-level visibility ranges for object filtering
-- `effects{}` — Visual effect toggles and settings
+- `effects{}` — Visual effect toggles and settings (includes `galacticParticles`, `missionTrajectories`)
 - `constellationDefs{}` — Constellation line patterns and metadata
 - `cosmicFilamentNodes[]`, `cosmicFilamentLinks[]`, `cosmicVoids[]` — Large-scale structure
 - `cam3dViewpoints[]`, `cam3dLookTargets[]` — 3D camera slot defaults (8+8)
 - `categoryLayers{}` — Per-category interior layer definitions for overlay rendering
 - `scenePresets[]` — 3D scene configurations (camera, time, effects)
+- **Data placement rule**: trajectory/mission `var` declarations MUST go OUTSIDE `objects[]` array (can't have `var` inside array literal)
 
 ## Critical Patterns — Read Before Changing
 
 ### Visibility System
 - Objects filtered by `catRanges[category]` or per-object `visRange: [min, max]` in light-years
 - Filter uses 1% tolerance: `vr < range[0] * 0.99 || vr > range[1] * 1.01` (prevents float edge cases)
+- **Fade zones**: 15% fade at far edge of visRange; near-edge fade SKIPPED when `range[0] < 0.01` (prevents objects vanishing at close zoom)
+- `_visFade` alpha multiplier (0-1) stored per object, applied by `drawObject` and label rendering
+- **Selected objects bypass range checks** — always visible regardless of catRange/visRange
 - Sun has `visRange: [0, 250]` — must ALWAYS be visible in 2D
+- **Dual Sun**: "Sun" (solar) hidden in 3D when camDist > 100 ly; "Sun (You Are Here)" (galaxy) hidden when camDist < 100 ly
 - `catRanges.stellar = [0.3, 2000]` — extended to prevent dead zone between stellar and galaxy scales
 - **No `Infinity` in visibility ranges** — use `400 * MLY` as upper bound
 
@@ -71,6 +81,38 @@ Files load via `<script>` tags in order, sharing globals. No modules (ES5 constr
 - "Sun (You Are Here)" (category galaxy) takes over at stellar+ distances
 - Sun must pass `isStar()` check for proper limb-darkened rendering (not planet terminator)
 - Stars keep their glow when physically resolved (`glowFade` exemption)
+
+### Camera-Relative Rendering (3D Precision)
+- `worldToScreen3D` uses coordinates relative to `_cam3dOriginX/Y/Z` (set to orbit focal point each frame)
+- Camera offset `_cam3dRelX/Y/Z` computed directly from orbit geometry — NEVER from `cam3d.px - focalX` (loses precision)
+- `orbitToCamera()` computes look angles from orbit offset directly, not `computeLookAngles` with world coords
+- Eliminates catastrophic cancellation when subtracting large nearly-equal coordinates
+- Without this, objects vanish below ~10 km orbit distance; with it, visible down to ~9 meters
+- `viewZ <= 1e-20` threshold in worldToScreen3D (was 1e-12 which was too aggressive for close orbits)
+
+### Mission Trajectory System
+- Time-bounded objects: `_missionActive` flag, hidden outside launch-to-splashdown window
+- `missions[]` array in `updatePlanetPositions()` — each entry: `{ name, launchJ2000, traj }`
+- Trajectory: array of `[hours, distance_km, angle_offset_rad]` waypoints, 200-point interpolation for rendering
+- Uses sim time (`getSimDaysJ2000()`) not wall-clock — plays at user's time speed
+- Auto-follow engaged for selected mission spacecraft
+- Tour steps support `simTimeJ2000` and `timeSpeed` to control simulation clock
+- Selected post-mission objects stay visible at Earth (not hidden off-map)
+
+### Galactic Motion System
+- Three tiers: galactic rotation (MW objects), galaxy peculiar velocities (Local Group), Hubble flow (cosmic)
+- Galactic params computed at init: `_galR`, `_galAngle0`, `_galPeriod`, `_galBaseX/Y`, `_galBase3dX/Y/Z`
+- 2D positions updated from galactic orbit delta; 3D positions rotated around galactic center axis
+- `o.dist` computed from 3D positions (`sqrt(wx3d² + wy3d² + wz3d²)`), NOT from 2D map coords
+- Satellite galaxies use circular orbits (not linear velocities which cause escape trajectories)
+- `GAL_PATTERN_SPEED` — verify unit conversions with dimensional analysis (km/s/kpc → rad/yr)
+- Density field: 200 local + 800 galactic particles, cross-fade at 1000-2000 ly zoom
+- Per-particle perf reduction (skip every other particle), NOT per-frame (causes synchronized blinking)
+
+### Glossary Image Framework
+- `glossaryData` entries support `images: [{ src, caption, credit }]` — rendered as 2x2 grid, lazy-loaded
+- `objects[]` entries support `gallery: [{ src, title, text }]` — large stacked cards in info panel
+- Both use click-to-lightbox. Images stored in `img/`, deployed via `deploy.sh`
 
 ### Shared Helpers
 - `isStar(obj)` — returns true for stellar, exotic, Sun, Sun (You Are Here)
@@ -129,16 +171,22 @@ After changes, verify at each zoom preset:
 6. Great Attractor — cosmic filaments, voids, galaxy clusters visible, no objects popping out at max zoom
 
 ## Deployment
-- **Deploy script**: `./deploy.sh` — rsyncs `index.html` + `js/` to bill and skippy
+- **Deploy script**: `./deploy.sh` — rsyncs `index.html` + `js/` + `img/` to bill and skippy
+- **Cache busting**: deploy.sh auto-stamps `?v=YYYYMMDDHHMMSS` on script tags before upload (Cloudflare 4h cache)
 - **Auto-deploy**: `pre-push` git hook runs `deploy.sh` when pushing to `main`
 - **bill**: `cosmos.eusd.org` — `/opt/caddy/sites-content/distance-to-a-star/`
 - **skippy**: `cosmos.711bf.org` — `/var/www/cosmos/`
+- **Cloudflare**: `cf-cache-status: HIT` with 4h TTL — always bump cache-buster on deploy or files won't update
 
 ## Key Functions (`js/app.js`)
 - `navigateToObject(name)` — Zoom+pan to frame an object (2D animation)
 - `navigateToObject3D(name)` — Fly camera to object in 3D
 - `updatePlanetPositions()` — Keplerian mechanics + satellite offsets (Moon, Charon, Pluto barycenter)
-- `updateStellarPositions()` — Proper motion position updates
+- `updateStellarPositions()` — Galactic rotation + z-oscillation + proper motion blending
+- `updateGalaxyMotion()` — Galaxy peculiar velocities + Hubble flow
+- `drawMilkyWayBand3D()` — Luminous galactic band in 3D sky view
+- `drawGalacticParticles()` / `drawGalacticParticles3D()` — Density field particles (2D/3D)
+- `drawMissionTrajectories()` / `drawMissionTrajectories3D()` — Mission path lines (2D/3D)
 - `drawOrbits()` — Cached Keplerian orbit ellipse paths
 - `drawAsteroidBelt()` — Cached procedural asteroid dots with Kirkwood gaps
 - `drawSpiralArms(...)` — Logarithmic spiral galaxy renderer
@@ -170,6 +218,6 @@ Glossary: Solar System, Stars, Nebulae, Galaxies & Clusters, Extreme Phenomena, 
 
 ## 3D Camera Tracking
 - `cam3d.trackTarget` — key string for look-at lock-on
-- `orbitToCamera()` positions camera behind focal object relative to target
-- Default: 0.9x focal-to-target distance, 8deg elevation
+- `orbitToCamera()` — free orbit with look-at override (user controls yaw/pitch, camera always faces target)
 - Tracking persists across "View from" changes
+- Look-at engagement preserves current orbit distance (doesn't yank camera away)
