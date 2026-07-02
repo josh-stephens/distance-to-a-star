@@ -264,6 +264,7 @@ var dpr = Math.min(devicePixelRatio || 1, 2);
 var _perfFps = 60, _perfFrameCount = 0, _perfLastCheck = 0, _perfReduced = false;
 
 function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
   var rect = canvas.getBoundingClientRect();
   W = rect.width * dpr;
   H = rect.height * dpr;
@@ -2385,14 +2386,14 @@ function drawMissionTrajectories() {
     if (!obj._missionActive && state.selected !== obj) continue;
     var pts = obj._trajPoints;
     // Use object color, semi-transparent
-    ctx.strokeStyle = obj.color.replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', '');
-    // Convert hex to rgba if needed
     if (obj.color[0] === '#') {
       var hex = obj.color;
       var r2 = parseInt(hex.slice(1, 3), 16);
       var g2 = parseInt(hex.slice(3, 5), 16);
       var b2 = parseInt(hex.slice(5, 7), 16);
       ctx.strokeStyle = 'rgba(' + r2 + ',' + g2 + ',' + b2 + ',0.35)';
+    } else {
+      ctx.strokeStyle = obj.color.replace('rgb(', 'rgba(').replace(')', ', 0.4)');
     }
     ctx.beginPath();
     var started = false;
@@ -5571,7 +5572,7 @@ function draw2D(ts) {
     var selDx = state.panX - state.selected.x;
     var selDy = state.panY - state.selected.y;
     var selDist = Math.sqrt(selDx * selDx + selDy * selDy);
-    if (selDist > vr * 0.5) {
+    if (selDist > getViewRadius() * 0.5) {
       state.panX = state.selected.x;
       state.panY = state.selected.y;
     }
@@ -8014,6 +8015,7 @@ document.getElementById('glossary-close').addEventListener('click', function() {
 // ─── Scene presets ────────────────────────────────────────────────────
 
 function applyScenePreset(preset) {
+  if (tourEngine.active) tourEngine.stop();
   // Enter 3D mode if not already
   if (!state.mode3d) {
     toggle3D();
@@ -8491,7 +8493,7 @@ function readHash() {
   if (params.vr) {
     var vr = parseFloat(params.vr);
     if (!isNaN(vr) && vr > 0) {
-      state.zoom = viewRadiusToSlider(vr);
+      state.zoom = Math.max(0, Math.min(1000, viewRadiusToSlider(vr)));
       slider.value = Math.round(state.zoom);
     }
   }
@@ -8509,7 +8511,9 @@ function readHash() {
     }
   }
   if (params.m === '3d' && !state.mode3d) {
-    state.mode3d = true;
+    toggle3D(); // single source of 3D chrome truth; camera overridden below
+    orbitMode.active = false;
+    cam3dAnim.active = false;
     if (params.cx) cam3d.px = parseFloat(params.cx) || 0;
     if (params.cy) cam3d.py = parseFloat(params.cy) || 0;
     if (params.cz) cam3d.pz = parseFloat(params.cz) || 0;
@@ -8525,6 +8529,7 @@ function readHash() {
         orbitMode.focalY = fObj.wy3d || fObj.y || 0;
         orbitMode.focalZ = fObj.wz3d || 0;
       }
+      orbitToCamera();
     }
   }
   // Restore time state
@@ -9077,6 +9082,7 @@ function animatePanToSun() {
 }
 
 function goHome() {
+  if (state.mode3d) return; // 2D-only: would animate hidden pan/zoom state in 3D
   if (tourEngine.active) tourEngine.stop();
   var targetSlider = presets.solar.slider;
   var startZoom = state.zoom;
@@ -9569,7 +9575,8 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
-  if (e.target.tagName === 'INPUT') return;
+  var tgtTag = e.target.tagName;
+  if (tgtTag === 'INPUT' || tgtTag === 'TEXTAREA' || e.target.isContentEditable) return;
 
   if (e.key === '/') {
     e.preventDefault();
@@ -9593,6 +9600,15 @@ document.addEventListener('keydown', function(e) {
       simTime.paused = !simTime.paused;
       state.dirty = true;
     }
+    return;
+  }
+
+  // Tour hotkeys claim digits while the tour menu is open (must precede presets)
+  var tourDD = document.getElementById('tour-dropdown');
+  if (tourDD.classList.contains('open') && e.key >= '1' && e.key <= String(tourIds.length)) {
+    var tourIdx = parseInt(e.key, 10) - 1;
+    if (tourIds[tourIdx]) tourEngine.start(tourIds[tourIdx]);
+    closeTourDropdown();
     return;
   }
 
@@ -9624,14 +9640,6 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
-  // Tour hotkeys when dropdown is open
-  var tourDD = document.getElementById('tour-dropdown');
-  if (tourDD.classList.contains('open') && e.key >= '1' && e.key <= String(tourIds.length)) {
-    var tourIdx = parseInt(e.key) - 1;
-    if (tourIds[tourIdx]) tourEngine.start(tourIds[tourIdx]);
-    return;
-  }
-
   if (e.key === 'Escape') {
     if (tourEngine.active) tourEngine.stop();
     else {
@@ -9657,7 +9665,7 @@ document.addEventListener('keydown', function(e) {
   }
 
   // Arrow key panning (when not in tour)
-  if (!tourEngine.active && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+  if (!tourEngine.active && !state.mode3d && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
     var vr = getViewRadius();
     var panStep = vr * 0.15; // pan 15% of view radius per keypress
@@ -9785,6 +9793,24 @@ canvas.addEventListener('touchend', function(e) {
   touchState.pinching = false;
   touchState.panning = false;
   touchState.moved = false;
+  if (e.touches.length === 1) {
+    // One finger remains after a pinch — hand off to single-finger tracking
+    touchState.panning = true;
+    touchState.startX = e.touches[0].clientX;
+    touchState.startY = e.touches[0].clientY;
+    if (state.mode3d) {
+      if (orbitMode.active) {
+        touchState.startYaw = orbitMode.orbitYaw;
+        touchState.startPitch = orbitMode.orbitPitch;
+      } else {
+        touchState.startYaw = cam3d.yaw;
+        touchState.startPitch = cam3d.pitch;
+      }
+    } else {
+      touchState.startPanX = state.panX;
+      touchState.startPanY = state.panY;
+    }
+  }
 }, { passive: false });
 
 // ─── Init ──────────────────────────────────────────────────────────────
@@ -10225,7 +10251,12 @@ function dismissWelcome() {
   document.getElementById('info-panel').classList.add('hidden');
 }
 
-showWelcome();
+if (state.selected) {
+  // A restored last-session selection is already in the info panel — don't overwrite it
+  welcomeShowing = false;
+} else {
+  showWelcome();
+}
 
 resize();
 state.zoom = presets.solar.slider;
