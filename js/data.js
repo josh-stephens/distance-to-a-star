@@ -811,11 +811,11 @@ var objects = [
     desc: "The closest supernova since the invention of the telescope. Neutrino detectors in Japan and the US caught 25 neutrinos hours before the light arrived, confirming core-collapse theory and opening the era of neutrino astronomy." },
 
   // Clusters
-  { name: "47 Tucanae", x: 5000, y: -12000, dist: 14500, radius: 4, color: "#ffcc88", glow: "#ffcc8833",
+  { name: "47 Tucanae", x: 5577, y: -13385, dist: 14500, radius: 4, color: "#ffcc88", glow: "#ffcc8833",
     type: "Globular cluster", category: "cluster", visRange: [500, 150000],
     facts: [["Distance", "14,500 light-years"], ["Stars", "~1 million"], ["Rank", "2nd brightest globular"]],
     desc: "One of the most massive globular clusters, visible to the naked eye from the Southern Hemisphere." },
-  { name: "Omega Centauri", x: -8000, y: -13000, dist: 17000, radius: 5, color: "#ffdd99", glow: "#ffdd9944",
+  { name: "Omega Centauri", x: -8910, y: -14478, dist: 17000, radius: 5, color: "#ffdd99", glow: "#ffdd9944",
     type: "Globular cluster (~10M stars)", category: "cluster", visRange: [500, 150000],
     facts: [["Distance", "17,000 light-years"], ["Stars", "~10 million"], ["Origin", "May be a stripped dwarf galaxy core"]],
     desc: "The largest MW globular cluster. May be the remnant core of a consumed dwarf galaxy." },
