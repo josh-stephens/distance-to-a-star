@@ -10458,6 +10458,16 @@ state.zoom = presets.solar.slider;
 slider.value = state.zoom;
 state.activePreset = 'solar';
 
+// Warm the canvas fonts (canvas ctx.font doesn't reliably trigger @font-face loads)
+if (document.fonts && document.fonts.load) {
+  document.fonts.load('600 88px Orbitron');
+  document.fonts.load('800 112px Orbitron');
+  document.fonts.load('300 64px Rajdhani');
+  document.fonts.load('11px Rajdhani');
+  document.fonts.load('12px "Space Mono"');
+  document.fonts.load('700 12px "Space Mono"');
+}
+
 // Read URL hash if present
 readHash();
 
