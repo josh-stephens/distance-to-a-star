@@ -6434,41 +6434,43 @@ function animationLoop(ts) {
 function getHistoricalEvent(distLy) {
   var yearsAgo = distLy; // 1 ly = light traveling 1 year
   var launchYear = 2026 - yearsAgo;
+  var yr = Math.round(launchYear);
 
-  // Historical timeline (most recent first for matching)
-  var events = [
-    [0.002, null], // less than ~17 hours, skip
-    [0.01, "this light was already en route when you woke up today"],
-    [0.1, "this light left about " + (distLy * 365.25).toFixed(0) + " days ago"],
-    [1, "this light left about " + yearsAgo.toFixed(1) + " years ago"],
-    [4.3, "the light you see now left before the COVID-19 pandemic"],
-    [10, "the light you see now left when " + Math.round(2026 - yearsAgo) + " was a new year"],
-    [30, "this light left around " + Math.round(launchYear) + ", when the internet was just emerging"],
-    [65, "this light left around " + Math.round(launchYear) + ", during the Space Race era"],
-    [150, "this light left around " + Math.round(launchYear) + ", before the American Civil War"],
-    [250, "this light left around " + Math.round(launchYear) + ", before the American Revolution"],
-    [500, "this light departed around " + Math.round(launchYear) + ", when Columbus sailed"],
-    [1000, "this light left around " + Math.round(launchYear) + " AD, during the Viking Age"],
-    [2100, "this light left when Rome was still an empire"],
-    [5000, "this light left when the Egyptian pyramids were being built"],
-    [10000, "this light left at the dawn of agriculture and civilization"],
-    [40000, "this light left when Neanderthals still walked the Earth"],
-    [200000, "this light left when Homo sapiens first appeared"],
-    [2e6, "this light left when the first members of genus Homo appeared"],
-    [6e6, "this light left when humans and chimpanzees last shared a common ancestor"],
-    [66e6, "this light left when dinosaurs still ruled the Earth"],
-    [250e6, "this light left during the Permian period, before the Great Dying"],
-    [540e6, "this light left during the Cambrian explosion of complex life"],
-    [2e9, "this light left when only single-celled life existed on Earth"],
-    [4.5e9, "this light left before the Earth itself had formed"],
-    [13.8e9, "this light has been traveling since near the beginning of the universe"]
-  ];
+  // Sub-year scales
+  if (yearsAgo <= 0.002) return null; // less than ~17 hours, skip
+  if (yearsAgo <= 0.01) return "this light was already en route when you woke up today";
+  if (yearsAgo <= 0.1) return "this light left about " + (distLy * 365.25).toFixed(0) + " days ago";
+  if (yearsAgo <= 1) return "this light left about " + yearsAgo.toFixed(1) + " years ago";
 
-  for (var i = 0; i < events.length; i++) {
-    if (yearsAgo <= events[i][0]) {
-      return events[i][1];
-    }
-  }
+  // Historical eras keyed on the year the light departed — each label
+  // must be true across its entire span, not just at one edge.
+  if (launchYear >= 2015) return "this light left in " + yr + " — just a few years ago";
+  if (launchYear >= 2007) return "this light left in " + yr + ", when smartphones were brand new";
+  if (launchYear >= 1990) return "this light left in " + yr + ", when the internet was young";
+  if (launchYear >= 1957) return "this light left in " + yr + ", during the Space Race";
+  if (launchYear >= 1914) return "this light left in " + yr + ", in the era of the World Wars";
+  if (launchYear >= 1865) return "this light left in " + yr + ", in the age of railroads and telegraphs";
+  if (launchYear >= 1776) return "this light left in " + yr + ", before the American Civil War";
+  if (launchYear >= 1492) return "this light left in " + yr + ", before the American Revolution";
+  if (launchYear >= 1066) return "this light left in " + yr + " AD, before Columbus sailed to the Americas";
+  if (launchYear >= 793) return "this light left in " + yr + " AD, during the Viking Age";
+  if (launchYear >= 476) return "this light left in " + yr + " AD, in the early Middle Ages";
+  if (launchYear >= -27) return "this light left when Rome was still an empire";
+  if (launchYear >= -3100) return "this light left in the age of ancient Egypt";
+  if (launchYear >= -8000) return "this light left at the dawn of agriculture and civilization";
+
+  // Prehistoric / geological scales keyed on years ago
+  if (yearsAgo <= 40e3) return "this light left during the last Ice Age";
+  if (yearsAgo <= 100e3) return "this light left when humans were first migrating out of Africa";
+  if (yearsAgo <= 300e3) return "this light left when Homo sapiens first appeared";
+  if (yearsAgo <= 2.8e6) return "this light left when the first members of genus Homo appeared";
+  if (yearsAgo <= 7e6) return "this light left when humans and chimpanzees last shared a common ancestor";
+  if (yearsAgo <= 66e6) return "this light left when early primates evolved, after the dinosaurs";
+  if (yearsAgo <= 240e6) return "this light left when dinosaurs ruled the Earth";
+  if (yearsAgo <= 540e6) return "this light left when early life filled the ancient seas";
+  if (yearsAgo <= 2.5e9) return "this light left when only single-celled life existed on Earth";
+  if (yearsAgo <= 4.5e9) return "this light left when the Earth was young";
+  if (yearsAgo <= 13.8e9) return "this light is older than the Earth itself";
   return "this light has been traveling for " + (yearsAgo / 1e9).toFixed(1) + " billion years";
 }
 
@@ -6893,7 +6895,7 @@ function showInfo(obj) {
         card.appendChild(txt);
         var cred = document.createElement('div');
         cred.style.cssText = 'font-size:9px;color:#5a5a78;font-style:italic;margin-top:2px';
-        cred.textContent = 'NASA/ESA/CSA/STScI';
+        cred.textContent = item.credit || 'NASA/ESA/CSA/STScI';
         card.appendChild(cred);
         galDiv.appendChild(card);
       })(obj.gallery[gi]);
@@ -10219,10 +10221,11 @@ function showDocs() {
       'Objects accumulated in layers: solar system first, then nearby stars with real coordinates, then nebulae, clusters, and galaxies out to the Great Attractor. Each object carries its real distance and position in 3D space.',
       'The 3D Sky View came next \u2014 a perspective camera that can be placed at any object and pointed at any constellation. This revealed that constellations are corridors of unrelated stars, not flat patterns. Diffraction spikes, twinkling, nebula clouds, and galaxy disks give the 3D scene visual depth.',
       'Guided tours narrate the journey: the distance ladder explains how we measure the cosmos rung by rung; the constellations tour flies between stars to shatter the flat-sky illusion; the stellar neighborhood tour introduces the Sun\'s nearest neighbors.',
-      'Smart filtering keeps the scene readable \u2014 objects are scored by apparent brightness and category, overlapping dots are culled, and constellation members are boosted when the camera faces them. Sol stays bracketed in gold as an anchor from any distance.'
+      'Smart filtering keeps the scene readable \u2014 objects are scored by apparent brightness and category, overlapping dots are culled, and constellation members are boosted when the camera faces them. Sol stays bracketed in gold as an anchor from any distance.',
+      'Time simulation came later \u2014 the clock now winds forward and backward at up to millions of years per second, moving planets on Keplerian rails, stars on their galactic orbits, and galaxies on their long falls. Real JWST imagery joined the glossary and info panels, and Apollo and Artemis fly time-accurate mission trajectories.'
     ]},
     { title: 'What\'s ahead', lines: [
-      'Time simulation \u2014 wind the clock forward and backward to see stars move, constellations dissolve, and galaxies collide. Spectrum view \u2014 toggle between visible light, infrared, and other bands. Volumetric 3D rendering \u2014 objects with actual shape and structure instead of point-like dots. Real imagery in the glossary for famous objects. And eventually, a server-backed version for thousands of objects with live data.'
+      'Spectrum view \u2014 toggle between visible light, infrared, and other bands. Volumetric 3D rendering \u2014 objects with actual shape and structure instead of point-like dots. And eventually, a server-backed version for thousands of objects with live data.'
     ]}
   ];
 
