@@ -6833,6 +6833,18 @@ function showInfo(obj) {
     body.appendChild(pulseBtn);
   }
 
+  // Share: copy a deep link that restores this exact object/view
+  var shareBtn = document.createElement('button');
+  shareBtn.style.cssText = 'margin-top:12px;padding:6px 14px;background:#16162a;border:1px solid #2a3a4a;border-radius:4px;color:#88aabb;font-size:11px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px';
+  shareBtn.setAttribute('aria-label', 'Copy a shareable link to ' + displayName(obj));
+  var shareTxt = document.createElement('span');
+  shareTxt.textContent = '🔗 Copy link to this view';
+  shareBtn.appendChild(shareTxt);
+  shareBtn.addEventListener('mouseover', function() { this.style.background = '#1e2a3a'; this.style.color = '#aaccdd'; });
+  shareBtn.addEventListener('mouseout', function() { this.style.background = '#16162a'; this.style.color = '#88aabb'; });
+  shareBtn.addEventListener('click', function() { copyShareLink(shareTxt); });
+  body.appendChild(shareBtn);
+
   // Artemis II live mission phase indicator
   if (obj.name === 'Orion (Artemis II)' && typeof artemisIILaunchJ2000 !== 'undefined') {
     var phaseDiv = document.createElement('div');
@@ -8435,6 +8447,10 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   cancelBtn.addEventListener('click', closeFeedback);
   overlay.addEventListener('click', closeFeedback);
 
+  document.getElementById('share-btn').addEventListener('click', function() {
+    copyShareLink(this);
+  });
+
   sendBtn.addEventListener('click', function() {
     var msg = msgInput.value.trim();
     if (!msg) { statusEl.style.color = '#cc6644'; statusEl.textContent = 'Please enter a message.'; return; }
@@ -8540,6 +8556,38 @@ function showLightbox(src, alt, caption, credit) {
 
 function updateDocumentTitle(obj) {
   document.title = obj && obj.name ? displayName(obj) + ' — Cosmic Distance Explorer' : 'Cosmic Distance Explorer';
+}
+
+// Share: the URL hash already encodes the full view state — copy it
+function legacyCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  return ok;
+}
+
+function copyShareLink(labelEl) {
+  updateHash();
+  // updateHash debounces 300ms before writing the fresh hash — wait it out
+  setTimeout(function() {
+    var url = window.location.href;
+    var prev = labelEl.textContent;
+    function done(ok) {
+      labelEl.textContent = ok ? 'Link copied!' : 'Copy failed — URL bar has it';
+      setTimeout(function() { labelEl.textContent = prev; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function() { done(true); }, function() { done(legacyCopy(url)); });
+    } else {
+      done(legacyCopy(url));
+    }
+  }, 350);
 }
 
 // Keyboard object selection: [ and ] cycle through visible objects by distance
