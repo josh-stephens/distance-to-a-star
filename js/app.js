@@ -273,9 +273,13 @@ var W, H;
 // Adaptive performance: cap DPR and monitor FPS
 var dpr = Math.min(devicePixelRatio || 1, 2);
 var _perfFps = 60, _perfFrameCount = 0, _perfLastCheck = 0, _perfReduced = false;
+var _lastAmbientTick = 0; // caps ambient-animation redraws (~22fps) so idle scenes rest
+var _detailAnim = false;  // set by animated object details; consumed at the ambient cadence
+var _pendingHoverX = 0, _pendingHoverY = 0, _hoverRafId = 0, _canvasRect = null;
 
 function resize() {
   dpr = Math.min(devicePixelRatio || 1, 2);
+  _canvasRect = null;
   var rect = canvas.getBoundingClientRect();
   W = rect.width * dpr;
   H = rect.height * dpr;
@@ -288,7 +292,14 @@ window.addEventListener('resize', resize);
 
 // ─── Coordinate helpers ───────────────────────────────────────────────
 
-function getViewRadius() { return sliderToViewRadius(state.zoom); }
+// Memoized: called per object (and per particle) per frame; zoom rarely changes between calls
+var _vrMemoZoom = NaN, _vrMemoVal = 0;
+function getViewRadius() {
+  if (state.zoom === _vrMemoZoom) return _vrMemoVal;
+  _vrMemoZoom = state.zoom;
+  _vrMemoVal = sliderToViewRadius(state.zoom);
+  return _vrMemoVal;
+}
 
 function displayName(obj) {
   if (obj.name === 'Sun (You Are Here)') {
@@ -310,11 +321,17 @@ function displayName(obj) {
   return obj.name;
 }
 
+var _scMemoZoom = NaN, _scMemoW = -1, _scMemoH = -1, _scMemoVal = 0;
 function getScale() {
+  if (state.zoom === _scMemoZoom && W === _scMemoW && H === _scMemoH) return _scMemoVal;
+  _scMemoZoom = state.zoom;
+  _scMemoW = W;
+  _scMemoH = H;
   var vr = getViewRadius();
   var sw = W / dpr;
   var sh = H / dpr;
-  return Math.min(sw, sh) / (2 * vr);
+  _scMemoVal = Math.min(sw, sh) / (2 * vr);
+  return _scMemoVal;
 }
 
 function worldToScreen(wx, wy) {
@@ -469,25 +486,21 @@ function updatePlanetPositions() {
   // Barycenter is ~2,110 km from Pluto's center (outside Pluto, radius 1,188 km).
   // Pluto orbits barycenter at 2,110 km, Charon at 17,461 km. Period: 6.387 days.
   var baryX = 0, baryY = 0, baryZ = 0;
-  for (var j = 0; j < objects.length; j++) {
-    if (objects[j].name === 'Pluto') {
-      baryX = objects[j].x; baryY = objects[j].y; baryZ = objects[j].orbZ || 0;
-    }
+  var plutoObj = findObject('Pluto');
+  if (plutoObj) {
+    baryX = plutoObj.x; baryY = plutoObj.y; baryZ = plutoObj.orbZ || 0;
   }
   var pcPeriod = 6.387;
   var pcAngle = (days / pcPeriod) * Math.PI * 2;
   var plutoBaryDist = 2.23e-10;   // 2,110 km in ly
   var charonBaryDist = 1.845e-9;  // 17,461 km in ly
   // Offset Pluto from barycenter (Pluto is opposite side from Charon)
-  for (var j = 0; j < objects.length; j++) {
-    if (objects[j].name === 'Pluto') {
-      var po = objects[j];
-      po.wx3d = baryX - plutoBaryDist * Math.cos(pcAngle);
-      po.wy3d = baryY - plutoBaryDist * Math.sin(pcAngle);
-      po.wz3d = baryZ;
-      po.x = baryX - plutoBaryDist * Math.cos(pcAngle);
-      po.y = baryY - plutoBaryDist * Math.sin(pcAngle);
-    }
+  if (plutoObj) {
+    plutoObj.wx3d = baryX - plutoBaryDist * Math.cos(pcAngle);
+    plutoObj.wy3d = baryY - plutoBaryDist * Math.sin(pcAngle);
+    plutoObj.wz3d = baryZ;
+    plutoObj.x = baryX - plutoBaryDist * Math.cos(pcAngle);
+    plutoObj.y = baryY - plutoBaryDist * Math.sin(pcAngle);
   }
   for (var j = 0; j < objects.length; j++) {
     var sat = objects[j];
@@ -3371,7 +3384,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, snr, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3416,7 +3429,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
       ctx.stroke();
       ctx.restore();
     }
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3436,7 +3449,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, epr * 1.8, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3469,7 +3482,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, tpr * (1.4 + 3 * 0.45 + 1.1), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -6417,7 +6430,9 @@ function animationLoop(ts) {
   if (state.warpIntensity > 0.01) state.dirty = true;
 
   // Twinkling/ambient: throttle to every other frame when performance is reduced
-  if (effects.twinkling || effects.ambientParticles) {
+  if ((effects.twinkling || effects.ambientParticles || _detailAnim || !simTime.paused) && !document.hidden && ts - _lastAmbientTick > 45) {
+    _lastAmbientTick = ts;
+    _detailAnim = false;
     if (!_perfReduced || (_perfFrameCount & 1) === 0) state.dirty = true;
   }
 
@@ -8823,36 +8838,46 @@ window.addEventListener('mouseup', function() {
 canvas.addEventListener('mousemove', function(e) {
   if (dragState.dragging) return; // skip hover logic while dragging
 
-  var rect = canvas.getBoundingClientRect();
-  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  // Coalesce hover hit-testing to one pass per frame; redraw only when the
+  // hovered object actually changes (was: full visible-set recompute + forced
+  // redraw on every pointer event \u2014 a real cost on low-end hardware).
+  _pendingHoverX = e.clientX;
+  _pendingHoverY = e.clientY;
+  if (_hoverRafId) return;
+  _hoverRafId = requestAnimationFrame(function() {
+    _hoverRafId = 0;
+    if (!_canvasRect) _canvasRect = canvas.getBoundingClientRect();
+    var sx = _pendingHoverX - _canvasRect.left, sy = _pendingHoverY - _canvasRect.top;
 
-  var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
-  var hover = null, minD = 25;
-  state.hoverIconPos = null;
+    var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
+    var hover = null, minD = 25;
 
-  visible.forEach(function(o) {
-    var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
-    if (!sp) return;
-    var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
-    if (d < minD) { minD = d; hover = o; }
-  });
+    visible.forEach(function(o) {
+      var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
+      if (!sp) return;
+      var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
+      if (d < minD) { minD = d; hover = o; }
+    });
 
-  state.hoverObj = hover;
+    if (hover === state.hoverObj) return; // unchanged \u2014 no redraw needed
 
-  if (hover) {
-    var gName = hasGlossaryEntry(hover.name);
-    if (gName) {
-      var hsp = state.mode3d ? hover._sp3d : worldToScreen(hover.x, hover.y);
-      if (hsp) {
-        state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
-        state.dirty = true;
+    state.hoverObj = hover;
+    state.hoverIconPos = null;
+
+    if (hover) {
+      var gName = hasGlossaryEntry(hover.name);
+      if (gName) {
+        var hsp = state.mode3d ? hover._sp3d : worldToScreen(hover.x, hover.y);
+        if (hsp) {
+          state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
+        }
       }
     }
-  }
 
-  canvas.style.cursor = hover ? 'pointer' : 'grab';
-  canvas.title = hover ? hover.name + (hover.dist > 0 ? ' \u2014 ' + formatDistance(hover.dist) : '') : '';
-  state.dirty = true;
+    canvas.style.cursor = hover ? 'pointer' : 'grab';
+    canvas.title = hover ? hover.name + (hover.dist > 0 ? ' \u2014 ' + formatDistance(hover.dist) : '') : '';
+    state.dirty = true;
+  });
 });
 
 canvas.addEventListener('click', function(e) {
