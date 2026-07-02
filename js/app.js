@@ -22,16 +22,21 @@ function hash3(i, seed) {
 // ─── Object name index ──────────────────────────────────────────────
 
 var _objectByName = {};
+var _objectByNameLower = {};
 
 function buildObjectNameIndex() {
   _objectByName = {};
+  _objectByNameLower = {};
   for (var i = 0; i < objects.length; i++) {
     _objectByName[objects[i].name] = objects[i];
+    _objectByNameLower[objects[i].name.toLowerCase()] = objects[i];
   }
 }
 
+// Case-insensitive fallback guards tour/viewpoint data against casing slips
 function findObject(name) {
-  return _objectByName[name] || null;
+  if (!name) return null;
+  return _objectByName[name] || _objectByNameLower[String(name).toLowerCase()] || null;
 }
 
 // ─── Caches ─────────────────────────────────────────────────────────
