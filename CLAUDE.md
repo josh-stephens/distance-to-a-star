@@ -5,12 +5,19 @@ Interactive visualization of cosmic distances from Earth to the Great Attractor.
 
 ## File Structure
 ```
-index.html         # Markup + CSS (~620 lines)
-js/data.js         # Pure data declarations (~1300 lines)
-js/app.js          # All application logic (~8700 lines)
-deploy.sh          # rsync-based deploy to bill + skippy
+index.html         # Markup + CSS (~690 lines)
+js/data.js         # Pure data declarations (~1500 lines)
+js/app.js          # All application logic (~10500 lines)
+fonts/             # Self-hosted woff2 (Orbitron/Rajdhani/Space Mono, latin subsets)
+tests/             # Node validation scripts (no deps): validate-data.js, era-labels.test.js
+deploy.sh          # scp/rsync deploy: ./deploy.sh [bill|skippy|all]
 ```
 Files load via `<script>` tags in order, sharing globals. No modules (ES5 constraint).
+Fonts are self-hosted — do NOT reintroduce CDN links (no-external-dependencies rule).
+
+## Tests (run before committing)
+- `node tests/validate-data.js` — automates the whole Housekeeping Checklist below (10 checks: names, fields, tour targets, glossary sync incl. glossaryObjMap + group rules, catRanges, constellation/viewpoint/scene refs, image paths, refDistances, regions). deploy.sh refuses to ship if it fails.
+- `node tests/era-labels.test.js` — historical accuracy of `getHistoricalEvent`; every era label must be TRUE across its whole bucket (keyed on launch year for history, years-ago for geology). Run after touching that function.
 
 ## Code Conventions
 - **ES5 only**: `var` declarations, no arrow functions, no template literals, no `let`/`const`
@@ -20,6 +27,9 @@ Files load via `<script>` tags in order, sharing globals. No modules (ES5 constr
 - **State pattern**: Single `state` object, `updateAll`-style rendering
 - **Canvas rendering**: 2D context with `devicePixelRatio` scaling
 - **Error logging**: `animationLoop` catch block logs errors with `console.error` — never silently swallow rendering errors
+- **Redraw gating**: NEVER set `state.dirty = true` inside draw code — that creates a self-perpetuating max-fps loop (was a 120fps idle bug). Animated object details set `_detailAnim = true` instead; a ~22fps wall-clock gate in `animationLoop` consumes it (also covers twinkle/ambient/sim-time and skips when `document.hidden`). User input and camera animations still render at full rate.
+- **Reduced motion**: `reduceMotion` (prefers-reduced-motion) disables ambient effects; wrap any new animation duration in `animMs(ms)` so it jump-cuts
+- **`state.userPanned`**: set true on drag/arrow/preset/goHome, false on any selection — gates the draw2D anti-pop-off recenter so browsing never snaps back to the selection. Wire both sides for any new pan or selection path.
 
 ## Data Architecture (`js/data.js`)
 - `AU_IN_LY`, `MLY`, `KM_IN_LY`, `MIN_LOG`, `MAX_LOG` — Unit constants
@@ -135,7 +145,7 @@ Files load via `<script>` tags in order, sharing globals. No modules (ES5 constr
 - Both only visible when `vr < 0.003` (solar system scale)
 
 ## Housekeeping Checklist
-Run this checklist after adding new objects or features:
+**Automated**: `node tests/validate-data.js` runs all of the checks below (plus image paths, viewpoint/scene refs, refDistances, regions). Run it after any data change. The manual notes remain for context:
 
 ### Glossary Sync
 Every object in the `objects[]` array should have a corresponding entry in `glossaryData[]` (or be covered by a `glossaryObjMap` mapping). To check:
@@ -171,9 +181,9 @@ After changes, verify at each zoom preset:
 6. Great Attractor — cosmic filaments, voids, galaxy clusters visible, no objects popping out at max zoom
 
 ## Deployment
-- **Deploy script**: `./deploy.sh` — rsyncs `index.html` + `js/` + `img/` to bill and skippy
+- **Deploy script**: `./deploy.sh [bill|skippy|all]` (default `all`) — ships `index.html` + `js/` + `img/` + `fonts/`; aborts if `tests/validate-data.js` fails
 - **Cache busting**: deploy.sh auto-stamps `?v=YYYYMMDDHHMMSS` on script tags before upload (Cloudflare 4h cache)
-- **Auto-deploy**: `pre-push` git hook runs `deploy.sh` when pushing to `main`
+- **Auto-deploy**: `pre-push` git hook runs `deploy.sh` (both hosts) when pushing to `main`
 - **bill**: `cosmos.eusd.org` — `/opt/caddy/sites-content/distance-to-a-star/`
 - **skippy**: `cosmos.711bf.org` — `/var/www/cosmos/`
 - **Cloudflare**: `cf-cache-status: HIT` with 4h TTL — always bump cache-buster on deploy or files won't update
@@ -199,7 +209,12 @@ After changes, verify at each zoom preset:
 - `orbitToCamera()` — Computes camera position in orbit mode (respects tracking)
 - `isStar(obj)` — Shared star detection predicate
 - `hash3(i, seed)` — Deterministic pseudo-random triple
-- `findObject(name)` — O(1) name lookup via cached index
+- `findObject(name)` — O(1) name lookup via cached index (case-insensitive fallback)
+- `trapFocus(container, onEsc)` — dialog focus trap; returns release fn (feedback popover)
+- `showLightbox(src, alt, caption, credit)` — shared accessible image lightbox
+- `cycleSelection(dir)` — `[`/`]` keyboard selection through visible objects
+- `copyShareLink(labelEl)` / `updateDocumentTitle(obj)` — share button + dynamic tab title
+- `getHistoricalEvent(distLy)` — era ladder; labels must stay true across each bucket (tests/era-labels.test.js enforces)
 - `satMinSep(parentR, parentPhys, satR, satPhys)` — Minimum 2D satellite separation
 
 ## Tour Engine

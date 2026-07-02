@@ -22,16 +22,21 @@ function hash3(i, seed) {
 // ─── Object name index ──────────────────────────────────────────────
 
 var _objectByName = {};
+var _objectByNameLower = {};
 
 function buildObjectNameIndex() {
   _objectByName = {};
+  _objectByNameLower = {};
   for (var i = 0; i < objects.length; i++) {
     _objectByName[objects[i].name] = objects[i];
+    _objectByNameLower[objects[i].name.toLowerCase()] = objects[i];
   }
 }
 
+// Case-insensitive fallback guards tour/viewpoint data against casing slips
 function findObject(name) {
-  return _objectByName[name] || null;
+  if (!name) return null;
+  return _objectByName[name] || _objectByNameLower[String(name).toLowerCase()] || null;
 }
 
 // ─── Caches ─────────────────────────────────────────────────────────
@@ -152,6 +157,7 @@ var state = {
   hoverIconPos: null,
   mode3d: false,
   follow: null,             // 2D: object to keep centered (set by dbl-click)
+  userPanned: false,        // user moved the view away from the selection on purpose
   lastPanX: 0, lastPanY: 0, lastZoom: 0  // saved 2D state when entering 3D
 };
 
@@ -199,6 +205,16 @@ var hudStyles = {
                 distFont: '12px Space Mono, SF Mono, Menlo, Courier, monospace',
                 distColor: 'rgba(0, 200, 80, 0.6)' }
 };
+
+// Respect OS-level reduced-motion: freeze ambient animation, jump-cut camera moves
+var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+if (reduceMotion) {
+  effects.twinkling = false;
+  effects.ambientParticles = false;
+  effects.warpStreaks = false;
+}
+// 1 (not 0) so elapsed/duration can never be 0/0 -> NaN
+function animMs(ms) { return reduceMotion ? 1 : ms; }
 
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
 var pendingLabels = [];
@@ -262,8 +278,13 @@ var W, H;
 // Adaptive performance: cap DPR and monitor FPS
 var dpr = Math.min(devicePixelRatio || 1, 2);
 var _perfFps = 60, _perfFrameCount = 0, _perfLastCheck = 0, _perfReduced = false;
+var _lastAmbientTick = 0; // caps ambient-animation redraws (~22fps) so idle scenes rest
+var _detailAnim = false;  // set by animated object details; consumed at the ambient cadence
+var _pendingHoverX = 0, _pendingHoverY = 0, _hoverRafId = 0, _canvasRect = null;
 
 function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  _canvasRect = null;
   var rect = canvas.getBoundingClientRect();
   W = rect.width * dpr;
   H = rect.height * dpr;
@@ -276,7 +297,14 @@ window.addEventListener('resize', resize);
 
 // ─── Coordinate helpers ───────────────────────────────────────────────
 
-function getViewRadius() { return sliderToViewRadius(state.zoom); }
+// Memoized: called per object (and per particle) per frame; zoom rarely changes between calls
+var _vrMemoZoom = NaN, _vrMemoVal = 0;
+function getViewRadius() {
+  if (state.zoom === _vrMemoZoom) return _vrMemoVal;
+  _vrMemoZoom = state.zoom;
+  _vrMemoVal = sliderToViewRadius(state.zoom);
+  return _vrMemoVal;
+}
 
 function displayName(obj) {
   if (obj.name === 'Sun (You Are Here)') {
@@ -298,11 +326,17 @@ function displayName(obj) {
   return obj.name;
 }
 
+var _scMemoZoom = NaN, _scMemoW = -1, _scMemoH = -1, _scMemoVal = 0;
 function getScale() {
+  if (state.zoom === _scMemoZoom && W === _scMemoW && H === _scMemoH) return _scMemoVal;
+  _scMemoZoom = state.zoom;
+  _scMemoW = W;
+  _scMemoH = H;
   var vr = getViewRadius();
   var sw = W / dpr;
   var sh = H / dpr;
-  return Math.min(sw, sh) / (2 * vr);
+  _scMemoVal = Math.min(sw, sh) / (2 * vr);
+  return _scMemoVal;
 }
 
 function worldToScreen(wx, wy) {
@@ -457,25 +491,21 @@ function updatePlanetPositions() {
   // Barycenter is ~2,110 km from Pluto's center (outside Pluto, radius 1,188 km).
   // Pluto orbits barycenter at 2,110 km, Charon at 17,461 km. Period: 6.387 days.
   var baryX = 0, baryY = 0, baryZ = 0;
-  for (var j = 0; j < objects.length; j++) {
-    if (objects[j].name === 'Pluto') {
-      baryX = objects[j].x; baryY = objects[j].y; baryZ = objects[j].orbZ || 0;
-    }
+  var plutoObj = findObject('Pluto');
+  if (plutoObj) {
+    baryX = plutoObj.x; baryY = plutoObj.y; baryZ = plutoObj.orbZ || 0;
   }
   var pcPeriod = 6.387;
   var pcAngle = (days / pcPeriod) * Math.PI * 2;
   var plutoBaryDist = 2.23e-10;   // 2,110 km in ly
   var charonBaryDist = 1.845e-9;  // 17,461 km in ly
   // Offset Pluto from barycenter (Pluto is opposite side from Charon)
-  for (var j = 0; j < objects.length; j++) {
-    if (objects[j].name === 'Pluto') {
-      var po = objects[j];
-      po.wx3d = baryX - plutoBaryDist * Math.cos(pcAngle);
-      po.wy3d = baryY - plutoBaryDist * Math.sin(pcAngle);
-      po.wz3d = baryZ;
-      po.x = baryX - plutoBaryDist * Math.cos(pcAngle);
-      po.y = baryY - plutoBaryDist * Math.sin(pcAngle);
-    }
+  if (plutoObj) {
+    plutoObj.wx3d = baryX - plutoBaryDist * Math.cos(pcAngle);
+    plutoObj.wy3d = baryY - plutoBaryDist * Math.sin(pcAngle);
+    plutoObj.wz3d = baryZ;
+    plutoObj.x = baryX - plutoBaryDist * Math.cos(pcAngle);
+    plutoObj.y = baryY - plutoBaryDist * Math.sin(pcAngle);
   }
   for (var j = 0; j < objects.length; j++) {
     var sat = objects[j];
@@ -2385,14 +2415,14 @@ function drawMissionTrajectories() {
     if (!obj._missionActive && state.selected !== obj) continue;
     var pts = obj._trajPoints;
     // Use object color, semi-transparent
-    ctx.strokeStyle = obj.color.replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', '');
-    // Convert hex to rgba if needed
     if (obj.color[0] === '#') {
       var hex = obj.color;
       var r2 = parseInt(hex.slice(1, 3), 16);
       var g2 = parseInt(hex.slice(3, 5), 16);
       var b2 = parseInt(hex.slice(5, 7), 16);
       ctx.strokeStyle = 'rgba(' + r2 + ',' + g2 + ',' + b2 + ',0.35)';
+    } else {
+      ctx.strokeStyle = obj.color.replace('rgb(', 'rgba(').replace(')', ', 0.4)');
     }
     ctx.beginPath();
     var started = false;
@@ -3359,7 +3389,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, snr, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3404,7 +3434,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
       ctx.stroke();
       ctx.restore();
     }
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3424,7 +3454,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, epr * 1.8, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -3457,7 +3487,7 @@ function drawObjectDetail(obj, cx, cy, r, ts) {
     ctx.arc(cx, cy, tpr * (1.4 + 3 * 0.45 + 1.1), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    state.dirty = true;
+    _detailAnim = true;
     return;
   }
 
@@ -5567,11 +5597,11 @@ function draw2D(ts) {
   }
   // Keep pan centered on selected object at close zoom (prevents pop-off
   // for dynamically positioned objects like spacecraft and satellites)
-  if (state.selected && !state.follow) {
+  if (state.selected && !state.follow && !state.userPanned) {
     var selDx = state.panX - state.selected.x;
     var selDy = state.panY - state.selected.y;
     var selDist = Math.sqrt(selDx * selDx + selDy * selDy);
-    if (selDist > vr * 0.5) {
+    if (selDist > getViewRadius() * 0.5) {
       state.panX = state.selected.x;
       state.panY = state.selected.y;
     }
@@ -6405,7 +6435,9 @@ function animationLoop(ts) {
   if (state.warpIntensity > 0.01) state.dirty = true;
 
   // Twinkling/ambient: throttle to every other frame when performance is reduced
-  if (effects.twinkling || effects.ambientParticles) {
+  if ((effects.twinkling || effects.ambientParticles || _detailAnim || !simTime.paused) && !document.hidden && ts - _lastAmbientTick > 45) {
+    _lastAmbientTick = ts;
+    _detailAnim = false;
     if (!_perfReduced || (_perfFrameCount & 1) === 0) state.dirty = true;
   }
 
@@ -6433,41 +6465,43 @@ function animationLoop(ts) {
 function getHistoricalEvent(distLy) {
   var yearsAgo = distLy; // 1 ly = light traveling 1 year
   var launchYear = 2026 - yearsAgo;
+  var yr = Math.round(launchYear);
 
-  // Historical timeline (most recent first for matching)
-  var events = [
-    [0.002, null], // less than ~17 hours, skip
-    [0.01, "this light was already en route when you woke up today"],
-    [0.1, "this light left about " + (distLy * 365.25).toFixed(0) + " days ago"],
-    [1, "this light left about " + yearsAgo.toFixed(1) + " years ago"],
-    [4.3, "the light you see now left before the COVID-19 pandemic"],
-    [10, "the light you see now left when " + Math.round(2026 - yearsAgo) + " was a new year"],
-    [30, "this light left around " + Math.round(launchYear) + ", when the internet was just emerging"],
-    [65, "this light left around " + Math.round(launchYear) + ", during the Space Race era"],
-    [150, "this light left around " + Math.round(launchYear) + ", before the American Civil War"],
-    [250, "this light left around " + Math.round(launchYear) + ", before the American Revolution"],
-    [500, "this light departed around " + Math.round(launchYear) + ", when Columbus sailed"],
-    [1000, "this light left around " + Math.round(launchYear) + " AD, during the Viking Age"],
-    [2100, "this light left when Rome was still an empire"],
-    [5000, "this light left when the Egyptian pyramids were being built"],
-    [10000, "this light left at the dawn of agriculture and civilization"],
-    [40000, "this light left when Neanderthals still walked the Earth"],
-    [200000, "this light left when Homo sapiens first appeared"],
-    [2e6, "this light left when the first members of genus Homo appeared"],
-    [6e6, "this light left when humans and chimpanzees last shared a common ancestor"],
-    [66e6, "this light left when dinosaurs still ruled the Earth"],
-    [250e6, "this light left during the Permian period, before the Great Dying"],
-    [540e6, "this light left during the Cambrian explosion of complex life"],
-    [2e9, "this light left when only single-celled life existed on Earth"],
-    [4.5e9, "this light left before the Earth itself had formed"],
-    [13.8e9, "this light has been traveling since near the beginning of the universe"]
-  ];
+  // Sub-year scales
+  if (yearsAgo <= 0.002) return null; // less than ~17 hours, skip
+  if (yearsAgo <= 0.01) return "this light was already en route when you woke up today";
+  if (yearsAgo <= 0.1) return "this light left about " + (distLy * 365.25).toFixed(0) + " days ago";
+  if (yearsAgo <= 1) return "this light left about " + yearsAgo.toFixed(1) + " years ago";
 
-  for (var i = 0; i < events.length; i++) {
-    if (yearsAgo <= events[i][0]) {
-      return events[i][1];
-    }
-  }
+  // Historical eras keyed on the year the light departed — each label
+  // must be true across its entire span, not just at one edge.
+  if (launchYear >= 2015) return "this light left in " + yr + " — just a few years ago";
+  if (launchYear >= 2007) return "this light left in " + yr + ", when smartphones were brand new";
+  if (launchYear >= 1990) return "this light left in " + yr + ", when the internet was young";
+  if (launchYear >= 1957) return "this light left in " + yr + ", during the Space Race";
+  if (launchYear >= 1914) return "this light left in " + yr + ", in the era of the World Wars";
+  if (launchYear >= 1865) return "this light left in " + yr + ", in the age of railroads and telegraphs";
+  if (launchYear >= 1776) return "this light left in " + yr + ", before the American Civil War";
+  if (launchYear >= 1492) return "this light left in " + yr + ", before the American Revolution";
+  if (launchYear >= 1066) return "this light left in " + yr + " AD, before Columbus sailed to the Americas";
+  if (launchYear >= 793) return "this light left in " + yr + " AD, during the Viking Age";
+  if (launchYear >= 476) return "this light left in " + yr + " AD, in the early Middle Ages";
+  if (launchYear >= -27) return "this light left when Rome was still an empire";
+  if (launchYear >= -3100) return "this light left in the age of ancient Egypt";
+  if (launchYear >= -8000) return "this light left at the dawn of agriculture and civilization";
+
+  // Prehistoric / geological scales keyed on years ago
+  if (yearsAgo <= 40e3) return "this light left during the last Ice Age";
+  if (yearsAgo <= 100e3) return "this light left when humans were first migrating out of Africa";
+  if (yearsAgo <= 300e3) return "this light left when Homo sapiens first appeared";
+  if (yearsAgo <= 2.8e6) return "this light left when the first members of genus Homo appeared";
+  if (yearsAgo <= 7e6) return "this light left when humans and chimpanzees last shared a common ancestor";
+  if (yearsAgo <= 66e6) return "this light left when early primates evolved, after the dinosaurs";
+  if (yearsAgo <= 240e6) return "this light left when dinosaurs ruled the Earth";
+  if (yearsAgo <= 540e6) return "this light left when early life filled the ancient seas";
+  if (yearsAgo <= 2.5e9) return "this light left when only single-celled life existed on Earth";
+  if (yearsAgo <= 4.5e9) return "this light left when the Earth was young";
+  if (yearsAgo <= 13.8e9) return "this light is older than the Earth itself";
   return "this light has been traveling for " + (yearsAgo / 1e9).toFixed(1) + " billion years";
 }
 
@@ -6740,6 +6774,7 @@ function formatLightTravelElapsed(years) {
 function showInfo(obj) {
   var infoPanel = document.getElementById('info-panel');
   infoPanel.classList.remove('hidden');
+  updateDocumentTitle(obj);
   document.getElementById('info-name').textContent = displayName(obj);
   document.getElementById('info-type').textContent = obj.type;
   var body = document.getElementById('info-body');
@@ -6802,6 +6837,18 @@ function showInfo(obj) {
     pulseBtn.addEventListener('click', function() { startLightPulse(obj); });
     body.appendChild(pulseBtn);
   }
+
+  // Share: copy a deep link that restores this exact object/view
+  var shareBtn = document.createElement('button');
+  shareBtn.style.cssText = 'margin-top:12px;padding:6px 14px;background:#16162a;border:1px solid #2a3a4a;border-radius:4px;color:#88aabb;font-size:11px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px';
+  shareBtn.setAttribute('aria-label', 'Copy a shareable link to ' + displayName(obj));
+  var shareTxt = document.createElement('span');
+  shareTxt.textContent = '🔗 Copy link to this view';
+  shareBtn.appendChild(shareTxt);
+  shareBtn.addEventListener('mouseover', function() { this.style.background = '#1e2a3a'; this.style.color = '#aaccdd'; });
+  shareBtn.addEventListener('mouseout', function() { this.style.background = '#16162a'; this.style.color = '#88aabb'; });
+  shareBtn.addEventListener('click', function() { copyShareLink(shareTxt); });
+  body.appendChild(shareBtn);
 
   // Artemis II live mission phase indicator
   if (obj.name === 'Orion (Artemis II)' && typeof artemisIILaunchJ2000 !== 'undefined') {
@@ -6866,20 +6913,14 @@ function showInfo(obj) {
         img.src = item.src;
         img.alt = item.title;
         img.style.cssText = 'width:100%;border-radius:6px;border:1px solid #2a2a44;display:block;cursor:pointer';
+        img.tabIndex = 0;
+        img.setAttribute('role', 'button');
         img.addEventListener('click', function(e) {
           e.stopPropagation();
-          var overlay = document.createElement('div');
-          overlay.className = 'img-lightbox';
-          var fullImg = document.createElement('img');
-          fullImg.src = item.src;
-          fullImg.alt = item.title;
-          overlay.appendChild(fullImg);
-          var lbCap = document.createElement('div');
-          lbCap.className = 'img-lightbox-caption';
-          lbCap.textContent = item.title;
-          overlay.appendChild(lbCap);
-          overlay.addEventListener('click', function() { document.body.removeChild(overlay); });
-          document.body.appendChild(overlay);
+          showLightbox(item.src, item.title, item.title, item.credit || 'NASA/ESA/CSA/STScI');
+        });
+        img.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
         });
         card.appendChild(img);
         var title = document.createElement('div');
@@ -6892,7 +6933,7 @@ function showInfo(obj) {
         card.appendChild(txt);
         var cred = document.createElement('div');
         cred.style.cssText = 'font-size:9px;color:#5a5a78;font-style:italic;margin-top:2px';
-        cred.textContent = 'NASA/ESA/CSA/STScI';
+        cred.textContent = item.credit || 'NASA/ESA/CSA/STScI';
         card.appendChild(cred);
         galDiv.appendChild(card);
       })(obj.gallery[gi]);
@@ -7167,7 +7208,7 @@ var tourEngine = {
                 yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
               cam3dAnim.to = { px: camX, py: camY, pz: camZ,
                 yaw: la.yaw, pitch: la.pitch, fov: 60 };
-              cam3dAnim.duration = 1500 / self.transitionSpeed;
+              cam3dAnim.duration = animMs(1500 / self.transitionSpeed);
               cam3dAnim.startTime = performance.now();
               cam3dAnim.active = true;
               // Enter orbit mode around the viewFrom object (star, planet, etc.)
@@ -7287,7 +7328,7 @@ var tourEngine = {
     var startZoom = state.zoom;
     var startPanX = state.panX, startPanY = state.panY;
     var zoomDist = Math.abs(targetSlider - startZoom);
-    var duration = Math.max(1200, Math.min(3000, zoomDist * 4)) / this.transitionSpeed;
+    var duration = animMs(Math.max(1200, Math.min(3000, zoomDist * 4)) / this.transitionSpeed);
     var startTime = performance.now();
 
     function animateZoom(t) {
@@ -7645,28 +7686,14 @@ function makeEntryEl(entry, idx) {
           cred.textContent = imgData.credit;
           thumb.appendChild(cred);
         }
+        thumb.tabIndex = 0;
+        thumb.setAttribute('role', 'button');
         thumb.addEventListener('click', function(e) {
           e.stopPropagation();
-          var overlay = document.createElement('div');
-          overlay.className = 'img-lightbox';
-          var fullImg = document.createElement('img');
-          fullImg.src = imgData.src;
-          fullImg.alt = imgData.caption;
-          overlay.appendChild(fullImg);
-          var lbCap = document.createElement('div');
-          lbCap.className = 'img-lightbox-caption';
-          lbCap.textContent = imgData.caption;
-          overlay.appendChild(lbCap);
-          if (imgData.credit) {
-            var lbCred = document.createElement('div');
-            lbCred.className = 'img-lightbox-credit';
-            lbCred.textContent = imgData.credit;
-            overlay.appendChild(lbCred);
-          }
-          overlay.addEventListener('click', function() {
-            document.body.removeChild(overlay);
-          });
-          document.body.appendChild(overlay);
+          showLightbox(imgData.src, imgData.caption, imgData.caption, imgData.credit);
+        });
+        thumb.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.click(); }
         });
         strip.appendChild(thumb);
       })(entry.images[ii]);
@@ -7700,8 +7727,9 @@ function buildGlossary() {
   var cats = ["Solar System", "Stars", "Nebulae", "Galaxies & Clusters", "Extreme Phenomena", "Concepts"];
   cats.forEach(function(cat) {
     // Category header with collapse arrow
-    var catLabel = document.createElement('div');
+    var catLabel = document.createElement('button');
     catLabel.className = 'glossary-cat-label collapsed';
+    catLabel.setAttribute('aria-expanded', 'false');
     catLabel.dataset.cat = cat;
 
     var arrow = document.createElement('span');
@@ -7732,6 +7760,7 @@ function buildGlossary() {
         if (searchVal) return; // Filtered state handled by filter click handler
         var wasCollapsed = label.classList.contains('collapsed');
         label.classList.toggle('collapsed');
+        label.setAttribute('aria-expanded', wasCollapsed ? 'true' : 'false');
         arrowEl.textContent = wasCollapsed ? 'v' : '>';
         // Show/hide entries belonging to this category
         var next = label.nextElementSibling;
@@ -8014,6 +8043,7 @@ document.getElementById('glossary-close').addEventListener('click', function() {
 // ─── Scene presets ────────────────────────────────────────────────────
 
 function applyScenePreset(preset) {
+  if (tourEngine.active) tourEngine.stop();
   // Enter 3D mode if not already
   if (!state.mode3d) {
     toggle3D();
@@ -8073,7 +8103,7 @@ function applyScenePreset(preset) {
 
   // Build dropdown items
   for (var i = 0; i < scenePresets.length; i++) {
-    var item = document.createElement('div');
+    var item = document.createElement('button');
     item.className = 'scene-item';
     item.dataset.sceneIdx = i;
 
@@ -8161,6 +8191,7 @@ function buildEffectsPanel() {
   sliderLabel.textContent = 'Glow';
   var sliderInput = document.createElement('input');
   sliderInput.type = 'range';
+  sliderInput.setAttribute('aria-label', 'Glow intensity');
   sliderInput.min = '0';
   sliderInput.max = '200';
   sliderInput.value = String(Math.round(effects.glowIntensity * 100));
@@ -8182,6 +8213,7 @@ function buildEffectsPanel() {
   var styleLabel = document.createElement('span');
   styleLabel.textContent = 'HUD Style';
   var styleSelect = document.createElement('select');
+  styleSelect.setAttribute('aria-label', 'HUD style');
   styleSelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
   var styleNames = { cinematic: 'Cinematic', minimal: 'Minimal', bold: 'Bold', retro: 'Retro', 'retro-sm': 'Retro Small' };
   Object.keys(styleNames).forEach(function(key) {
@@ -8211,6 +8243,7 @@ function buildEffectsPanel() {
   var overlayLabel = document.createElement('span');
   overlayLabel.textContent = 'Object Style';
   var overlaySelect = document.createElement('select');
+  overlaySelect.setAttribute('aria-label', 'Object overlay style');
   overlaySelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
   var overlayNames = { flat: 'Flat', albedo: 'Albedo', wireframe: 'Wireframe', depth: 'Depth', layers: 'Layers' };
   Object.keys(overlayNames).forEach(function(key) {
@@ -8391,13 +8424,21 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   var msgInput = document.getElementById('fb-msg');
   var statusEl = document.getElementById('fb-status');
 
+  var fbRelease = null;
+
   function openFeedback() {
     popover.classList.add('open');
     overlay.classList.add('open');
+    fbRelease = trapFocus(popover, closeFeedback);
     msgInput.focus();
   }
 
   function closeFeedback() {
+    if (fbRelease) {
+      var rel = fbRelease;
+      fbRelease = null;
+      rel();
+    }
     popover.classList.remove('open');
     overlay.classList.remove('open');
     nameInput.value = '';
@@ -8410,6 +8451,10 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   btn.addEventListener('click', openFeedback);
   cancelBtn.addEventListener('click', closeFeedback);
   overlay.addEventListener('click', closeFeedback);
+
+  document.getElementById('share-btn').addEventListener('click', function() {
+    copyShareLink(this);
+  });
 
   sendBtn.addEventListener('click', function() {
     var msg = msgInput.value.trim();
@@ -8442,6 +8487,137 @@ document.getElementById('docs-btn').addEventListener('click', function() {
     });
   });
 })();
+
+// ─── Shared a11y helpers ──────────────────────────────────────────────
+
+// Keep Tab/Shift+Tab inside container; Esc calls onEsc. Returns a release
+// function that detaches the handler and restores prior focus.
+function trapFocus(container, onEsc) {
+  var prevFocus = document.activeElement;
+  function keyHandler(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onEsc) onEsc();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var els = container.querySelectorAll('button, input, textarea, select, a[href], [tabindex]');
+    var list = [];
+    for (var i = 0; i < els.length; i++) {
+      if (!els[i].disabled && els[i].offsetParent !== null) list.push(els[i]);
+    }
+    if (!list.length) return;
+    var first = list[0], last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  document.addEventListener('keydown', keyHandler, true);
+  return function() {
+    document.removeEventListener('keydown', keyHandler, true);
+    if (prevFocus && prevFocus.focus) prevFocus.focus();
+  };
+}
+
+function showLightbox(src, alt, caption, credit) {
+  var prevFocus = document.activeElement;
+  var overlay = document.createElement('div');
+  overlay.className = 'img-lightbox';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', caption || 'Image viewer');
+  overlay.tabIndex = -1;
+  var fullImg = document.createElement('img');
+  fullImg.src = src;
+  fullImg.alt = alt || caption || '';
+  overlay.appendChild(fullImg);
+  if (caption) {
+    var lbCap = document.createElement('div');
+    lbCap.className = 'img-lightbox-caption';
+    lbCap.textContent = caption;
+    overlay.appendChild(lbCap);
+  }
+  if (credit) {
+    var lbCred = document.createElement('div');
+    lbCred.className = 'img-lightbox-credit';
+    lbCred.textContent = credit;
+    overlay.appendChild(lbCred);
+  }
+  function close() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (prevFocus && prevFocus.focus) prevFocus.focus();
+  }
+  overlay.addEventListener('click', close);
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  });
+  document.body.appendChild(overlay);
+  overlay.focus();
+}
+
+function updateDocumentTitle(obj) {
+  document.title = obj && obj.name ? displayName(obj) + ' — Cosmic Distance Explorer' : 'Cosmic Distance Explorer';
+}
+
+// Share: the URL hash already encodes the full view state — copy it
+function legacyCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  return ok;
+}
+
+function copyShareLink(labelEl) {
+  updateHash();
+  // updateHash debounces 300ms before writing the fresh hash — wait it out
+  setTimeout(function() {
+    var url = window.location.href;
+    var prev = labelEl.textContent;
+    function done(ok) {
+      labelEl.textContent = ok ? 'Link copied!' : 'Copy failed — URL bar has it';
+      setTimeout(function() { labelEl.textContent = prev; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function() { done(true); }, function() { done(legacyCopy(url)); });
+    } else {
+      done(legacyCopy(url));
+    }
+  }, 350);
+}
+
+// Keyboard object selection: [ and ] cycle through visible objects by distance
+function cycleSelection(dir) {
+  var list = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
+  if (!list || !list.length) return;
+  list = list.slice().sort(function(a, b) { return a.dist - b.dist; });
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] === state.selected) { idx = i; break; }
+  }
+  idx = (idx + dir + list.length) % list.length;
+  var obj = list[idx];
+  state.selected = obj;
+  state.userPanned = false;
+  saveSelectedObject(obj.name);
+  dismissWelcome();
+  showInfo(obj);
+  if (!state.mode3d) {
+    state.panX = obj.x;
+    state.panY = obj.y;
+  }
+  state.dirty = true;
+  updateHash();
+}
 
 // ─── URL hash state ───────────────────────────────────────────────────
 
@@ -8487,11 +8663,12 @@ function readHash() {
   });
   if (params.px) { var px = parseFloat(params.px); if (!isNaN(px)) state.panX = px; }
   if (params.py) { var py = parseFloat(params.py); if (!isNaN(py)) state.panY = py; }
+  if (params.px || params.py) state.userPanned = true; // shared view offset is intentional
   updateRecenterBtn();
   if (params.vr) {
     var vr = parseFloat(params.vr);
     if (!isNaN(vr) && vr > 0) {
-      state.zoom = viewRadiusToSlider(vr);
+      state.zoom = Math.max(0, Math.min(1000, viewRadiusToSlider(vr)));
       slider.value = Math.round(state.zoom);
     }
   }
@@ -8509,7 +8686,9 @@ function readHash() {
     }
   }
   if (params.m === '3d' && !state.mode3d) {
-    state.mode3d = true;
+    toggle3D(); // single source of 3D chrome truth; camera overridden below
+    orbitMode.active = false;
+    cam3dAnim.active = false;
     if (params.cx) cam3d.px = parseFloat(params.cx) || 0;
     if (params.cy) cam3d.py = parseFloat(params.cy) || 0;
     if (params.cz) cam3d.pz = parseFloat(params.cz) || 0;
@@ -8525,6 +8704,7 @@ function readHash() {
         orbitMode.focalY = fObj.wy3d || fObj.y || 0;
         orbitMode.focalZ = fObj.wz3d || 0;
       }
+      orbitToCamera();
     }
   }
   // Restore time state
@@ -8597,6 +8777,7 @@ slider.addEventListener('input', function() {
 });
 
 canvas.addEventListener('wheel', function(e) {
+  if (e.ctrlKey) return; // pass ctrl+wheel / pinch through to browser zoom (accessibility)
   e.preventDefault();
   dismissWelcome();
   if (state.mode3d) {
@@ -8687,6 +8868,7 @@ window.addEventListener('mousemove', function(e) {
         state.dirty = true;
       } else {
         var scale = getScale();
+        state.userPanned = true;
         state.panX = dragState.startPanX - dx / scale;
         state.panY = dragState.startPanY - dy / scale;
         state.follow = null;
@@ -8709,36 +8891,46 @@ window.addEventListener('mouseup', function() {
 canvas.addEventListener('mousemove', function(e) {
   if (dragState.dragging) return; // skip hover logic while dragging
 
-  var rect = canvas.getBoundingClientRect();
-  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  // Coalesce hover hit-testing to one pass per frame; redraw only when the
+  // hovered object actually changes (was: full visible-set recompute + forced
+  // redraw on every pointer event \u2014 a real cost on low-end hardware).
+  _pendingHoverX = e.clientX;
+  _pendingHoverY = e.clientY;
+  if (_hoverRafId) return;
+  _hoverRafId = requestAnimationFrame(function() {
+    _hoverRafId = 0;
+    if (!_canvasRect) _canvasRect = canvas.getBoundingClientRect();
+    var sx = _pendingHoverX - _canvasRect.left, sy = _pendingHoverY - _canvasRect.top;
 
-  var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
-  var hover = null, minD = 25;
-  state.hoverIconPos = null;
+    var visible = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
+    var hover = null, minD = 25;
 
-  visible.forEach(function(o) {
-    var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
-    if (!sp) return;
-    var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
-    if (d < minD) { minD = d; hover = o; }
-  });
+    visible.forEach(function(o) {
+      var sp = state.mode3d ? o._sp3d : worldToScreen(o.x, o.y);
+      if (!sp) return;
+      var d = Math.sqrt(Math.pow(sp.x - sx, 2) + Math.pow(sp.y - sy, 2));
+      if (d < minD) { minD = d; hover = o; }
+    });
 
-  state.hoverObj = hover;
+    if (hover === state.hoverObj) return; // unchanged \u2014 no redraw needed
 
-  if (hover) {
-    var gName = hasGlossaryEntry(hover.name);
-    if (gName) {
-      var hsp = state.mode3d ? hover._sp3d : worldToScreen(hover.x, hover.y);
-      if (hsp) {
-        state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
-        state.dirty = true;
+    state.hoverObj = hover;
+    state.hoverIconPos = null;
+
+    if (hover) {
+      var gName = hasGlossaryEntry(hover.name);
+      if (gName) {
+        var hsp = state.mode3d ? hover._sp3d : worldToScreen(hover.x, hover.y);
+        if (hsp) {
+          state.hoverIconPos = { x: hsp.x + hover.radius + 12, y: hsp.y - hover.radius - 6, name: typeof gName === 'string' ? gName : hover.name };
+        }
       }
     }
-  }
 
-  canvas.style.cursor = hover ? 'pointer' : 'grab';
-  canvas.title = hover ? hover.name + (hover.dist > 0 ? ' \u2014 ' + formatDistance(hover.dist) : '') : '';
-  state.dirty = true;
+    canvas.style.cursor = hover ? 'pointer' : 'grab';
+    canvas.title = hover ? hover.name + (hover.dist > 0 ? ' \u2014 ' + formatDistance(hover.dist) : '') : '';
+    state.dirty = true;
+  });
 });
 
 canvas.addEventListener('click', function(e) {
@@ -8775,6 +8967,7 @@ canvas.addEventListener('click', function(e) {
 
   if (hit) {
     state.selected = hit;
+    state.userPanned = false;
     saveSelectedObject(hit.name);
     showInfo(hit);
     state.dirty = true;
@@ -8829,6 +9022,7 @@ canvas.addEventListener('dblclick', function(e) {
     });
     if (hit) {
       state.selected = hit;
+      state.userPanned = false;
       saveSelectedObject(hit.name);
       showInfo(hit);
       // Fly to standard orbit around this object
@@ -8840,7 +9034,7 @@ canvas.addEventListener('dblclick', function(e) {
         yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
       cam3dAnim.to = { px: toX, py: toY, pz: toZ,
         yaw: angles.yaw, pitch: angles.pitch, fov: 60 };
-      cam3dAnim.duration = 2000;
+      cam3dAnim.duration = animMs(2000);
       cam3dAnim.startTime = performance.now();
       cam3dAnim.active = true;
       orbitMode.focalX = fx;
@@ -8889,6 +9083,7 @@ document.querySelectorAll('.preset-btn').forEach(function(btn) {
     var p = presets[btn.dataset.preset];
     if (!p) return;
     state.activePreset = btn.dataset.preset;
+    state.userPanned = true; // preset browse shouldn't snap back to the selection
 
     var startZoom = state.zoom;
     var startPanX = state.panX, startPanY = state.panY;
@@ -8925,6 +9120,7 @@ function navigateToObject(objName) {
     }
   }
   if (!obj) return;
+  state.userPanned = false;
 
   var range = obj.visRange || catRanges[obj.category];
   if (!range) return;
@@ -9036,7 +9232,7 @@ function navigateToObject3D(objName) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: toX, py: toY, pz: toZ,
     yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
-  cam3dAnim.duration = 2000;
+  cam3dAnim.duration = animMs(2000);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
 
@@ -9077,7 +9273,9 @@ function animatePanToSun() {
 }
 
 function goHome() {
+  if (state.mode3d) return; // 2D-only: would animate hidden pan/zoom state in 3D
   if (tourEngine.active) tourEngine.stop();
+  state.userPanned = true; // heading home is a deliberate move away from the selection
   var targetSlider = presets.solar.slider;
   var startZoom = state.zoom;
   var startPanX = state.panX, startPanY = state.panY;
@@ -9118,6 +9316,7 @@ document.getElementById('recenter-btn').addEventListener('click', animatePanToSu
 
 document.getElementById('info-close').addEventListener('click', function() {
   document.getElementById('info-panel').classList.add('hidden');
+  updateDocumentTitle(null);
 });
 
 
@@ -9349,7 +9548,7 @@ function animateOrbitFocal(tx, ty, tz, tname) {
   orbitMode.focalAnim.toY = ty;
   orbitMode.focalAnim.toZ = tz;
   orbitMode.focalAnim.toName = tname;
-  orbitMode.focalAnim.duration = 1200;
+  orbitMode.focalAnim.duration = animMs(1200);
   orbitMode.focalAnim.startTime = performance.now();
   orbitMode.focalAnim.active = true;
 }
@@ -9389,7 +9588,7 @@ function lookAtTarget(targetKey, duration) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
-  cam3dAnim.duration = duration || 1200;
+  cam3dAnim.duration = animMs(duration || 1200);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
   state.dirty = true;
@@ -9494,7 +9693,7 @@ function flyCamera(presetName, duration, lookTarget) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: toX, py: toY, pz: toZ,
     yaw: toYaw, pitch: toPitch, fov: preset.fov };
-  cam3dAnim.duration = (duration || 2000) / tourEngine.transitionSpeed;
+  cam3dAnim.duration = animMs((duration || 2000) / tourEngine.transitionSpeed);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
 
@@ -9569,9 +9768,10 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
-  if (e.target.tagName === 'INPUT') return;
+  var tgtTag = e.target.tagName;
+  if (tgtTag === 'INPUT' || tgtTag === 'TEXTAREA' || e.target.isContentEditable) return;
 
-  if (e.key === '/') {
+  if (e.key === '/' || e.key === 'g' || e.key === 'G') {
     e.preventDefault();
     var gPanel = document.getElementById('glossary-panel');
     if (!gPanel.classList.contains('open')) {
@@ -9596,12 +9796,24 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
+  // Tour hotkeys claim digits while the tour menu is open (must precede presets)
+  var tourDD = document.getElementById('tour-dropdown');
+  if (tourDD.classList.contains('open') && e.key >= '1' && e.key <= String(tourIds.length)) {
+    var tourIdx = parseInt(e.key, 10) - 1;
+    if (tourIds[tourIdx]) tourEngine.start(tourIds[tourIdx]);
+    closeTourDropdown();
+    return;
+  }
+
   if (presetKeys[e.key]) {
     var btn = document.querySelector('.preset-btn[data-preset="' + presetKeys[e.key] + '"]');
     if (btn) btn.click();
     return;
   }
 
+  if (e.key === '[') { cycleSelection(-1); return; }
+  if (e.key === ']') { cycleSelection(1); return; }
+  if (e.key === '?') { showWelcome(); return; }
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
   if (e.key === 'v' || e.key === 'V') { toggle3D(); return; }
   if (e.key === 'o' || e.key === 'O') { toggleOrbitMode(); return; }
@@ -9621,14 +9833,6 @@ document.addEventListener('keydown', function(e) {
     } else {
       document.getElementById('tour-dropdown').classList.toggle('open');
     }
-    return;
-  }
-
-  // Tour hotkeys when dropdown is open
-  var tourDD = document.getElementById('tour-dropdown');
-  if (tourDD.classList.contains('open') && e.key >= '1' && e.key <= String(tourIds.length)) {
-    var tourIdx = parseInt(e.key) - 1;
-    if (tourIds[tourIdx]) tourEngine.start(tourIds[tourIdx]);
     return;
   }
 
@@ -9657,10 +9861,11 @@ document.addEventListener('keydown', function(e) {
   }
 
   // Arrow key panning (when not in tour)
-  if (!tourEngine.active && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+  if (!tourEngine.active && !state.mode3d && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
     var vr = getViewRadius();
     var panStep = vr * 0.15; // pan 15% of view radius per keypress
+    state.userPanned = true;
     if (e.key === 'ArrowLeft') state.panX -= panStep;
     if (e.key === 'ArrowRight') state.panX += panStep;
     if (e.key === 'ArrowUp') state.panY -= panStep;
@@ -9759,6 +9964,7 @@ canvas.addEventListener('touchmove', function(e) {
         state.dirty = true;
       } else {
         var scale = getScale();
+        state.userPanned = true;
         state.panX = touchState.startPanX - dx / scale;
         state.panY = touchState.startPanY - dy / scale;
         state.follow = null;
@@ -9785,6 +9991,24 @@ canvas.addEventListener('touchend', function(e) {
   touchState.pinching = false;
   touchState.panning = false;
   touchState.moved = false;
+  if (e.touches.length === 1) {
+    // One finger remains after a pinch — hand off to single-finger tracking
+    touchState.panning = true;
+    touchState.startX = e.touches[0].clientX;
+    touchState.startY = e.touches[0].clientY;
+    if (state.mode3d) {
+      if (orbitMode.active) {
+        touchState.startYaw = orbitMode.orbitYaw;
+        touchState.startPitch = orbitMode.orbitPitch;
+      } else {
+        touchState.startYaw = cam3d.yaw;
+        touchState.startPitch = cam3d.pitch;
+      }
+    } else {
+      touchState.startPanX = state.panX;
+      touchState.startPanY = state.panY;
+    }
+  }
 }, { passive: false });
 
 // ─── Init ──────────────────────────────────────────────────────────────
@@ -9854,7 +10078,7 @@ function openSlotDropdown(btn, type) {
       if (f && candidates[ci].label.toLowerCase().indexOf(f) < 0) continue;
       if (shown >= 20) break;
       shown++;
-      var opt = document.createElement('div');
+      var opt = document.createElement('button');
       opt.className = 'slot-option';
       opt.textContent = candidates[ci].label;
       (function(c) {
@@ -10125,7 +10349,8 @@ function buildFeatureList(body) {
     ['O', 'Orbit Mode \u2014 in 3D, orbit around the selected object'],
     ['T', 'Guided Tours \u2014 constellation corridors, scale of the universe'],
     ['Dbl-click', 'In 3D, double-click any object to fly there'],
-    ['G', 'Glossary \u2014 searchable encyclopedia of every object'],
+    ['G or /', 'Glossary \u2014 searchable encyclopedia of every object'],
+    ['[ and ]', 'Cycle selection through visible objects'],
     ['L', 'Light Pulse \u2014 watch light travel from the Sun'],
     ['D', 'How this was built \u2014 the story behind the project'],
     ['1-6', 'Zoom presets from Solar System to Great Attractor'],
@@ -10193,16 +10418,17 @@ function showDocs() {
       'Objects accumulated in layers: solar system first, then nearby stars with real coordinates, then nebulae, clusters, and galaxies out to the Great Attractor. Each object carries its real distance and position in 3D space.',
       'The 3D Sky View came next \u2014 a perspective camera that can be placed at any object and pointed at any constellation. This revealed that constellations are corridors of unrelated stars, not flat patterns. Diffraction spikes, twinkling, nebula clouds, and galaxy disks give the 3D scene visual depth.',
       'Guided tours narrate the journey: the distance ladder explains how we measure the cosmos rung by rung; the constellations tour flies between stars to shatter the flat-sky illusion; the stellar neighborhood tour introduces the Sun\'s nearest neighbors.',
-      'Smart filtering keeps the scene readable \u2014 objects are scored by apparent brightness and category, overlapping dots are culled, and constellation members are boosted when the camera faces them. Sol stays bracketed in gold as an anchor from any distance.'
+      'Smart filtering keeps the scene readable \u2014 objects are scored by apparent brightness and category, overlapping dots are culled, and constellation members are boosted when the camera faces them. Sol stays bracketed in gold as an anchor from any distance.',
+      'Time simulation came later \u2014 the clock now winds forward and backward at up to millions of years per second, moving planets on Keplerian rails, stars on their galactic orbits, and galaxies on their long falls. Real JWST imagery joined the glossary and info panels, and Apollo and Artemis fly time-accurate mission trajectories.'
     ]},
     { title: 'What\'s ahead', lines: [
-      'Time simulation \u2014 wind the clock forward and backward to see stars move, constellations dissolve, and galaxies collide. Spectrum view \u2014 toggle between visible light, infrared, and other bands. Volumetric 3D rendering \u2014 objects with actual shape and structure instead of point-like dots. Real imagery in the glossary for famous objects. And eventually, a server-backed version for thousands of objects with live data.'
+      'Spectrum view \u2014 toggle between visible light, infrared, and other bands. Volumetric 3D rendering \u2014 objects with actual shape and structure instead of point-like dots. And eventually, a server-backed version for thousands of objects with live data.'
     ]}
   ];
 
   for (var s = 0; s < sections.length; s++) {
     var sec = sections[s];
-    var heading = document.createElement('div');
+    var heading = document.createElement('h3');
     heading.textContent = sec.title;
     heading.style.cssText = 'font-size:13px;font-weight:600;color:#aabbcc;margin:' + (s === 0 ? '4' : '14') + 'px 0 6px;';
     body.appendChild(heading);
@@ -10225,12 +10451,27 @@ function dismissWelcome() {
   document.getElementById('info-panel').classList.add('hidden');
 }
 
-showWelcome();
+if (state.selected) {
+  // A restored last-session selection is already in the info panel — don't overwrite it
+  welcomeShowing = false;
+} else {
+  showWelcome();
+}
 
 resize();
 state.zoom = presets.solar.slider;
 slider.value = state.zoom;
 state.activePreset = 'solar';
+
+// Warm the canvas fonts (canvas ctx.font doesn't reliably trigger @font-face loads)
+if (document.fonts && document.fonts.load) {
+  document.fonts.load('600 88px Orbitron');
+  document.fonts.load('800 112px Orbitron');
+  document.fonts.load('300 64px Rajdhani');
+  document.fonts.load('11px Rajdhani');
+  document.fonts.load('12px "Space Mono"');
+  document.fonts.load('700 12px "Space Mono"');
+}
 
 // Read URL hash if present
 readHash();
