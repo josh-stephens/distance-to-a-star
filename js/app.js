@@ -152,6 +152,7 @@ var state = {
   hoverIconPos: null,
   mode3d: false,
   follow: null,             // 2D: object to keep centered (set by dbl-click)
+  userPanned: false,        // user moved the view away from the selection on purpose
   lastPanX: 0, lastPanY: 0, lastZoom: 0  // saved 2D state when entering 3D
 };
 
@@ -199,6 +200,16 @@ var hudStyles = {
                 distFont: '12px Space Mono, SF Mono, Menlo, Courier, monospace',
                 distColor: 'rgba(0, 200, 80, 0.6)' }
 };
+
+// Respect OS-level reduced-motion: freeze ambient animation, jump-cut camera moves
+var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+if (reduceMotion) {
+  effects.twinkling = false;
+  effects.ambientParticles = false;
+  effects.warpStreaks = false;
+}
+// 1 (not 0) so elapsed/duration can never be 0/0 -> NaN
+function animMs(ms) { return reduceMotion ? 1 : ms; }
 
 var frameFlash = { active: false, x: 0, y: 0, startTime: 0, color: '#ffffff' };
 var pendingLabels = [];
@@ -5568,7 +5579,7 @@ function draw2D(ts) {
   }
   // Keep pan centered on selected object at close zoom (prevents pop-off
   // for dynamically positioned objects like spacecraft and satellites)
-  if (state.selected && !state.follow) {
+  if (state.selected && !state.follow && !state.userPanned) {
     var selDx = state.panX - state.selected.x;
     var selDy = state.panY - state.selected.y;
     var selDist = Math.sqrt(selDx * selDx + selDy * selDy);
@@ -6743,6 +6754,7 @@ function formatLightTravelElapsed(years) {
 function showInfo(obj) {
   var infoPanel = document.getElementById('info-panel');
   infoPanel.classList.remove('hidden');
+  updateDocumentTitle(obj);
   document.getElementById('info-name').textContent = displayName(obj);
   document.getElementById('info-type').textContent = obj.type;
   var body = document.getElementById('info-body');
@@ -6869,20 +6881,14 @@ function showInfo(obj) {
         img.src = item.src;
         img.alt = item.title;
         img.style.cssText = 'width:100%;border-radius:6px;border:1px solid #2a2a44;display:block;cursor:pointer';
+        img.tabIndex = 0;
+        img.setAttribute('role', 'button');
         img.addEventListener('click', function(e) {
           e.stopPropagation();
-          var overlay = document.createElement('div');
-          overlay.className = 'img-lightbox';
-          var fullImg = document.createElement('img');
-          fullImg.src = item.src;
-          fullImg.alt = item.title;
-          overlay.appendChild(fullImg);
-          var lbCap = document.createElement('div');
-          lbCap.className = 'img-lightbox-caption';
-          lbCap.textContent = item.title;
-          overlay.appendChild(lbCap);
-          overlay.addEventListener('click', function() { document.body.removeChild(overlay); });
-          document.body.appendChild(overlay);
+          showLightbox(item.src, item.title, item.title, item.credit || 'NASA/ESA/CSA/STScI');
+        });
+        img.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
         });
         card.appendChild(img);
         var title = document.createElement('div');
@@ -7170,7 +7176,7 @@ var tourEngine = {
                 yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
               cam3dAnim.to = { px: camX, py: camY, pz: camZ,
                 yaw: la.yaw, pitch: la.pitch, fov: 60 };
-              cam3dAnim.duration = 1500 / self.transitionSpeed;
+              cam3dAnim.duration = animMs(1500 / self.transitionSpeed);
               cam3dAnim.startTime = performance.now();
               cam3dAnim.active = true;
               // Enter orbit mode around the viewFrom object (star, planet, etc.)
@@ -7290,7 +7296,7 @@ var tourEngine = {
     var startZoom = state.zoom;
     var startPanX = state.panX, startPanY = state.panY;
     var zoomDist = Math.abs(targetSlider - startZoom);
-    var duration = Math.max(1200, Math.min(3000, zoomDist * 4)) / this.transitionSpeed;
+    var duration = animMs(Math.max(1200, Math.min(3000, zoomDist * 4)) / this.transitionSpeed);
     var startTime = performance.now();
 
     function animateZoom(t) {
@@ -7648,28 +7654,14 @@ function makeEntryEl(entry, idx) {
           cred.textContent = imgData.credit;
           thumb.appendChild(cred);
         }
+        thumb.tabIndex = 0;
+        thumb.setAttribute('role', 'button');
         thumb.addEventListener('click', function(e) {
           e.stopPropagation();
-          var overlay = document.createElement('div');
-          overlay.className = 'img-lightbox';
-          var fullImg = document.createElement('img');
-          fullImg.src = imgData.src;
-          fullImg.alt = imgData.caption;
-          overlay.appendChild(fullImg);
-          var lbCap = document.createElement('div');
-          lbCap.className = 'img-lightbox-caption';
-          lbCap.textContent = imgData.caption;
-          overlay.appendChild(lbCap);
-          if (imgData.credit) {
-            var lbCred = document.createElement('div');
-            lbCred.className = 'img-lightbox-credit';
-            lbCred.textContent = imgData.credit;
-            overlay.appendChild(lbCred);
-          }
-          overlay.addEventListener('click', function() {
-            document.body.removeChild(overlay);
-          });
-          document.body.appendChild(overlay);
+          showLightbox(imgData.src, imgData.caption, imgData.caption, imgData.credit);
+        });
+        thumb.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.click(); }
         });
         strip.appendChild(thumb);
       })(entry.images[ii]);
@@ -7703,8 +7695,9 @@ function buildGlossary() {
   var cats = ["Solar System", "Stars", "Nebulae", "Galaxies & Clusters", "Extreme Phenomena", "Concepts"];
   cats.forEach(function(cat) {
     // Category header with collapse arrow
-    var catLabel = document.createElement('div');
+    var catLabel = document.createElement('button');
     catLabel.className = 'glossary-cat-label collapsed';
+    catLabel.setAttribute('aria-expanded', 'false');
     catLabel.dataset.cat = cat;
 
     var arrow = document.createElement('span');
@@ -7735,6 +7728,7 @@ function buildGlossary() {
         if (searchVal) return; // Filtered state handled by filter click handler
         var wasCollapsed = label.classList.contains('collapsed');
         label.classList.toggle('collapsed');
+        label.setAttribute('aria-expanded', wasCollapsed ? 'true' : 'false');
         arrowEl.textContent = wasCollapsed ? 'v' : '>';
         // Show/hide entries belonging to this category
         var next = label.nextElementSibling;
@@ -8077,7 +8071,7 @@ function applyScenePreset(preset) {
 
   // Build dropdown items
   for (var i = 0; i < scenePresets.length; i++) {
-    var item = document.createElement('div');
+    var item = document.createElement('button');
     item.className = 'scene-item';
     item.dataset.sceneIdx = i;
 
@@ -8165,6 +8159,7 @@ function buildEffectsPanel() {
   sliderLabel.textContent = 'Glow';
   var sliderInput = document.createElement('input');
   sliderInput.type = 'range';
+  sliderInput.setAttribute('aria-label', 'Glow intensity');
   sliderInput.min = '0';
   sliderInput.max = '200';
   sliderInput.value = String(Math.round(effects.glowIntensity * 100));
@@ -8186,6 +8181,7 @@ function buildEffectsPanel() {
   var styleLabel = document.createElement('span');
   styleLabel.textContent = 'HUD Style';
   var styleSelect = document.createElement('select');
+  styleSelect.setAttribute('aria-label', 'HUD style');
   styleSelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
   var styleNames = { cinematic: 'Cinematic', minimal: 'Minimal', bold: 'Bold', retro: 'Retro', 'retro-sm': 'Retro Small' };
   Object.keys(styleNames).forEach(function(key) {
@@ -8215,6 +8211,7 @@ function buildEffectsPanel() {
   var overlayLabel = document.createElement('span');
   overlayLabel.textContent = 'Object Style';
   var overlaySelect = document.createElement('select');
+  overlaySelect.setAttribute('aria-label', 'Object overlay style');
   overlaySelect.style.cssText = 'background:#1a1a2e;color:#aaa;border:1px solid #333;border-radius:4px;padding:2px 6px;font-size:11px;';
   var overlayNames = { flat: 'Flat', albedo: 'Albedo', wireframe: 'Wireframe', depth: 'Depth', layers: 'Layers' };
   Object.keys(overlayNames).forEach(function(key) {
@@ -8395,13 +8392,21 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   var msgInput = document.getElementById('fb-msg');
   var statusEl = document.getElementById('fb-status');
 
+  var fbRelease = null;
+
   function openFeedback() {
     popover.classList.add('open');
     overlay.classList.add('open');
+    fbRelease = trapFocus(popover, closeFeedback);
     msgInput.focus();
   }
 
   function closeFeedback() {
+    if (fbRelease) {
+      var rel = fbRelease;
+      fbRelease = null;
+      rel();
+    }
     popover.classList.remove('open');
     overlay.classList.remove('open');
     nameInput.value = '';
@@ -8447,6 +8452,105 @@ document.getElementById('docs-btn').addEventListener('click', function() {
   });
 })();
 
+// ─── Shared a11y helpers ──────────────────────────────────────────────
+
+// Keep Tab/Shift+Tab inside container; Esc calls onEsc. Returns a release
+// function that detaches the handler and restores prior focus.
+function trapFocus(container, onEsc) {
+  var prevFocus = document.activeElement;
+  function keyHandler(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onEsc) onEsc();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var els = container.querySelectorAll('button, input, textarea, select, a[href], [tabindex]');
+    var list = [];
+    for (var i = 0; i < els.length; i++) {
+      if (!els[i].disabled && els[i].offsetParent !== null) list.push(els[i]);
+    }
+    if (!list.length) return;
+    var first = list[0], last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  document.addEventListener('keydown', keyHandler, true);
+  return function() {
+    document.removeEventListener('keydown', keyHandler, true);
+    if (prevFocus && prevFocus.focus) prevFocus.focus();
+  };
+}
+
+function showLightbox(src, alt, caption, credit) {
+  var prevFocus = document.activeElement;
+  var overlay = document.createElement('div');
+  overlay.className = 'img-lightbox';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', caption || 'Image viewer');
+  overlay.tabIndex = -1;
+  var fullImg = document.createElement('img');
+  fullImg.src = src;
+  fullImg.alt = alt || caption || '';
+  overlay.appendChild(fullImg);
+  if (caption) {
+    var lbCap = document.createElement('div');
+    lbCap.className = 'img-lightbox-caption';
+    lbCap.textContent = caption;
+    overlay.appendChild(lbCap);
+  }
+  if (credit) {
+    var lbCred = document.createElement('div');
+    lbCred.className = 'img-lightbox-credit';
+    lbCred.textContent = credit;
+    overlay.appendChild(lbCred);
+  }
+  function close() {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (prevFocus && prevFocus.focus) prevFocus.focus();
+  }
+  overlay.addEventListener('click', close);
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  });
+  document.body.appendChild(overlay);
+  overlay.focus();
+}
+
+function updateDocumentTitle(obj) {
+  document.title = obj && obj.name ? displayName(obj) + ' — Cosmic Distance Explorer' : 'Cosmic Distance Explorer';
+}
+
+// Keyboard object selection: [ and ] cycle through visible objects by distance
+function cycleSelection(dir) {
+  var list = state.mode3d ? getVisibleObjects3D() : getVisibleObjects();
+  if (!list || !list.length) return;
+  list = list.slice().sort(function(a, b) { return a.dist - b.dist; });
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] === state.selected) { idx = i; break; }
+  }
+  idx = (idx + dir + list.length) % list.length;
+  var obj = list[idx];
+  state.selected = obj;
+  state.userPanned = false;
+  saveSelectedObject(obj.name);
+  dismissWelcome();
+  showInfo(obj);
+  if (!state.mode3d) {
+    state.panX = obj.x;
+    state.panY = obj.y;
+  }
+  state.dirty = true;
+  updateHash();
+}
+
 // ─── URL hash state ───────────────────────────────────────────────────
 
 var hashUpdateTimer = null;
@@ -8491,6 +8595,7 @@ function readHash() {
   });
   if (params.px) { var px = parseFloat(params.px); if (!isNaN(px)) state.panX = px; }
   if (params.py) { var py = parseFloat(params.py); if (!isNaN(py)) state.panY = py; }
+  if (params.px || params.py) state.userPanned = true; // shared view offset is intentional
   updateRecenterBtn();
   if (params.vr) {
     var vr = parseFloat(params.vr);
@@ -8604,6 +8709,7 @@ slider.addEventListener('input', function() {
 });
 
 canvas.addEventListener('wheel', function(e) {
+  if (e.ctrlKey) return; // pass ctrl+wheel / pinch through to browser zoom (accessibility)
   e.preventDefault();
   dismissWelcome();
   if (state.mode3d) {
@@ -8694,6 +8800,7 @@ window.addEventListener('mousemove', function(e) {
         state.dirty = true;
       } else {
         var scale = getScale();
+        state.userPanned = true;
         state.panX = dragState.startPanX - dx / scale;
         state.panY = dragState.startPanY - dy / scale;
         state.follow = null;
@@ -8782,6 +8889,7 @@ canvas.addEventListener('click', function(e) {
 
   if (hit) {
     state.selected = hit;
+    state.userPanned = false;
     saveSelectedObject(hit.name);
     showInfo(hit);
     state.dirty = true;
@@ -8836,6 +8944,7 @@ canvas.addEventListener('dblclick', function(e) {
     });
     if (hit) {
       state.selected = hit;
+      state.userPanned = false;
       saveSelectedObject(hit.name);
       showInfo(hit);
       // Fly to standard orbit around this object
@@ -8847,7 +8956,7 @@ canvas.addEventListener('dblclick', function(e) {
         yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
       cam3dAnim.to = { px: toX, py: toY, pz: toZ,
         yaw: angles.yaw, pitch: angles.pitch, fov: 60 };
-      cam3dAnim.duration = 2000;
+      cam3dAnim.duration = animMs(2000);
       cam3dAnim.startTime = performance.now();
       cam3dAnim.active = true;
       orbitMode.focalX = fx;
@@ -8896,6 +9005,7 @@ document.querySelectorAll('.preset-btn').forEach(function(btn) {
     var p = presets[btn.dataset.preset];
     if (!p) return;
     state.activePreset = btn.dataset.preset;
+    state.userPanned = true; // preset browse shouldn't snap back to the selection
 
     var startZoom = state.zoom;
     var startPanX = state.panX, startPanY = state.panY;
@@ -8932,6 +9042,7 @@ function navigateToObject(objName) {
     }
   }
   if (!obj) return;
+  state.userPanned = false;
 
   var range = obj.visRange || catRanges[obj.category];
   if (!range) return;
@@ -9043,7 +9154,7 @@ function navigateToObject3D(objName) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: toX, py: toY, pz: toZ,
     yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
-  cam3dAnim.duration = 2000;
+  cam3dAnim.duration = animMs(2000);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
 
@@ -9086,6 +9197,7 @@ function animatePanToSun() {
 function goHome() {
   if (state.mode3d) return; // 2D-only: would animate hidden pan/zoom state in 3D
   if (tourEngine.active) tourEngine.stop();
+  state.userPanned = true; // heading home is a deliberate move away from the selection
   var targetSlider = presets.solar.slider;
   var startZoom = state.zoom;
   var startPanX = state.panX, startPanY = state.panY;
@@ -9126,6 +9238,7 @@ document.getElementById('recenter-btn').addEventListener('click', animatePanToSu
 
 document.getElementById('info-close').addEventListener('click', function() {
   document.getElementById('info-panel').classList.add('hidden');
+  updateDocumentTitle(null);
 });
 
 
@@ -9357,7 +9470,7 @@ function animateOrbitFocal(tx, ty, tz, tname) {
   orbitMode.focalAnim.toY = ty;
   orbitMode.focalAnim.toZ = tz;
   orbitMode.focalAnim.toName = tname;
-  orbitMode.focalAnim.duration = 1200;
+  orbitMode.focalAnim.duration = animMs(1200);
   orbitMode.focalAnim.startTime = performance.now();
   orbitMode.focalAnim.active = true;
 }
@@ -9397,7 +9510,7 @@ function lookAtTarget(targetKey, duration) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: cam3d.px, py: cam3d.py, pz: cam3d.pz,
     yaw: angles.yaw, pitch: angles.pitch, fov: cam3d.fov };
-  cam3dAnim.duration = duration || 1200;
+  cam3dAnim.duration = animMs(duration || 1200);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
   state.dirty = true;
@@ -9502,7 +9615,7 @@ function flyCamera(presetName, duration, lookTarget) {
     yaw: cam3d.yaw, pitch: cam3d.pitch, fov: cam3d.fov };
   cam3dAnim.to = { px: toX, py: toY, pz: toZ,
     yaw: toYaw, pitch: toPitch, fov: preset.fov };
-  cam3dAnim.duration = (duration || 2000) / tourEngine.transitionSpeed;
+  cam3dAnim.duration = animMs((duration || 2000) / tourEngine.transitionSpeed);
   cam3dAnim.startTime = performance.now();
   cam3dAnim.active = true;
 
@@ -9580,7 +9693,7 @@ document.addEventListener('keydown', function(e) {
   var tgtTag = e.target.tagName;
   if (tgtTag === 'INPUT' || tgtTag === 'TEXTAREA' || e.target.isContentEditable) return;
 
-  if (e.key === '/') {
+  if (e.key === '/' || e.key === 'g' || e.key === 'G') {
     e.preventDefault();
     var gPanel = document.getElementById('glossary-panel');
     if (!gPanel.classList.contains('open')) {
@@ -9620,6 +9733,9 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
+  if (e.key === '[') { cycleSelection(-1); return; }
+  if (e.key === ']') { cycleSelection(1); return; }
+  if (e.key === '?') { showWelcome(); return; }
   if (e.key === 'h' || e.key === 'H') { goHome(); return; }
   if (e.key === 'v' || e.key === 'V') { toggle3D(); return; }
   if (e.key === 'o' || e.key === 'O') { toggleOrbitMode(); return; }
@@ -9671,6 +9787,7 @@ document.addEventListener('keydown', function(e) {
     e.preventDefault();
     var vr = getViewRadius();
     var panStep = vr * 0.15; // pan 15% of view radius per keypress
+    state.userPanned = true;
     if (e.key === 'ArrowLeft') state.panX -= panStep;
     if (e.key === 'ArrowRight') state.panX += panStep;
     if (e.key === 'ArrowUp') state.panY -= panStep;
@@ -9769,6 +9886,7 @@ canvas.addEventListener('touchmove', function(e) {
         state.dirty = true;
       } else {
         var scale = getScale();
+        state.userPanned = true;
         state.panX = touchState.startPanX - dx / scale;
         state.panY = touchState.startPanY - dy / scale;
         state.follow = null;
@@ -9882,7 +10000,7 @@ function openSlotDropdown(btn, type) {
       if (f && candidates[ci].label.toLowerCase().indexOf(f) < 0) continue;
       if (shown >= 20) break;
       shown++;
-      var opt = document.createElement('div');
+      var opt = document.createElement('button');
       opt.className = 'slot-option';
       opt.textContent = candidates[ci].label;
       (function(c) {
@@ -10153,7 +10271,8 @@ function buildFeatureList(body) {
     ['O', 'Orbit Mode \u2014 in 3D, orbit around the selected object'],
     ['T', 'Guided Tours \u2014 constellation corridors, scale of the universe'],
     ['Dbl-click', 'In 3D, double-click any object to fly there'],
-    ['G', 'Glossary \u2014 searchable encyclopedia of every object'],
+    ['G or /', 'Glossary \u2014 searchable encyclopedia of every object'],
+    ['[ and ]', 'Cycle selection through visible objects'],
     ['L', 'Light Pulse \u2014 watch light travel from the Sun'],
     ['D', 'How this was built \u2014 the story behind the project'],
     ['1-6', 'Zoom presets from Solar System to Great Attractor'],
@@ -10231,7 +10350,7 @@ function showDocs() {
 
   for (var s = 0; s < sections.length; s++) {
     var sec = sections[s];
-    var heading = document.createElement('div');
+    var heading = document.createElement('h3');
     heading.textContent = sec.title;
     heading.style.cssText = 'font-size:13px;font-weight:600;color:#aabbcc;margin:' + (s === 0 ? '4' : '14') + 'px 0 6px;';
     body.appendChild(heading);

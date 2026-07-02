@@ -36,13 +36,13 @@
   }
   .top-bar h1 { font-size: 14px; font-weight: 600; color: #e8e8f0; margin-right: 12px; white-space: nowrap; }
   .preset-btn {
-    padding: 5px 12px; border: 1px solid #2a2a44; background: #16162a;
+    padding: 5px 12px; border: 1px solid #62628a; background: #16162a;
     color: #9898b0; border-radius: 4px; font-size: 11px; cursor: pointer;
     transition: all 0.2s; white-space: nowrap;
   }
   .preset-btn:hover { background: #1e1e38; color: #c8c8e0; }
   .preset-btn.active { background: #1a2a4a; border-color: #3a5a8a; color: #7aaaee; }
-  .key-hint { opacity: 0.35; margin-left: 3px; font-size: 10px; }
+  .key-hint { color: #9a9ab8; margin-left: 3px; font-size: 10px; }
   .glossary-btn {
     padding: 5px 14px; border: 1px solid #2a3a4a; background: #162a2a;
     color: #88aabb; border-radius: 4px; font-size: 11px; cursor: pointer;
@@ -101,7 +101,7 @@
   .cam3d-presets .cam-look-btn { border-color: #2a3a44; }
   .cam3d-presets .cam-look-btn:hover { background: #162a38; color: #aaddee; }
   .cam3d-presets .cam-preset-btn.tracking { border-color: #3a6a5a; background: #1a2e28; color: #7aba9a; }
-  .cam3d-presets .cam-label { font-size: 10px; color: #5a5a7a; }
+  .cam3d-presets .cam-label { font-size: 10px; color: #9090ae; }
   .cam3d-presets .cam-sep { color: #2a2a44; font-size: 14px; margin: 0 2px; }
   .cam3d-presets { flex-wrap: wrap; }
   .cam-slot-dropdown {
@@ -142,7 +142,7 @@
   .tour-dropdown-item:last-child { border-bottom: none; }
   .tour-dropdown-item:hover { background: #1a1a38; color: #c8c8e0; }
   .tour-dropdown-item .tour-item-name { font-weight: 600; color: #b8b8d0; }
-  .tour-dropdown-item .tour-item-desc { font-size: 10px; color: #7a7a96; margin-top: 2px; }
+  .tour-dropdown-item .tour-item-desc { font-size: 10px; color: #9494b0; margin-top: 2px; }
   .tour-dropdown-item .tour-key-hint { float: right; opacity: 0.3; font-size: 10px; margin-left: 8px; }
   .docs-btn {
     padding: 5px 14px; border: 1px solid #2a3a44; background: #141e28;
@@ -152,7 +152,7 @@
   .docs-btn:hover { background: #1a2a38; color: #99bbcc; }
   .feedback-btn {
     padding: 5px 12px; border: 1px solid #2a2a44; background: #14141e;
-    color: #7a7a96; border-radius: 4px; font-size: 11px; cursor: pointer;
+    color: #9494b0; border-radius: 4px; font-size: 11px; cursor: pointer;
     transition: all 0.2s; white-space: nowrap; text-decoration: none;
   }
   .feedback-btn:hover { background: #1a1a38; color: #9898b0; border-color: #3a3a55; }
@@ -168,7 +168,7 @@
   .feedback-popover h3 { margin: 0 0 16px; color: #c8c8e0; font-size: 15px; }
   .feedback-popover label { display: block; font-size: 11px; color: #8a8aa4; margin-bottom: 4px; }
   .feedback-popover input, .feedback-popover textarea {
-    width: 100%; box-sizing: border-box; background: #0a0a14; border: 1px solid #4a4a66;
+    width: 100%; box-sizing: border-box; background: #0a0a14; border: 1px solid #6e6e92;
     border-radius: 5px; color: #c8c8e0; padding: 8px 10px; font-size: 12px;
     font-family: -apple-system, system-ui, sans-serif; margin-bottom: 12px; resize: vertical;
   }
@@ -178,7 +178,7 @@
   .feedback-actions button {
     padding: 6px 16px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;
   }
-  .feedback-cancel { background: none; border: 1px solid #2a2a44; color: #7a7a96; }
+  .feedback-cancel { background: none; border: 1px solid #2a2a44; color: #9494b0; }
   .feedback-cancel:hover { border-color: #3a3a55; color: #9898b0; }
   .feedback-send { background: #1a3a2a; border: 1px solid #3a6a4a; color: #88cc88; }
   .feedback-send:hover { background: #224a34; color: #aaddaa; }
@@ -215,7 +215,7 @@
   }
   .narr-collapse-btn, .narr-settings-btn {
     width: 22px; height: 22px;
-    border: none; background: none; color: #4a5a78; font-size: 14px;
+    border: none; background: none; color: #7f94bd; font-size: 14px;
     cursor: pointer; border-radius: 50%; transition: all 0.3s;
     text-shadow: 0 0 6px rgba(122, 170, 238, 0.3);
     line-height: 22px; text-align: center; padding: 0;
@@ -237,7 +237,7 @@
   .narr-setting-label { font-size: 12px; color: #7a7a98; min-width: 80px; }
   .narr-setting-slider {
     flex: 1; -webkit-appearance: none; appearance: none; height: 3px;
-    background: #2a2a44; border-radius: 2px;
+    background: #62628a; border-radius: 2px;
   }
   .narr-setting-slider::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
@@ -249,30 +249,30 @@
     background: #7aaaee; cursor: pointer;
   }
   .narr-setting-input {
-    width: 48px; background: #0c0c1a; border: 1px solid #4a4a66; border-radius: 4px;
+    width: 48px; background: #0c0c1a; border: 1px solid #6e6e92; border-radius: 4px;
     color: #c8c8e0; font-size: 12px; padding: 3px 6px; text-align: center;
     font-family: 'SF Mono', Menlo, monospace;
   }
   .narr-setting-input:focus { border-color: #3a5a8a; }
-  .narr-setting-unit { font-size: 11px; color: #7a7a96; }
+  .narr-setting-unit { font-size: 11px; color: #9494b0; }
   .narr-toggle { cursor: pointer; display: inline-block; }
   .narr-toggle input { display: none; }
   .narr-toggle-track {
-    display: inline-block; width: 34px; height: 18px; background: #2a2a44;
+    display: inline-block; width: 34px; height: 18px; background: #62628a;
     border-radius: 9px; position: relative; transition: background 0.3s;
   }
   .narr-toggle-thumb {
     position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
-    background: #5a5a78; border-radius: 50%; transition: all 0.3s;
+    background: #c8c8e8; border-radius: 50%; transition: all 0.3s;
   }
   .narr-toggle input:checked + .narr-toggle-track { background: #1a3a5a; }
   .narr-toggle input:checked + .narr-toggle-track .narr-toggle-thumb {
     left: 18px; background: #7aaaee; box-shadow: 0 0 6px rgba(122, 170, 238, 0.5);
   }
-  .narration-step { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #7a7a96; margin-bottom: 4px; }
+  .narration-step { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: #9494b0; margin-bottom: 4px; }
   .narration-title { font-size: 16px; font-weight: 600; color: #e0e0f0; margin-bottom: 4px; }
   .narration-body { font-size: 12px; line-height: 1.5; color: #9898b8; }
-  .narration-scale { font-size: 10px; color: #5a6a8a; margin-top: 6px; font-family: 'SF Mono', Menlo, monospace; }
+  .narration-scale { font-size: 10px; color: #8b9bc0; margin-top: 6px; font-family: 'SF Mono', Menlo, monospace; }
   .narration-controls { display: flex; justify-content: center; gap: 12px; margin-top: 12px; pointer-events: auto; }
   .narr-ctrl-btn {
     padding: 4px 12px; border: 1px solid #2a2a44; background: #16162acc;
@@ -312,8 +312,8 @@
   .info-panel.hidden { opacity: 0; pointer-events: none; transform: translateX(20px); }
   .info-header { padding: 22px 24px 16px; border-bottom: 1px solid #1e1e30; flex-shrink: 0; position: relative; }
   .info-header h2 { font-size: 19px; color: #e8e8f0; margin-bottom: 6px; word-wrap: break-word; overflow-wrap: break-word; padding-right: 28px; }
-  .info-header .type-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #7a7a96; }
-  .info-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #7a7a96; font-size: 22px; cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 4px; transition: all 0.2s; }
+  .info-header .type-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #9494b0; }
+  .info-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #9494b0; font-size: 22px; cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 4px; transition: all 0.2s; }
   .info-close:hover { color: #c8c8e0; background: rgba(255,255,255,0.06); }
   .info-body { padding: 22px 24px; flex: 1; overflow-y: auto; min-height: 0; }
   .info-body p { font-size: 15px; line-height: 1.75; margin-bottom: 14px; color: #b0b0c8; word-wrap: break-word; overflow-wrap: break-word; }
@@ -335,12 +335,12 @@
     display: flex; align-items: center; justify-content: space-between;
   }
   .glossary-header h3 { font-size: 15px; color: #e0e0f0; }
-  .glossary-close { background: none; border: none; color: #7a7a96; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
+  .glossary-close { background: none; border: none; color: #9494b0; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
   .glossary-close:hover { color: #c8c8e0; background: rgba(255,255,255,0.06); }
   .glossary-search { padding: 8px 20px; flex-shrink: 0; }
   .glossary-search-input {
     width: 100%; padding: 6px 28px 6px 10px; background: #16162a;
-    border: 1px solid #4a4a66; border-radius: 4px; color: #c8c8d4;
+    border: 1px solid #6e6e92; border-radius: 4px; color: #c8c8d4;
     font-size: 12px;
   }
   .glossary-search-input:focus { border-color: #3a4a6a; }
@@ -348,23 +348,23 @@
   .glossary-search-wrap { position: relative; }
   .glossary-search-clear {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; color: #7a7a96; cursor: pointer; font-size: 14px;
+    background: none; border: none; color: #9494b0; cursor: pointer; font-size: 14px;
     padding: 2px 4px; display: none;
   }
   .glossary-search-clear.visible { display: block; }
   .glossary-body { flex: 1; overflow-y: auto; padding: 12px 0; }
   .glossary-cat-label {
-    font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #7a7a96;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #9494b0;
     padding: 10px 20px 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;
     user-select: none; transition: color 0.15s;
   }
   .glossary-cat-label:hover { color: #8888aa; }
   .glossary-cat-arrow {
     display: inline-block; width: 10px; font-size: 10px; flex-shrink: 0;
-    color: #7a7a96;
+    color: #9494b0;
   }
   .glossary-cat-count {
-    font-size: 9px; color: #3a3a55; margin-left: auto; font-variant-numeric: tabular-nums;
+    font-size: 9px; color: #8a8aa8; margin-left: auto; font-variant-numeric: tabular-nums;
   }
   .glossary-mode-toggle {
     display: flex; background: #16162a; border: 1px solid #2a2a44; border-radius: 4px;
@@ -372,7 +372,7 @@
   }
   .glossary-mode-btn {
     padding: 4px 8px; font-size: 10px; background: none; border: none;
-    color: #7a7a96; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    color: #9494b0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }
   .glossary-mode-btn.active { background: #2a2a44; color: #b0b0cc; }
   .glossary-mode-btn:hover:not(.active) { color: #8888aa; }
@@ -386,7 +386,7 @@
   .glossary-accent { width: 3px; height: 28px; border-radius: 2px; flex-shrink: 0; }
   .glossary-entry-info { flex: 1; min-width: 0; }
   .glossary-entry-name { font-size: 13px; font-weight: 600; color: #c8c8e0; }
-  .glossary-entry-cat { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #7a7a96; margin-left: 8px; }
+  .glossary-entry-cat { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #9494b0; margin-left: 8px; }
   .glossary-entry-short { font-size: 11px; color: #7a7a98; margin-top: 2px; }
   .glossary-entry-long {
     max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
@@ -405,7 +405,7 @@
   .glossary-img-thumb { cursor: pointer; }
   .glossary-img-thumb:hover .glossary-img { border-color: #4a6a8a; }
   .glossary-img-caption { font-size: 10px; color: #8898b8; margin-top: 3px; line-height: 1.3; }
-  .glossary-img-credit { font-size: 9px; color: #5a5a78; font-style: italic; }
+  .glossary-img-credit { font-size: 9px; color: #9292b0; font-style: italic; }
   .img-lightbox {
     position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.88);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -419,7 +419,7 @@
     margin-top: 10px; font-size: 13px; color: #b8c8e0; text-align: center;
   }
   .img-lightbox-credit {
-    font-size: 11px; color: #6a7a98; font-style: italic; margin-top: 2px;
+    font-size: 11px; color: #8b9bc0; font-style: italic; margin-top: 2px;
   }
   .glossary-goto {
     display: inline-flex; align-items: center; justify-content: center;
@@ -435,7 +435,7 @@
   .effects-toggle {
     position: fixed; bottom: 16px; left: 16px; z-index: 12;
     width: 32px; height: 32px; border-radius: 6px; border: 1px solid #2a2a44;
-    background: #12121ecc; color: #7a7a96; font-size: 16px; cursor: pointer;
+    background: #12121ecc; color: #9494b0; font-size: 16px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.2s; backdrop-filter: blur(8px);
   }
@@ -454,9 +454,9 @@
   .effects-panel .slider-row span { font-size: 11px; color: #9898b0; white-space: nowrap; }
   .effects-panel input[type="range"] { width: 100px; accent-color: #4a6a9a; }
 
-  .scale-bar { position: fixed; bottom: 16px; right: 16px; z-index: 10; font-size: 11px; color: #7a7a96; pointer-events: none; text-align: right; }
-  .scale-bar-line { width: 120px; height: 2px; background: #3a3a55; margin-bottom: 4px; position: relative; margin-left: auto; }
-  .scale-bar-line::before, .scale-bar-line::after { content: ''; position: absolute; width: 2px; height: 8px; background: #3a3a55; top: -3px; }
+  .scale-bar { position: fixed; bottom: 16px; right: 16px; z-index: 10; font-size: 11px; color: #9494b0; pointer-events: none; text-align: right; }
+  .scale-bar-line { width: 120px; height: 2px; background: #62628a; margin-bottom: 4px; position: relative; margin-left: auto; }
+  .scale-bar-line::before, .scale-bar-line::after { content: ''; position: absolute; width: 2px; height: 8px; background: #62628a; top: -3px; }
   .scale-bar-line::before { left: 0; }
   .scale-bar-line::after { right: 0; }
 
@@ -465,7 +465,7 @@
     display: flex; align-items: center; gap: 12px;
     background: #12121ecc; padding: 8px 16px; border-radius: 8px; border: 1px solid #1e1e30; backdrop-filter: blur(8px);
   }
-  .zoom-control label { font-size: 11px; color: #7a7a96; white-space: nowrap; }
+  .zoom-control label { font-size: 11px; color: #9494b0; white-space: nowrap; }
   .zoom-control input[type="range"] { width: 300px; accent-color: #4a6a9a; }
   .zoom-value { font-size: 11px; color: #9898b0; font-family: 'SF Mono', Menlo, monospace; min-width: 80px; text-align: right; }
 
@@ -483,6 +483,18 @@
   .recenter-btn:hover { background: rgba(26, 30, 18, 0.95); border-color: #5a7a3a; color: #eedd66; }
   .recenter-btn .sun-icon { font-size: 16px; line-height: 1; }
   .recenter-btn.visible { display: flex; }
+
+  /* JS-built menu items are real <button>s for keyboard/SR access */
+  button.scene-item, button.slot-option {
+    display: block; width: 100%; text-align: left;
+    background: none; border: none; border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-family: inherit; cursor: pointer;
+  }
+  button.slot-option { border-bottom: none; }
+  button.glossary-cat-label {
+    width: 100%; text-align: left; background: none; border: none;
+    font-family: inherit;
+  }
 
   @media (max-width: 700px) {
     .zoom-control input[type="range"] { width: 150px; }
@@ -517,12 +529,12 @@
 <div class="cam3d-presets" id="cam3d-presets" style="display:none"></div>
 
 <div class="feedback-overlay" id="feedback-overlay"></div>
-<div class="feedback-popover" id="feedback-popover">
-  <h3>&#x2709; Send Feedback</h3>
+<div class="feedback-popover" id="feedback-popover" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+  <h3 id="fb-title">&#x2709; Send Feedback</h3>
   <label for="fb-name">Name (optional)</label>
-  <input type="text" id="fb-name" placeholder="Your name" autocomplete="off">
+  <input type="text" id="fb-name" placeholder="Your name" autocomplete="name">
   <label for="fb-contact">Email or contact info (optional, if you'd like a reply)</label>
-  <input type="text" id="fb-contact" placeholder="email@example.com" autocomplete="off">
+  <input type="text" id="fb-contact" placeholder="email@example.com" autocomplete="email">
   <label for="fb-msg">Message</label>
   <textarea id="fb-msg" placeholder="What did you think? Ideas, bugs, suggestions..."></textarea>
   <div class="feedback-actions">
@@ -533,7 +545,7 @@
 </div>
 
 <main class="main-area" id="main-area">
-  <canvas id="canvas" tabindex="0" role="application" aria-label="Interactive cosmic distance visualization showing celestial objects from the Solar System to the Great Attractor. Use scroll to zoom, click objects for details, and keyboard shortcuts 1-6 for zoom presets.">
+  <canvas id="canvas" tabindex="0" role="application" aria-label="Interactive cosmic distance visualization showing celestial objects from the Solar System to the Great Attractor. Use scroll to zoom, click objects for details, keys 1-6 for zoom presets, bracket keys [ and ] to cycle through visible objects, and G for the glossary.">
     <p>Interactive visualization of cosmic distances from Earth to the Great Attractor. Your browser does not support the canvas element.</p>
   </canvas>
 
@@ -545,7 +557,7 @@
     <div class="glossary-search">
       <div class="glossary-search-row">
         <div class="glossary-search-wrap" style="flex:1">
-          <input type="text" class="glossary-search-input" id="glossary-search-input" placeholder="Filter glossary...">
+          <input type="text" class="glossary-search-input" id="glossary-search-input" placeholder="Filter glossary..." aria-label="Filter glossary">
           <button class="glossary-search-clear" id="glossary-search-clear" aria-label="Clear search">&times;</button>
         </div>
         <div class="glossary-mode-toggle" id="glossary-mode-toggle">
@@ -627,14 +639,14 @@
 
 <div class="scale-bar">
   <div class="scale-bar-line"></div>
-  <span id="scale-label" aria-live="polite"></span>
+  <span id="scale-label"></span>
   <div id="scale-time" style="font-size:10px;color:#8a8aa4;margin-top:2px"></div>
 </div>
 
 <div class="zoom-control">
   <label for="zoom-slider">Zoom</label>
   <input type="range" id="zoom-slider" min="0" max="1000" value="0">
-  <span class="zoom-value" id="zoom-label" aria-live="polite"></span>
+  <span class="zoom-value" id="zoom-label"></span>
 </div>
 
 <div class="hint" id="hint">Scroll to zoom | Click objects for info | Keys 1-6 for presets | [ ] select objects | T tours | S scenes | H home | G glossary</div>
